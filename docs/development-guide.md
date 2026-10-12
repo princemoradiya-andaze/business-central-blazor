@@ -13,17 +13,40 @@ dotnet run --project src/BusinessCentralBlazor.Web
 
 SQL Server is not required for a build, but the initial schema has been migrated and verified against local SQL Server Express. For database work, restore the local EF tool, set `ConnectionStrings__ErpDatabase` in the current shell, and follow [the schema migration instructions](schema/initial-schema.md). CI checks that the EF model has no unapplied model changes after the migration. Do not add local connection strings containing credentials to tracked files.
 
+## Identity and administrator-managed accounts
+
+The web app requires `ConnectionStrings__ErpDatabase` to use Identity-backed routes. Apply the existing migrations before bootstrapping an account. Public self-registration is intentionally disabled. The local administrator tool creates the first administrator exactly once; subsequent accounts are created by an operator using the same trusted local tool. Protect local access to the database and shell accordingly.
+
+```powershell
+$env:ConnectionStrings__ErpDatabase = 'Server=.\BCDEMO;Database=BusinessCentralBlazor_Phase0;Trusted_Connection=True;TrustServerCertificate=True'
+dotnet ef database update --project src\BusinessCentralBlazor.Infrastructure --startup-project src\BusinessCentralBlazor.Web
+$env:BC_ADMIN_EMAIL = Read-Host 'Administrator email'
+$env:BC_ADMIN_DISPLAY_NAME = Read-Host 'Administrator display name'
+$securePassword = Read-Host 'Administrator password' -AsSecureString
+$passwordPointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($securePassword)
+try {
+    $env:BC_ADMIN_PASSWORD = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($passwordPointer)
+    dotnet run --project tools\BusinessCentralBlazor.AdminTool -- bootstrap-admin
+} finally {
+    [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($passwordPointer)
+    Remove-Item Env:BC_ADMIN_PASSWORD -ErrorAction SilentlyContinue
+}
+Remove-Item Env:BC_ADMIN_EMAIL, Env:BC_ADMIN_DISPLAY_NAME -ErrorAction SilentlyContinue
+```
+
+For each later account, set `BC_USER_EMAIL`, `BC_USER_DISPLAY_NAME`, and `BC_USER_PASSWORD` in the current process, then run `dotnet run --project tools\BusinessCentralBlazor.AdminTool -- create-user`. The tool assigns the standard `User` role and refuses to run until an administrator exists. Use a unique password of at least 12 characters with uppercase, lowercase, digit, and non-alphanumeric characters; Identity locks accounts for 15 minutes after five failed sign-in attempts. The tool never accepts passwords as command-line arguments or prints them. Environment variables are still visible to the process and its child processes, so remove them immediately after use and do not persist them in shell profiles or repository files.
+
 ## Branch and review workflow
 
 - `main` is production-ready; `dev` is the integration branch.
 - Create short-lived feature/fix branches from `dev`; open pull requests into `dev`.
 - Verify merged `dev` locally against SQL Server, then promote a tested release from `dev` to `main` through a pull request and verify `main` locally.
-- Require the configured CI check to pass before merging; follow repository PR protections.
+- Require the configured CI check to pass before merging; ask the user for explicit approval before merging every feature or release PR.
 - Do not force-push or commit secrets. Hosted deployment is not part of the current workflow.
-- Create one GitHub issue per bounded task, then create `feature/#<issue-number>-<short-description>` or `fix/#<issue-number>-<short-description>` from `dev`. Link the issue in its PR and keep it open until local checks, merged `dev` verification, and applicable `main` verification are complete.
+- Create one GitHub issue per bounded task, then create `feature/<issue-number>-<short-description>` or `fix/<issue-number>-<short-description>` from `dev`. Link the issue in its PR and keep it open until local checks, merged `dev` verification, and applicable `main` verification are complete.
 
 The `dev` branch was created from `main`. The repository is public by the user's choice. Both `main` and `dev` require PRs and the `build-and-test` status check, with strict up-to-date checks and administrator enforcement; zero approving reviews are configured, as requested. Direct force-pushes and deletion are disabled. Do not change repository visibility without authorization.
 
 ## CI/CD
 
-`.github/workflows/ci.yml` restores, builds, and tests the solution for `main`, `dev`, and pull requests targeting those branches. CI has passed for earlier `dev` integrations; the current schema-alignment changes still need their PR checks. The agreed workflow uses local SQL Server Express and does not include hosted dev or production deployment. See [the project playbook](project-playbook.md) for phase gates and dated history.
+`.github/workflows/ci.yml` restores, builds, and tests the solution for `main`, `dev`, and pull requests targeting those branches. Confirm each required check has completed successfully before asking for merge approval. The agreed workflow uses local SQL Server Express and does not include hosted dev or production deployment. See [the project playbook](project-playbook.md) for phase gates and dated history.

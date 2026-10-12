@@ -20,13 +20,17 @@ Only mark tasks complete when their acceptance criteria have been verified.
 - [x] Run restore/build/tests, EF migration drift, SQL smoke, dependency, app HTTP, and secret/artifact checks on the initial schema branch.
 - [x] Merge the independently designed schema branch through a PR into `dev`; verify merged restore/build/tests, migration drift, and SQL smoke test locally and in CI.
 - [x] Merge the schema-alignment update through a PR into `dev`, then repeat migration, SQL smoke-test, build/test, and app-startup verification locally on the merged `dev` code.
-- [ ] After local `dev` verification, promote Phase 0 to `main` through a release PR; verify CI and repeat the applicable local checks on `main` before closing the issue.
+- [x] After local `dev` verification, promote Phase 0 to `main` through a release PR; verify CI and repeat the applicable local checks on `main`.
 
 ## Phase 1 — Foundation framework
 
-- [ ] Implement ASP.NET Core Identity authentication and authorization.
-- [ ] Enforce tenant/company membership boundaries.
-- [ ] Build the application shell and reusable page/CRUD framework.
+- [ ] Phase tracker: [#10](https://github.com/princemoradiya-andaze/business-central-blazor/issues/10) — complete all four scoped issues below, then verify on `dev` and release to `main`.
+- [ ] [#11](https://github.com/princemoradiya-andaze/business-central-blazor/issues/11) — ASP.NET Core Identity sign-in/out and administrator-managed accounts; no public self-registration.
+- [ ] [#13](https://github.com/princemoradiya-andaze/business-central-blazor/issues/13) — tenant/company memberships and validated active-company context.
+- [ ] [#14](https://github.com/princemoradiya-andaze/business-central-blazor/issues/14) — authorization policies and cross-tenant/company data isolation.
+- [ ] [#12](https://github.com/princemoradiya-andaze/business-central-blazor/issues/12) — authenticated application shell, navigation, and reusable CRUD foundation.
+
+**Merge gate:** Ask the user for explicit approval before merging every PR, even when all CI checks pass.
 
 ## Later phases
 
@@ -36,4 +40,4 @@ Only mark tasks complete when their acceptance criteria have been verified.
 
 ## Current next step
 
-The user authorized read-only inspection of selected metadata from the local Business Central 28.4 source archive, and the schema was revised to align key journal, account, and accounting-period concepts without copying Microsoft implementation code. The alignment migration is merged into `dev` and verified locally against `BusinessCentralBlazor_Phase0`; hosted deployment is not part of the agreed workflow. Keep Phase 0 open until the later `main` PR/CI/local check is complete.
+Phase 0 is complete on `main`. Phase 1 is tracked by issue #10 and four implementation issues (#11–#14). Authentication uses administrator-managed users with no public self-registration; the user selected a one-time CLI bootstrap with credentials supplied through environment variables. Issue #11 is in progress on its issue branch. Ask the user before merging this or any later PR. Hosted deployment is not part of the agreed workflow.

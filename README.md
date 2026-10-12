@@ -4,7 +4,7 @@ An independently implemented, modular-monolith ERP application using Blazor Serv
 
 ## Status
 
-The repository is at the Phase 0 foundation stage. The EF Core/Identity schema and selected Business Central concept alignment are merged into `dev` and verified locally against SQL Server Express. Login/authorization wiring, posting services, business modules, and hosted deployment are not part of the current foundation. Release to `main` through a pull request and local verification remain before Phase 0 is complete.
+Phase 0 is complete on `main`. Phase 1 authentication work is in progress on an issue branch: users sign in with administrator-provisioned accounts; public self-registration is disabled. Company membership enforcement and reusable business screens remain future Phase 1 work. Hosted deployment is not part of the current workflow.
 
 ## Prerequisites
 
@@ -20,7 +20,7 @@ dotnet test BusinessCentralBlazor.sln --no-build
 dotnet run --project src/BusinessCentralBlazor.Web
 ```
 
-For the local SQL Server migration, restore the repository-local EF tool and follow the [schema migration instructions](docs/schema/initial-schema.md). Never commit local connection strings containing credentials.
+Set `ConnectionStrings__ErpDatabase` in the current PowerShell session before running the app or EF tools. For the local SQL Server migration, restore the repository-local EF tool and follow the [schema migration instructions](docs/schema/initial-schema.md). Never commit connection strings containing credentials.
 
 ## Architecture
 
