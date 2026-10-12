@@ -2,6 +2,7 @@ using BusinessCentralBlazor.Infrastructure.Identity;
 using BusinessCentralBlazor.Infrastructure.Persistence;
 using BusinessCentralBlazor.Domain.Entities;
 using BusinessCentralBlazor.Web.Services;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -31,6 +32,7 @@ public sealed class AuthenticationWebApplicationFactory : WebApplicationFactory<
             services.RemoveAll<DbContextOptions<ErpDbContext>>();
             services.RemoveAll<ErpDbContext>();
             services.AddDbContext<ErpDbContext>(options => options.UseInMemoryDatabase(databaseName));
+            services.AddTransient<IStartupFilter, CompanyAuthorizationTestApiStartupFilter>();
         });
     }
 

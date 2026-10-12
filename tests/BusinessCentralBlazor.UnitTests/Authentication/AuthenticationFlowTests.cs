@@ -65,6 +65,11 @@ public sealed class AuthenticationFlowTests(AuthenticationWebApplicationFactory 
         Assert.DoesNotContain("Register", await login.Content.ReadAsStringAsync(), StringComparison.OrdinalIgnoreCase);
 
         await SignInAsync(client);
+        var company = await factory.AddCompanyMembershipAsync(
+            TestEmail,
+            $"REG-{Guid.NewGuid():N}",
+            "Registration-route test company");
+        await SelectCompanyAsync(client, company.CompanyId);
         var registration = await client.GetAsync("/account/register");
 
         Assert.Equal(HttpStatusCode.NotFound, registration.StatusCode);
@@ -95,6 +100,11 @@ public sealed class AuthenticationFlowTests(AuthenticationWebApplicationFactory 
         });
 
         var response = await SignInAsync(client);
+        var company = await factory.AddCompanyMembershipAsync(
+            TestEmail,
+            $"AUTH-{Guid.NewGuid():N}",
+            "Authentication-flow test company");
+        await SelectCompanyAsync(client, company.CompanyId);
 
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
         Assert.Equal("/", response.Headers.Location?.OriginalString);
@@ -160,6 +170,20 @@ public sealed class AuthenticationFlowTests(AuthenticationWebApplicationFactory 
                 ["Input.Password"] = TestPassword,
                 ["Input.RememberMe"] = "false"
             }));
+    }
+
+    private static async Task SelectCompanyAsync(HttpClient client, Guid companyId)
+    {
+        var page = await client.GetAsync("/account/company");
+        var token = GetAntiforgeryToken(await page.Content.ReadAsStringAsync());
+        using var response = await client.PostAsync(
+            "/account/company",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = token,
+                ["SelectedCompanyId"] = companyId.ToString()
+            }));
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
     }
 
     private static async Task<string> SubmitLoginAsync(HttpClient client, string email, string password)
