@@ -46,6 +46,7 @@ builder.Services.AddScoped<IGeneralJournalService, GeneralJournalService>();
 builder.Services.AddScoped<ITaxSetupService, TaxSetupService>();
 builder.Services.AddScoped<IGeneralLedgerInquiryService, GeneralLedgerInquiryService>();
 builder.Services.AddScoped<IBankService, BankService>();
+builder.Services.AddScoped<ICompanySettingsService, CompanySettingsService>();
 builder.Services.AddRazorPages();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();

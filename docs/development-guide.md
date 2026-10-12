@@ -64,6 +64,13 @@ The authenticated financial menu links to company-scoped posted entries at `/fin
 
 These reports read immutable `GeneralLedgerEntries` only. Account and active-company scope is resolved server-side for every operation; posted entries cannot be edited or deleted through inquiry screens. This feature reuses the existing schema and requires no migration.
 
+## Company base currency
+
+`/financial/company-settings` configures the active company's base currency and can add entries to
+the shared currency catalogue (visible to all companies). The base currency is required before
+bank-account setup; changing it is blocked after the company has journal lines, bank accounts,
+posted ledger activity, or currency rates.
+
 ## Bank accounts, receipts/payments, and manual reconciliation
 
 `/financial/banks` provides company-scoped bank/cash setup; each bank uses one dedicated, unblocked,
