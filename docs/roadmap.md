@@ -11,16 +11,16 @@ Only mark tasks complete when their acceptance criteria have been verified.
 - [x] Document the issue/branch/PR lifecycle and dated project change history in `docs/project-playbook.md`.
 - [x] Create `dev` from `main`; merge the initial foundation through a PR and verify local dev-branch build/tests and GitHub CI.
 - [x] Require PRs and passing strict `build-and-test` checks on `main` and `dev`; disable administrator bypass, force-push, and branch deletion.
-- [ ] Verify applicable on-premises artifact source-use terms and user entitlement before inspecting or extracting AL source.
-- [ ] Catalogue selected source metadata with provenance and identify version/coverage gaps.
-- [x] Design and document the initial independent application schema, relationships, posting invariants, and ER diagram.
+- [x] Obtain the user's explicit permission to inspect selected local AL metadata; review only relevant definitions read-only and leave all source archives unchanged.
+- [x] Catalogue selected foundational metadata with artifact/version provenance and record scope and coverage gaps.
+- [x] Design and document the application-owned schema, including selected Business Central-aligned concepts, relationships, posting invariants, and ER diagram.
 - [x] Implement initial EF Core/Identity entities and SQL Server migration; apply to a new local development database.
 - [x] Verify model mappings, SQL constraints/indexes, migration history, and dependency vulnerability status.
 - [x] Run the SQL persistence/constraint smoke test; verify all test rows roll back.
-- [x] Re-run final local restore/build/tests, EF migration drift check, SQL smoke test, dependency audit, app HTTP smoke test, and secret/artifact exclusion on this issue branch.
+- [x] Run restore/build/tests, EF migration drift, SQL smoke, dependency, app HTTP, and secret/artifact checks on the initial schema branch.
 - [x] Merge the independently designed schema branch through a PR into `dev`; verify merged restore/build/tests, migration drift, and SQL smoke test locally and in CI.
-- [ ] Verify Phase 0 in an available hosted dev environment.
-- [ ] Promote the completed, metadata-reviewed Phase 0 release to `main` through an approved release PR and verify production/main before closing the issue.
+- [ ] Merge the schema-alignment update through a PR into `dev`, then repeat migration, SQL smoke-test, build/test, and app-startup verification locally on the merged `dev` code.
+- [ ] After local `dev` verification, promote Phase 0 to `main` through a release PR; verify CI and repeat the applicable local checks on `main` before closing the issue.
 
 ## Phase 1 — Foundation framework
 
@@ -36,4 +36,4 @@ Only mark tasks complete when their acceptance criteria have been verified.
 
 ## Current next step
 
-Verify applicable on-premises license terms and entitlement for the locally available Business Central 28.4 artifacts before inspecting AL source. The independent schema and initial SQL Server migration are implemented and verified locally/in CI on `dev`; next unblock permitted metadata discovery and identify/provision hosted dev and production release environments. Keep the Phase 0 issue open and do not promote it to `main` until these gates are verified.
+The user authorized read-only inspection of selected metadata from the local Business Central 28.4 source archive, and the schema was revised to align key journal, account, and accounting-period concepts without copying Microsoft implementation code. The new alignment migration still needs to reach `dev` and be verified locally against `BusinessCentralBlazor_Phase0`; hosted deployment is not part of the agreed workflow. Keep Phase 0 open until that local verification and the later `main` PR/CI/local check are complete.

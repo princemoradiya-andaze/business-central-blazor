@@ -66,10 +66,11 @@ public sealed class AccountingPeriod
 {
     public Guid Id { get; set; }
     public Guid CompanyId { get; set; }
-    public string Code { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
     public DateOnly StartsOn { get; set; }
     public DateOnly EndsOn { get; set; }
-    public AccountingPeriodStatus Status { get; set; }
+    public bool IsClosed { get; set; }
+    public bool DateLocked { get; set; }
 }
 
 public sealed class GeneralLedgerAccount
@@ -78,6 +79,7 @@ public sealed class GeneralLedgerAccount
     public Guid CompanyId { get; set; }
     public string Number { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
+    public AccountCategory Category { get; set; }
     public AccountType Type { get; set; }
     public Guid? ParentAccountId { get; set; }
     public bool AllowsDirectPosting { get; set; } = true;
@@ -106,8 +108,10 @@ public sealed class GeneralJournalBatch
 {
     public Guid Id { get; set; }
     public Guid CompanyId { get; set; }
-    public Guid AccountingPeriodId { get; set; }
-    public string Number { get; set; } = string.Empty;
+    public Guid JournalTemplateId { get; set; }
+    public Guid DefaultAccountingPeriodId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
     public JournalBatchStatus Status { get; set; }
     public DateTimeOffset CreatedAtUtc { get; set; }
     public DateTimeOffset? PostedAtUtc { get; set; }
@@ -115,11 +119,21 @@ public sealed class GeneralJournalBatch
     public byte[] RowVersion { get; set; } = [];
 }
 
+public sealed class GeneralJournalTemplate
+{
+    public Guid Id { get; set; }
+    public Guid CompanyId { get; set; }
+    public string Code { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public JournalTemplateType Type { get; set; }
+}
+
 public sealed class GeneralJournalLine
 {
     public Guid Id { get; set; }
     public Guid CompanyId { get; set; }
     public Guid JournalBatchId { get; set; }
+    public Guid AccountingPeriodId { get; set; }
     public Guid AccountId { get; set; }
     public int LineNumber { get; set; }
     public DateOnly PostingDate { get; set; }

@@ -28,28 +28,29 @@ namespace BusinessCentralBlazor.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<string>("Code")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("nvarchar(32)");
-
                     b.Property<Guid>("CompanyId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("DateLocked")
+                        .HasColumnType("bit");
 
                     b.Property<DateOnly>("EndsOn")
                         .HasColumnType("date");
 
+                    b.Property<bool>("IsClosed")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
                     b.Property<DateOnly>("StartsOn")
                         .HasColumnType("date");
 
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("nvarchar(16)");
-
                     b.HasKey("Id");
 
-                    b.HasIndex("CompanyId", "Code")
+                    b.HasIndex("CompanyId", "StartsOn")
                         .IsUnique();
 
                     b.ToTable("AccountingPeriods", t =>
@@ -358,16 +359,24 @@ namespace BusinessCentralBlazor.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<Guid>("AccountingPeriodId")
-                        .HasColumnType("uniqueidentifier");
-
                     b.Property<Guid>("CompanyId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("datetimeoffset");
 
-                    b.Property<string>("Number")
+                    b.Property<Guid>("DefaultAccountingPeriodId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid>("JournalTemplateId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(32)
                         .HasColumnType("nvarchar(32)");
@@ -393,9 +402,9 @@ namespace BusinessCentralBlazor.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("PostedByUserId");
 
-                    b.HasIndex("CompanyId", "AccountingPeriodId");
+                    b.HasIndex("CompanyId", "DefaultAccountingPeriodId");
 
-                    b.HasIndex("CompanyId", "Number")
+                    b.HasIndex("CompanyId", "JournalTemplateId", "Name")
                         .IsUnique();
 
                     b.ToTable("GeneralJournalBatches");
@@ -408,6 +417,9 @@ namespace BusinessCentralBlazor.Infrastructure.Persistence.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<Guid>("AccountId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("AccountingPeriodId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<Guid>("CompanyId")
@@ -457,6 +469,8 @@ namespace BusinessCentralBlazor.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("CompanyId", "AccountId");
 
+                    b.HasIndex("CompanyId", "AccountingPeriodId");
+
                     b.HasIndex("CompanyId", "JournalBatchId", "LineNumber")
                         .IsUnique();
 
@@ -472,6 +486,38 @@ namespace BusinessCentralBlazor.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("BusinessCentralBlazor.Domain.Entities.GeneralJournalTemplate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId", "Code")
+                        .IsUnique();
+
+                    b.ToTable("GeneralJournalTemplates");
+                });
+
             modelBuilder.Entity("BusinessCentralBlazor.Domain.Entities.GeneralLedgerAccount", b =>
                 {
                     b.Property<Guid>("Id")
@@ -480,6 +526,11 @@ namespace BusinessCentralBlazor.Infrastructure.Persistence.Migrations
 
                     b.Property<bool>("AllowsDirectPosting")
                         .HasColumnType("bit");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
 
                     b.Property<Guid>("CompanyId")
                         .HasColumnType("uniqueidentifier");
@@ -1132,7 +1183,14 @@ namespace BusinessCentralBlazor.Infrastructure.Persistence.Migrations
 
                     b.HasOne("BusinessCentralBlazor.Domain.Entities.AccountingPeriod", null)
                         .WithMany()
-                        .HasForeignKey("CompanyId", "AccountingPeriodId")
+                        .HasForeignKey("CompanyId", "DefaultAccountingPeriodId")
+                        .HasPrincipalKey("CompanyId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("BusinessCentralBlazor.Domain.Entities.GeneralJournalTemplate", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId", "JournalTemplateId")
                         .HasPrincipalKey("CompanyId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
@@ -1158,10 +1216,26 @@ namespace BusinessCentralBlazor.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("BusinessCentralBlazor.Domain.Entities.AccountingPeriod", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId", "AccountingPeriodId")
+                        .HasPrincipalKey("CompanyId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("BusinessCentralBlazor.Domain.Entities.GeneralJournalBatch", null)
                         .WithMany()
                         .HasForeignKey("CompanyId", "JournalBatchId")
                         .HasPrincipalKey("CompanyId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BusinessCentralBlazor.Domain.Entities.GeneralJournalTemplate", b =>
+                {
+                    b.HasOne("BusinessCentralBlazor.Domain.Entities.Company", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

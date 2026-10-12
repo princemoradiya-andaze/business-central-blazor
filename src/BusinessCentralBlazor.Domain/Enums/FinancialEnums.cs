@@ -1,12 +1,6 @@
 namespace BusinessCentralBlazor.Domain.Enums;
 
-public enum AccountingPeriodStatus
-{
-    Open,
-    Closed
-}
-
-public enum AccountType
+public enum AccountCategory
 {
     Asset,
     Liability,
@@ -15,10 +9,29 @@ public enum AccountType
     Expense
 }
 
+public enum AccountType
+{
+    Posting,
+    Heading,
+    Total,
+    BeginTotal,
+    EndTotal
+}
+
 public enum JournalBatchStatus
 {
     Open,
     Posted
+}
+
+public enum JournalTemplateType
+{
+    General,
+    Sales,
+    Purchases,
+    CashReceipts,
+    Payments,
+    Assets
 }
 
 public enum ItemType

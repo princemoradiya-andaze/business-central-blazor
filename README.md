@@ -4,7 +4,7 @@ An independently implemented, modular-monolith ERP application using Blazor Serv
 
 ## Status
 
-The repository is at the Phase 0 foundation stage. The .NET solution, initial EF Core/Identity schema, SQL Server migration, and local database verification are in place. Login/authorization wiring, posting services, business modules, and deployment pipelines have not been implemented.
+The repository is at the Phase 0 foundation stage. The initial EF Core/Identity schema is on `dev` and has been verified locally. A follow-up schema alignment to selected Business Central concepts is being prepared on a feature branch; its migration and local database checks are still pending. Login/authorization wiring, posting services, business modules, and hosted deployment are not part of the current foundation.
 
 ## Prerequisites
 
