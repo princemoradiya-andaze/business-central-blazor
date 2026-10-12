@@ -19,7 +19,7 @@ Only mark tasks complete when their acceptance criteria have been verified.
 - [x] Run the SQL persistence/constraint smoke test; verify all test rows roll back.
 - [x] Run restore/build/tests, EF migration drift, SQL smoke, dependency, app HTTP, and secret/artifact checks on the initial schema branch.
 - [x] Merge the independently designed schema branch through a PR into `dev`; verify merged restore/build/tests, migration drift, and SQL smoke test locally and in CI.
-- [ ] Merge the schema-alignment update through a PR into `dev`, then repeat migration, SQL smoke-test, build/test, and app-startup verification locally on the merged `dev` code.
+- [x] Merge the schema-alignment update through a PR into `dev`, then repeat migration, SQL smoke-test, build/test, and app-startup verification locally on the merged `dev` code.
 - [ ] After local `dev` verification, promote Phase 0 to `main` through a release PR; verify CI and repeat the applicable local checks on `main` before closing the issue.
 
 ## Phase 1 — Foundation framework
@@ -36,4 +36,4 @@ Only mark tasks complete when their acceptance criteria have been verified.
 
 ## Current next step
 
-The user authorized read-only inspection of selected metadata from the local Business Central 28.4 source archive, and the schema was revised to align key journal, account, and accounting-period concepts without copying Microsoft implementation code. The new alignment migration still needs to reach `dev` and be verified locally against `BusinessCentralBlazor_Phase0`; hosted deployment is not part of the agreed workflow. Keep Phase 0 open until that local verification and the later `main` PR/CI/local check are complete.
+The user authorized read-only inspection of selected metadata from the local Business Central 28.4 source archive, and the schema was revised to align key journal, account, and accounting-period concepts without copying Microsoft implementation code. The alignment migration is merged into `dev` and verified locally against `BusinessCentralBlazor_Phase0`; hosted deployment is not part of the agreed workflow. Keep Phase 0 open until the later `main` PR/CI/local check is complete.
