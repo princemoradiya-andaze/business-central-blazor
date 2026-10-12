@@ -2,6 +2,10 @@
 
 <!-- Describe the change and why it is needed. -->
 
+## Related issue
+
+<!-- Link the issue, for example #42. Feature PRs target dev; close the issue after the approved merge and acceptance checks. Do not merge without explicit user approval. -->
+
 ## Verification
 
 - [ ] `dotnet build BusinessCentralBlazor.sln --no-restore`
