@@ -23,6 +23,13 @@
                     {
                         <option value="@account.Id">@account.Number — @account.Name</option>
                     }
+                    @if (SelectedTaxCode is { } taxCode &&
+                         !Accounts.Any(account => account.Id == GetMappedTaxAccountId(taxCode)))
+                    {
+                        <option value="@GetMappedTaxAccountId(taxCode)" disabled>
+                            Configured tax account is not available for posting
+                        </option>
+                    }
                 </InputSelect>
             </div>
             <div class="col-md-4">
@@ -53,13 +60,58 @@
             <div class="col-md-6">
                 <label class="form-label" for="journal-line-debit">Debit</label>
                 <InputNumber id="journal-line-debit" class="form-control" min="0" step="0.0001"
-                             @bind-Value="Model.DebitAmount" />
+                             @bind-Value="Model.DebitAmount" @bind-Value:after="TaxSideChanged" />
             </div>
             <div class="col-md-6">
                 <label class="form-label" for="journal-line-credit">Credit</label>
                 <InputNumber id="journal-line-credit" class="form-control" min="0" step="0.0001"
-                             @bind-Value="Model.CreditAmount" />
+                             @bind-Value="Model.CreditAmount" @bind-Value:after="TaxSideChanged" />
             </div>
+            <div class="col-md-6">
+                <label class="form-label" for="journal-line-tax-code">Tax code (manual tax line)</label>
+                <InputSelect id="journal-line-tax-code" class="form-select" @bind-Value="Model.TaxCodeId"
+                             @bind-Value:after="TaxCodeChanged">
+                    <option value="">No tax code</option>
+                    @foreach (var taxCode in TaxCodes)
+                    {
+                        <option value="@taxCode.Id">@taxCode.Code — @taxCode.Description</option>
+                    }
+                </InputSelect>
+            </div>
+            @if (SelectedTaxCode is not null)
+            {
+                <div class="col-md-6">
+                    <label class="form-label" for="journal-line-tax-base">Taxable base</label>
+                    <InputNumber id="journal-line-tax-base" class="form-control" min="0.0001" step="0.0001"
+                                 @bind-Value="Model.TaxBaseAmount" />
+                    <div class="form-text">
+                        Enter the taxable base. This line must post the calculated tax amount to the configured
+                        @(Model.DebitAmount > 0 ? "recoverable" : "liability") account.
+                    </div>
+                </div>
+                @if (GetEffectiveTaxRate(SelectedTaxCode) is { } effectiveRate)
+                {
+                    <div class="col-12">
+                        <p class="form-text">
+                            Effective rate: @effectiveRate.RatePercent.ToString("0.####")%.
+                            @if (GetExpectedTaxAmount(effectiveRate) is { } expectedTaxAmount)
+                            {
+                                <span>Calculated tax amount: @expectedTaxAmount.ToString("0.0000").</span>
+                            }
+                            else
+                            {
+                                <span>Enter a valid taxable base to calculate the tax amount.</span>
+                            }
+                        </p>
+                    </div>
+                }
+                else if (GetEffectiveTaxRate(SelectedTaxCode) is null)
+                {
+                    <div class="col-12">
+                        <p class="text-danger mb-0">No rate for this tax code is effective on the posting date.</p>
+                    </div>
+                }
+            }
         </div>
 
         <div class="mt-4">
@@ -139,6 +191,9 @@
     public IReadOnlyList<GeneralJournalAccountOption> Accounts { get; set; } = [];
 
     [Parameter, EditorRequired]
+    public IReadOnlyList<GeneralJournalTaxCodeOption> TaxCodes { get; set; } = [];
+
+    [Parameter, EditorRequired]
     public IReadOnlyList<JournalDimensionOption> Dimensions { get; set; } = [];
 
     [Parameter, EditorRequired]
@@ -154,6 +209,61 @@
     public string? ErrorMessage { get; set; }
 
     private IReadOnlyList<JournalDimensionOption> AvailableDimensions => Dimensions;
+    private GeneralJournalTaxCodeOption? SelectedTaxCode =>
+        TaxCodes.FirstOrDefault(item => item.Id == Model.TaxCodeId);
+
+    private Guid GetMappedTaxAccountId(GeneralJournalTaxCodeOption taxCode) =>
+        Model.DebitAmount > 0 ? taxCode.RecoverableAccountId : taxCode.LiabilityAccountId;
+
+    private GeneralJournalTaxRateOption? GetEffectiveTaxRate(GeneralJournalTaxCodeOption? taxCode) =>
+        taxCode?.Rates.FirstOrDefault(rate =>
+            rate.StartsOn <= Model.PostingDate &&
+            (rate.EndsOn is null || rate.EndsOn >= Model.PostingDate));
+
+    private decimal? GetExpectedTaxAmount(GeneralJournalTaxRateOption rate)
+    {
+        if (Model.TaxBaseAmount is not { } taxableBase || taxableBase <= 0)
+        {
+            return null;
+        }
+
+        try
+        {
+            return decimal.Round(
+                checked(taxableBase * rate.RatePercent / 100m),
+                4,
+                MidpointRounding.AwayFromZero);
+        }
+        catch (OverflowException)
+        {
+            return null;
+        }
+    }
+
+    private void TaxCodeChanged()
+    {
+        var taxCode = SelectedTaxCode;
+        if (taxCode is not null)
+        {
+            Model.AccountId = GetMappedTaxAccountId(taxCode);
+        }
+        else if (Model.TaxCodeId is null)
+        {
+            Model.TaxBaseAmount = null;
+        }
+    }
+
+    private void TaxSideChanged()
+    {
+        if (Model.TaxCodeId is { } taxCodeId)
+        {
+            var taxCode = TaxCodes.FirstOrDefault(item => item.Id == taxCodeId);
+            if (taxCode is not null)
+            {
+                Model.AccountId = GetMappedTaxAccountId(taxCode);
+            }
+        }
+    }
 
     private IEnumerable<JournalDimensionOption> GetAvailableDimensions(
         JournalDimensionAssignmentInput current) =>

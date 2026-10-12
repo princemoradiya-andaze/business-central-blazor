@@ -30,6 +30,8 @@ public sealed class ErpDbContextModelTests
             "CurrencyRates",
             "AccountingPeriods",
             "GeneralLedgerAccounts",
+            "TaxCodes",
+            "TaxRates",
             "GeneralJournalTemplates",
             "GeneralJournalBatches",
             "GeneralJournalLines",
@@ -133,6 +135,60 @@ public sealed class ErpDbContextModelTests
         Assert.Equal(
             typeof(AccountType),
             account.FindProperty(nameof(GeneralLedgerAccount.Type))!.ClrType);
+    }
+
+    [Fact]
+    public void TaxSetupAndJournalTaxReferencesAreCompanyScopedAndAuditable()
+    {
+        using var context = CreateContext();
+        var model = context.GetService<IDesignTimeModel>().Model;
+        var taxCode = model.FindEntityType(typeof(TaxCode))!;
+        var taxRate = model.FindEntityType(typeof(TaxRate))!;
+        var line = model.FindEntityType(typeof(GeneralJournalLine))!;
+        var entry = model.FindEntityType(typeof(GeneralLedgerEntry))!;
+
+        Assert.Contains(taxCode.GetIndexes(), index =>
+            index.IsUnique &&
+            index.Properties.Select(property => property.Name)
+                .SequenceEqual(["CompanyId", "Code"]));
+        foreach (var accountProperty in new[] { "LiabilityAccountId", "RecoverableAccountId" })
+        {
+            var mapping = Assert.Single(taxCode.GetForeignKeys(), foreignKey =>
+                foreignKey.Properties.Select(property => property.Name)
+                    .SequenceEqual(["CompanyId", accountProperty]));
+            Assert.Equal(
+                ["CompanyId", "Id"],
+                mapping.PrincipalKey.Properties.Select(property => property.Name));
+        }
+        Assert.Contains(taxRate.GetIndexes(), index =>
+            index.IsUnique &&
+            index.Properties.Select(property => property.Name)
+                .SequenceEqual(["CompanyId", "TaxCodeId", "StartsOn"]));
+        var codeForeignKey = Assert.Single(taxRate.GetForeignKeys(), foreignKey =>
+            foreignKey.Properties.Select(property => property.Name)
+                .SequenceEqual(["CompanyId", "TaxCodeId"]));
+        Assert.Equal(
+            ["CompanyId", "Id"],
+            codeForeignKey.PrincipalKey.Properties.Select(property => property.Name));
+        Assert.Contains(taxRate.GetCheckConstraints(), constraint =>
+            constraint.Name == "CK_TaxRates_DateRange");
+        Assert.Contains(taxRate.GetCheckConstraints(), constraint =>
+            constraint.Name == "CK_TaxRates_PositiveRate");
+
+        foreach (var entity in new[] { line, entry })
+        {
+            var taxRateForeignKey = Assert.Single(entity.GetForeignKeys(), foreignKey =>
+                foreignKey.Properties.Select(property => property.Name)
+                    .SequenceEqual(["CompanyId", "TaxCodeId", "TaxRateId"]));
+            Assert.Equal(
+                ["CompanyId", "TaxCodeId", "Id"],
+                taxRateForeignKey.PrincipalKey.Properties.Select(property => property.Name));
+            Assert.Contains(entity.GetCheckConstraints(), constraint =>
+                constraint.Name == "CK_" + entity.GetTableName() + "_TaxDetails");
+            Assert.Equal(
+                4,
+                entity.FindProperty(nameof(GeneralJournalLine.TaxBaseAmount))!.GetScale());
+        }
     }
 
     [Fact]

@@ -25,6 +25,7 @@ else
 {
     <p class="text-body-secondary">Batch: @batch.Name</p>
     <GeneralJournalLineForm Model="@input" BatchId="@BatchId" OpenPeriods="@openPeriods" Accounts="@accounts"
+                            TaxCodes="@taxCodes"
                             Dimensions="@dimensions" SubmitText="Save line" IsSaving="@isSaving"
                             ErrorMessage="@errorMessage" OnValidSubmit="SaveAsync" />
 }
@@ -41,6 +42,7 @@ else
     private GeneralJournalLineDetail? line;
     private IReadOnlyList<AccountingPeriodListItem> openPeriods = [];
     private IReadOnlyList<GeneralJournalAccountOption> accounts = [];
+    private IReadOnlyList<GeneralJournalTaxCodeOption> taxCodes = [];
     private IReadOnlyList<JournalDimensionOption> dimensions = [];
     private bool isLoading = true;
     private bool isSaving;
@@ -57,6 +59,7 @@ else
             var periods = await GeneralJournalService.GetPeriodsAsync(user);
             openPeriods = periods.Where(period => !period.IsClosed && !period.DateLocked).ToArray();
             accounts = await GeneralJournalService.GetPostingAccountsAsync(user);
+            taxCodes = await GeneralJournalService.GetTaxCodesAsync(user);
             dimensions = await GeneralJournalService.GetDimensionsAsync(user);
             if (line is not null)
             {
@@ -68,6 +71,9 @@ else
                 input.Description = line.Description;
                 input.DebitAmount = line.DebitAmount;
                 input.CreditAmount = line.CreditAmount;
+                var selectedTaxCode = taxCodes.FirstOrDefault(code => code.Code == line.TaxCode);
+                input.TaxCodeId = selectedTaxCode?.Id;
+                input.TaxBaseAmount = line.TaxBaseAmount;
                 input.Dimensions = line.Dimensions.Select(item => new JournalDimensionAssignmentInput
                 {
                     DimensionId = item.DimensionId,

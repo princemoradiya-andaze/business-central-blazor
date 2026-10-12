@@ -57,6 +57,8 @@ public sealed class GeneralJournalLineInput
 
     public decimal DebitAmount { get; set; }
     public decimal CreditAmount { get; set; }
+    public Guid? TaxCodeId { get; set; }
+    public decimal? TaxBaseAmount { get; set; }
     public List<JournalDimensionAssignmentInput> Dimensions { get; set; } = [];
 }
 
@@ -116,6 +118,10 @@ public sealed record GeneralJournalLineDetail(
     string Description,
     decimal DebitAmount,
     decimal CreditAmount,
+    string? TaxCode,
+    decimal? TaxRatePercent,
+    decimal? TaxBaseAmount,
+    TaxPostingType? TaxPostingType,
     IReadOnlyList<JournalLineDimensionDetail> Dimensions);
 
 public sealed record GeneralJournalBatchDetail(
@@ -131,6 +137,19 @@ public sealed record GeneralJournalBatchDetail(
     IReadOnlyList<GeneralJournalLineDetail> Lines);
 
 public sealed record GeneralJournalAccountOption(Guid Id, string Number, string Name);
+
+public sealed record GeneralJournalTaxCodeOption(
+    Guid Id,
+    string Code,
+    string Description,
+    Guid LiabilityAccountId,
+    Guid RecoverableAccountId,
+    IReadOnlyList<GeneralJournalTaxRateOption> Rates);
+
+public sealed record GeneralJournalTaxRateOption(
+    decimal RatePercent,
+    DateOnly StartsOn,
+    DateOnly? EndsOn);
 
 public sealed record JournalDimensionValueOption(Guid Id, string Code, string Name, bool IsBlocked);
 
@@ -148,6 +167,7 @@ public interface IGeneralJournalService
     Task<IReadOnlyList<GeneralJournalBatchListItem>> GetBatchesAsync(ClaimsPrincipal user);
     Task<GeneralJournalBatchDetail?> GetBatchAsync(ClaimsPrincipal user, Guid batchId);
     Task<IReadOnlyList<GeneralJournalAccountOption>> GetPostingAccountsAsync(ClaimsPrincipal user);
+    Task<IReadOnlyList<GeneralJournalTaxCodeOption>> GetTaxCodesAsync(ClaimsPrincipal user);
     Task<IReadOnlyList<JournalDimensionOption>> GetDimensionsAsync(ClaimsPrincipal user);
     Task<Guid> CreateBatchAsync(ClaimsPrincipal user, GeneralJournalBatchInput input);
     Task<bool> UpdateBatchAsync(ClaimsPrincipal user, Guid batchId, GeneralJournalBatchInput input);
@@ -347,6 +367,15 @@ public sealed class GeneralJournalService(
             .AsNoTracking()
             .Where(account => account.CompanyId == company.CompanyId && accountIds.Contains(account.Id))
             .ToDictionaryAsync(account => account.Id);
+        var taxCodeIds = lines
+            .Where(line => line.TaxCodeId != null)
+            .Select(line => line.TaxCodeId!.Value)
+            .Distinct()
+            .ToArray();
+        var taxCodes = await dbContext.TaxCodes
+            .AsNoTracking()
+            .Where(code => code.CompanyId == company.CompanyId && taxCodeIds.Contains(code.Id))
+            .ToDictionaryAsync(code => code.Id, code => code.Code);
         var linePeriods = await dbContext.AccountingPeriods
             .AsNoTracking()
             .Where(period => period.CompanyId == company.CompanyId && periodIds.Contains(period.Id))
@@ -395,6 +424,10 @@ public sealed class GeneralJournalService(
                 line.Description,
                 line.DebitAmount,
                 line.CreditAmount,
+                line.TaxCodeId is { } taxCodeId ? taxCodes.GetValueOrDefault(taxCodeId) : null,
+                line.TaxRatePercent,
+                line.TaxBaseAmount,
+                line.TaxPostingType,
                 dimensionsByLine.GetValueOrDefault(line.Id, []));
         }).ToArray();
 
@@ -424,6 +457,41 @@ public sealed class GeneralJournalService(
             .OrderBy(account => account.Number)
             .Select(account => new GeneralJournalAccountOption(account.Id, account.Number, account.Name))
             .ToListAsync();
+    }
+
+    public async Task<IReadOnlyList<GeneralJournalTaxCodeOption>> GetTaxCodesAsync(ClaimsPrincipal user)
+    {
+        var company = await GetRequiredCompanyAsync(user);
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync();
+        var codes = await dbContext.TaxCodes
+            .AsNoTracking()
+            .Where(code => code.CompanyId == company.CompanyId && !code.IsBlocked)
+            .OrderBy(code => code.Code)
+            .ToListAsync();
+        if (codes.Count == 0)
+        {
+            return [];
+        }
+
+        var codeIds = codes.Select(code => code.Id).ToArray();
+        var rates = await dbContext.TaxRates
+            .AsNoTracking()
+            .Where(rate => rate.CompanyId == company.CompanyId && codeIds.Contains(rate.TaxCodeId))
+            .OrderBy(rate => rate.StartsOn)
+            .ToListAsync();
+        return codes.Select(code => new GeneralJournalTaxCodeOption(
+            code.Id,
+            code.Code,
+            code.Description,
+            code.LiabilityAccountId,
+            code.RecoverableAccountId,
+            rates.Where(rate => rate.TaxCodeId == code.Id)
+                .Select(rate => new GeneralJournalTaxRateOption(
+                    rate.RatePercent,
+                    rate.StartsOn,
+                    rate.EndsOn))
+                .ToArray()))
+            .ToArray();
     }
 
     public async Task<IReadOnlyList<JournalDimensionOption>> GetDimensionsAsync(ClaimsPrincipal user)
@@ -574,7 +642,7 @@ public sealed class GeneralJournalService(
         NormalizeAndValidate(input);
         await using var dbContext = await dbContextFactory.CreateDbContextAsync();
         var batch = await GetRequiredOpenBatchAsync(dbContext, company.CompanyId, batchId);
-        await ValidateLineAsync(dbContext, company.CompanyId, batchId, null, input);
+        var taxDetails = await ValidateLineAsync(dbContext, company.CompanyId, batchId, null, input);
         var line = new GeneralJournalLine
         {
             Id = Guid.NewGuid(),
@@ -587,7 +655,12 @@ public sealed class GeneralJournalService(
             DocumentNumber = input.DocumentNumber,
             Description = input.Description,
             DebitAmount = input.DebitAmount,
-            CreditAmount = input.CreditAmount
+            CreditAmount = input.CreditAmount,
+            TaxCodeId = input.TaxCodeId,
+            TaxRateId = taxDetails?.RateId,
+            TaxRatePercent = taxDetails?.RatePercent,
+            TaxBaseAmount = input.TaxBaseAmount,
+            TaxPostingType = taxDetails?.PostingType
         };
         dbContext.GeneralJournalLines.Add(line);
         AddDimensionAssignments(dbContext, company.CompanyId, line.Id, input.Dimensions);
@@ -614,7 +687,7 @@ public sealed class GeneralJournalService(
             return false;
         }
 
-        await ValidateLineAsync(dbContext, company.CompanyId, batchId, lineId, input);
+        var taxDetails = await ValidateLineAsync(dbContext, company.CompanyId, batchId, lineId, input);
         line.AccountingPeriodId = input.AccountingPeriodId;
         line.AccountId = input.AccountId;
         line.LineNumber = input.LineNumber;
@@ -623,6 +696,11 @@ public sealed class GeneralJournalService(
         line.Description = input.Description;
         line.DebitAmount = input.DebitAmount;
         line.CreditAmount = input.CreditAmount;
+        line.TaxCodeId = input.TaxCodeId;
+        line.TaxRateId = taxDetails?.RateId;
+        line.TaxRatePercent = taxDetails?.RatePercent;
+        line.TaxBaseAmount = input.TaxBaseAmount;
+        line.TaxPostingType = taxDetails?.PostingType;
         var oldAssignments = await dbContext.JournalLineDimensions
             .Where(item => item.CompanyId == company.CompanyId && item.JournalLineId == lineId)
             .ToListAsync();
@@ -700,6 +778,11 @@ public sealed class GeneralJournalService(
                 Description = line.Description,
                 DebitAmount = line.DebitAmount,
                 CreditAmount = line.CreditAmount,
+                TaxCodeId = line.TaxCodeId,
+                TaxRateId = line.TaxRateId,
+                TaxRatePercent = line.TaxRatePercent,
+                TaxBaseAmount = line.TaxBaseAmount,
+                TaxPostingType = line.TaxPostingType,
                 CreatedAtUtc = now
             });
         }
@@ -807,7 +890,12 @@ public sealed class GeneralJournalService(
                 CreditAmount = originalEntry.DebitAmount,
                 CurrencyCode = originalEntry.CurrencyCode,
                 CurrencyDebitAmount = originalEntry.CurrencyCreditAmount,
-                CurrencyCreditAmount = originalEntry.CurrencyDebitAmount
+                CurrencyCreditAmount = originalEntry.CurrencyDebitAmount,
+                TaxCodeId = originalEntry.TaxCodeId,
+                TaxRateId = originalEntry.TaxRateId,
+                TaxRatePercent = originalEntry.TaxRatePercent,
+                TaxBaseAmount = originalEntry.TaxBaseAmount,
+                TaxPostingType = originalEntry.TaxPostingType
             });
             foreach (var assignment in assignments.Where(item => item.JournalLineId == originalLine.Id))
             {
@@ -836,6 +924,11 @@ public sealed class GeneralJournalService(
                 CurrencyCode = originalEntry.CurrencyCode,
                 CurrencyDebitAmount = originalEntry.CurrencyCreditAmount,
                 CurrencyCreditAmount = originalEntry.CurrencyDebitAmount,
+                TaxCodeId = originalEntry.TaxCodeId,
+                TaxRateId = originalEntry.TaxRateId,
+                TaxRatePercent = originalEntry.TaxRatePercent,
+                TaxBaseAmount = originalEntry.TaxBaseAmount,
+                TaxPostingType = originalEntry.TaxPostingType,
                 CreatedAtUtc = now
             });
         }
@@ -882,6 +975,19 @@ public sealed class GeneralJournalService(
         if (input.PostingDate == default)
         {
             throw new ValidationException("Enter a posting date.");
+        }
+
+        if (input.TaxCodeId is null && input.TaxBaseAmount is not null)
+        {
+            throw new ValidationException("Select a tax code when entering a taxable base.");
+        }
+
+        if (input.TaxBaseAmount is { } baseAmount &&
+            (baseAmount <= 0 ||
+             baseAmount > MaximumAmount ||
+             decimal.Round(baseAmount, 4) != baseAmount))
+        {
+            throw new ValidationException("Enter a positive taxable base with no more than four decimal places.");
         }
     }
 
@@ -979,7 +1085,7 @@ public sealed class GeneralJournalService(
         return batch;
     }
 
-    private static async Task ValidateLineAsync(
+    private static async Task<TaxLineDetails?> ValidateLineAsync(
         ErpDbContext dbContext,
         Guid companyId,
         Guid batchId,
@@ -1008,7 +1114,9 @@ public sealed class GeneralJournalService(
                 "Select an unblocked posting account that allows direct posting from the active company.");
         }
 
+        var taxDetails = await ValidateTaxLineAsync(dbContext, companyId, input);
         await ValidateDimensionsAsync(dbContext, companyId, input.Dimensions);
+        return taxDetails;
     }
 
     private static async Task ValidatePersistedLineAsync(
@@ -1036,6 +1144,46 @@ public sealed class GeneralJournalService(
             throw new ValidationException("A journal line references an account that is no longer eligible for posting.");
         }
 
+        if (line.TaxCodeId is null)
+        {
+            if (line.TaxRateId is not null ||
+                line.TaxRatePercent is not null ||
+                line.TaxBaseAmount is not null ||
+                line.TaxPostingType is not null)
+            {
+                throw new ValidationException("A journal line has incomplete tax details.");
+            }
+        }
+        else
+        {
+            if (line.TaxRateId is null ||
+                line.TaxRatePercent is null ||
+                line.TaxBaseAmount is null ||
+                line.TaxPostingType is null)
+            {
+                throw new ValidationException("A journal line has incomplete tax details.");
+            }
+
+            var input = new GeneralJournalLineInput
+            {
+                AccountingPeriodId = line.AccountingPeriodId,
+                AccountId = line.AccountId,
+                PostingDate = line.PostingDate,
+                DebitAmount = line.DebitAmount,
+                CreditAmount = line.CreditAmount,
+                TaxCodeId = line.TaxCodeId,
+                TaxBaseAmount = line.TaxBaseAmount
+            };
+            var taxDetails = await ValidateTaxLineAsync(dbContext, companyId, input)
+                ?? throw new ValidationException("A journal line's tax details are incomplete.");
+            if (taxDetails.RateId != line.TaxRateId ||
+                taxDetails.RatePercent != line.TaxRatePercent ||
+                taxDetails.PostingType != line.TaxPostingType)
+            {
+                throw new ValidationException("A journal line's tax rate or treatment has changed; review the line before posting.");
+            }
+        }
+
         var dimensions = await dbContext.JournalLineDimensions
             .Where(item => item.CompanyId == companyId && item.JournalLineId == line.Id)
             .Select(item => new JournalDimensionAssignmentInput
@@ -1045,6 +1193,94 @@ public sealed class GeneralJournalService(
             })
             .ToListAsync();
         await ValidateDimensionsAsync(dbContext, companyId, dimensions);
+    }
+
+    private static async Task<TaxLineDetails?> ValidateTaxLineAsync(
+        ErpDbContext dbContext,
+        Guid companyId,
+        GeneralJournalLineInput input)
+    {
+        if (input.TaxCodeId is not { } taxCodeId)
+        {
+            if (input.TaxBaseAmount is not null)
+            {
+                throw new ValidationException("Select a tax code when entering a taxable base.");
+            }
+
+            return null;
+        }
+
+        if (input.TaxBaseAmount is not { } taxBaseAmount)
+        {
+            throw new ValidationException("Enter the taxable base for a tax journal line.");
+        }
+        if (taxBaseAmount <= 0 ||
+            taxBaseAmount > MaximumAmount ||
+            decimal.Round(taxBaseAmount, 4) != taxBaseAmount)
+        {
+            throw new ValidationException("Enter a positive taxable base with no more than four decimal places.");
+        }
+
+        var taxCode = await dbContext.TaxCodes.SingleOrDefaultAsync(code =>
+            code.CompanyId == companyId && code.Id == taxCodeId && !code.IsBlocked);
+        if (taxCode is null)
+        {
+            throw new ValidationException("Select an unblocked tax code from the active company.");
+        }
+
+        var rate = await dbContext.TaxRates.SingleOrDefaultAsync(item =>
+            item.CompanyId == companyId &&
+            item.TaxCodeId == taxCodeId &&
+            item.StartsOn <= input.PostingDate &&
+            (item.EndsOn == null || item.EndsOn >= input.PostingDate));
+        if (rate is null)
+        {
+            throw new ValidationException("No tax rate for this code is effective on the journal posting date.");
+        }
+
+        var postingType = input.DebitAmount > 0
+            ? TaxPostingType.Recoverable
+            : TaxPostingType.Liability;
+        var mappedAccountId = postingType == TaxPostingType.Recoverable
+            ? taxCode.RecoverableAccountId
+            : taxCode.LiabilityAccountId;
+        var expectedCategory = postingType == TaxPostingType.Recoverable
+            ? AccountCategory.Asset
+            : AccountCategory.Liability;
+        if (input.AccountId != mappedAccountId ||
+            !await dbContext.GeneralLedgerAccounts.AnyAsync(account =>
+                account.CompanyId == companyId &&
+                account.Id == mappedAccountId &&
+                account.Category == expectedCategory &&
+                account.Type == AccountType.Posting &&
+                account.AllowsDirectPosting &&
+                !account.IsBlocked))
+        {
+            throw new ValidationException(
+                $"A {postingType.ToString().ToLowerInvariant()} tax line must use its unblocked configured posting account.");
+        }
+
+        decimal expectedTaxAmount;
+        try
+        {
+            expectedTaxAmount = decimal.Round(
+                checked(taxBaseAmount * rate.RatePercent / 100m),
+                4,
+                MidpointRounding.AwayFromZero);
+        }
+        catch (OverflowException exception)
+        {
+            throw new ValidationException("The calculated tax amount exceeds the supported accounting range.", exception);
+        }
+
+        var enteredTaxAmount = input.DebitAmount > 0 ? input.DebitAmount : input.CreditAmount;
+        if (expectedTaxAmount <= 0 || enteredTaxAmount != expectedTaxAmount)
+        {
+            throw new ValidationException(
+                $"The tax line amount must equal the taxable base multiplied by the effective rate ({expectedTaxAmount:0.0000}).");
+        }
+
+        return new TaxLineDetails(rate.Id, rate.RatePercent, postingType);
     }
 
     private static async Task ValidateDimensionsAsync(
@@ -1099,6 +1335,8 @@ public sealed class GeneralJournalService(
             });
         }
     }
+
+    private sealed record TaxLineDetails(Guid RateId, decimal RatePercent, TaxPostingType PostingType);
 
     private static void ValidateBatchIsBalanced(IReadOnlyCollection<GeneralJournalLine> lines)
     {

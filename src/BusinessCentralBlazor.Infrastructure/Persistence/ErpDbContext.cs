@@ -19,6 +19,8 @@ public sealed class ErpDbContext(DbContextOptions<ErpDbContext> options)
     public DbSet<CurrencyRate> CurrencyRates => Set<CurrencyRate>();
     public DbSet<AccountingPeriod> AccountingPeriods => Set<AccountingPeriod>();
     public DbSet<GeneralLedgerAccount> GeneralLedgerAccounts => Set<GeneralLedgerAccount>();
+    public DbSet<TaxCode> TaxCodes => Set<TaxCode>();
+    public DbSet<TaxRate> TaxRates => Set<TaxRate>();
     public DbSet<Dimension> Dimensions => Set<Dimension>();
     public DbSet<DimensionValue> DimensionValues => Set<DimensionValue>();
     public DbSet<GeneralJournalTemplate> GeneralJournalTemplates => Set<GeneralJournalTemplate>();
@@ -176,6 +178,41 @@ public sealed class ErpDbContext(DbContextOptions<ErpDbContext> options)
             entity.Property(dimension => dimension.Name).HasMaxLength(120).IsRequired();
         });
 
+        modelBuilder.Entity<TaxCode>(entity =>
+        {
+            ConfigureCompanyEntity(entity);
+            entity.HasIndex(code => new { code.CompanyId, code.Code }).IsUnique();
+            entity.Property(code => code.Code).HasMaxLength(32).IsRequired();
+            entity.Property(code => code.Description).HasMaxLength(120).IsRequired();
+            entity.HasOne<GeneralLedgerAccount>().WithMany()
+                .HasForeignKey(code => new { code.CompanyId, code.LiabilityAccountId })
+                .HasPrincipalKey(account => new { account.CompanyId, account.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<GeneralLedgerAccount>().WithMany()
+                .HasForeignKey(code => new { code.CompanyId, code.RecoverableAccountId })
+                .HasPrincipalKey(account => new { account.CompanyId, account.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<TaxRate>(entity =>
+        {
+            ConfigureCompanyEntity(entity);
+            entity.HasAlternateKey(rate => new { rate.CompanyId, rate.TaxCodeId, rate.Id });
+            entity.HasIndex(rate => new { rate.CompanyId, rate.TaxCodeId, rate.StartsOn }).IsUnique();
+            entity.Property(rate => rate.RatePercent).HasPrecision(9, 4);
+            entity.ToTable(table =>
+            {
+                table.HasCheckConstraint("CK_TaxRates_PositiveRate", "[RatePercent] > 0");
+                table.HasCheckConstraint(
+                    "CK_TaxRates_DateRange",
+                    "[EndsOn] IS NULL OR [StartsOn] <= [EndsOn]");
+            });
+            entity.HasOne<TaxCode>().WithMany()
+                .HasForeignKey(rate => new { rate.CompanyId, rate.TaxCodeId })
+                .HasPrincipalKey(code => new { code.CompanyId, code.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
         modelBuilder.Entity<DimensionValue>(entity =>
         {
             ConfigureCompanyEntity(entity);
@@ -234,6 +271,7 @@ public sealed class ErpDbContext(DbContextOptions<ErpDbContext> options)
             entity.Property(line => line.DocumentNumber).HasMaxLength(64).IsRequired();
             entity.Property(line => line.Description).HasMaxLength(250).IsRequired();
             ConfigureAmounts(entity);
+            ConfigureTaxFields(entity);
             entity.Property(line => line.CurrencyCode).HasColumnType("char(3)");
             entity.Property(line => line.CurrencyDebitAmount).HasPrecision(19, 4);
             entity.Property(line => line.CurrencyCreditAmount).HasPrecision(19, 4);
@@ -257,6 +295,10 @@ public sealed class ErpDbContext(DbContextOptions<ErpDbContext> options)
             entity.HasOne<AccountingPeriod>().WithMany()
                 .HasForeignKey(line => new { line.CompanyId, line.AccountingPeriodId })
                 .HasPrincipalKey(period => new { period.CompanyId, period.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<TaxRate>().WithMany()
+                .HasForeignKey(line => new { line.CompanyId, line.TaxCodeId, line.TaxRateId })
+                .HasPrincipalKey(rate => new { rate.CompanyId, rate.TaxCodeId, rate.Id })
                 .OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<GeneralLedgerAccount>().WithMany()
                 .HasForeignKey(line => new { line.CompanyId, line.AccountId })
@@ -302,6 +344,7 @@ public sealed class ErpDbContext(DbContextOptions<ErpDbContext> options)
             entity.Property(entry => entry.Description).HasMaxLength(250).IsRequired();
             entity.Property(entry => entry.CreatedAtUtc).HasColumnType("datetimeoffset");
             ConfigureAmounts(entity);
+            ConfigureTaxFields(entity);
             entity.Property(entry => entry.CurrencyCode).HasColumnType("char(3)");
             entity.Property(entry => entry.CurrencyDebitAmount).HasPrecision(19, 4);
             entity.Property(entry => entry.CurrencyCreditAmount).HasPrecision(19, 4);
@@ -328,6 +371,10 @@ public sealed class ErpDbContext(DbContextOptions<ErpDbContext> options)
             entity.HasOne<GeneralLedgerAccount>().WithMany()
                 .HasForeignKey(entry => new { entry.CompanyId, entry.AccountId })
                 .HasPrincipalKey(account => new { account.CompanyId, account.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<TaxRate>().WithMany()
+                .HasForeignKey(entry => new { entry.CompanyId, entry.TaxCodeId, entry.TaxRateId })
+                .HasPrincipalKey(rate => new { rate.CompanyId, rate.TaxCodeId, rate.Id })
                 .OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<Currency>().WithMany().HasForeignKey(entry => entry.CurrencyCode)
                 .OnDelete(DeleteBehavior.Restrict);
@@ -432,5 +479,22 @@ public sealed class ErpDbContext(DbContextOptions<ErpDbContext> options)
             table.HasCheckConstraint("CK_" + entity.Metadata.GetTableName() + "_NonNegativeAmounts",
                 "[DebitAmount] >= 0 AND [CreditAmount] >= 0");
         });
+    }
+
+    private static void ConfigureTaxFields<TEntity>(
+        Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<TEntity> entity)
+        where TEntity : class
+    {
+        entity.Property<Guid?>("TaxCodeId");
+        entity.Property<Guid?>("TaxRateId");
+        entity.Property<decimal?>("TaxRatePercent").HasPrecision(9, 4);
+        entity.Property<decimal?>("TaxBaseAmount").HasPrecision(19, 4);
+        entity.Property<TaxPostingType?>("TaxPostingType").HasConversion<string>().HasMaxLength(16);
+        entity.ToTable(table => table.HasCheckConstraint(
+            "CK_" + entity.Metadata.GetTableName() + "_TaxDetails",
+            "([TaxCodeId] IS NULL AND [TaxRateId] IS NULL AND [TaxRatePercent] IS NULL AND " +
+            "[TaxBaseAmount] IS NULL AND [TaxPostingType] IS NULL) OR " +
+            "([TaxCodeId] IS NOT NULL AND [TaxRateId] IS NOT NULL AND [TaxRatePercent] > 0 AND " +
+            "[TaxBaseAmount] > 0 AND [TaxPostingType] IN ('Liability', 'Recoverable'))"));
     }
 }

@@ -1,0 +1,422 @@
+@page "/financial/tax-setup"
+@attribute [Authorize(Policy = CompanyAuthorizationPolicies.ActiveCompany)]
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ITaxSetupService TaxSetupService
+
+<PageTitle>Tax setup</PageTitle>
+
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+    <div>
+        <h1>Tax setup</h1>
+        <p class="text-body-secondary mb-0">
+            Maintain company tax codes, effective-dated rates, and tax liability/recoverable posting accounts.
+            Tax is entered manually on general journal lines; sales and purchase documents do not calculate tax.
+        </p>
+    </div>
+    <a class="btn btn-outline-secondary" href="/financial/journals">General journals</a>
+</div>
+
+@if (isLoading)
+{
+    <p role="status" aria-live="polite">Loading tax setup...</p>
+}
+else if (companyContextUnavailable)
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+    <a href="/account/company" data-enhance-nav="false">Select an active company</a>
+}
+else
+{
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert alert-danger" role="alert">@errorMessage</div>
+    }
+
+    <section class="card mb-4" aria-labelledby="new-tax-code-heading">
+        <div class="card-body">
+            <h2 id="new-tax-code-heading" class="h4">New tax code</h2>
+            @if (!accounts.Any(account => IsEligible(account, AccountCategory.Liability)) ||
+                 !accounts.Any(account => IsEligible(account, AccountCategory.Asset)))
+            {
+                <div class="alert alert-info" role="status">
+                    Create an unblocked, directly-postable Liability account and Asset account before setting up tax.
+                </div>
+            }
+            <EditForm Model="@newTaxCode" OnValidSubmit="CreateTaxCodeAsync" FormName="new-tax-code">
+                <DataAnnotationsValidator />
+                <ValidationSummary class="alert alert-danger" />
+                <fieldset disabled="@isSaving">
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label" for="new-tax-code-value">Code</label>
+                            <InputText id="new-tax-code-value" class="form-control" maxlength="32"
+                                       @bind-Value="newTaxCode.Code" />
+                            <ValidationMessage For="@(() => newTaxCode.Code)" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label" for="new-tax-code-description">Description</label>
+                            <InputText id="new-tax-code-description" class="form-control" maxlength="120"
+                                       @bind-Value="newTaxCode.Description" />
+                            <ValidationMessage For="@(() => newTaxCode.Description)" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label" for="new-tax-code-liability">Liability account</label>
+                            <InputSelect id="new-tax-code-liability" class="form-select"
+                                         @bind-Value="newTaxCode.LiabilityAccountId">
+                                <option value="@Guid.Empty">Select Liability account</option>
+                                @foreach (var account in accounts.Where(account => account.Category == AccountCategory.Liability))
+                                {
+                                    <option value="@account.Id">@FormatAccount(account)</option>
+                                }
+                            </InputSelect>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label" for="new-tax-code-recoverable">Recoverable account</label>
+                            <InputSelect id="new-tax-code-recoverable" class="form-select"
+                                         @bind-Value="newTaxCode.RecoverableAccountId">
+                                <option value="@Guid.Empty">Select Asset account</option>
+                                @foreach (var account in accounts.Where(account => account.Category == AccountCategory.Asset))
+                                {
+                                    <option value="@account.Id">@FormatAccount(account)</option>
+                                }
+                            </InputSelect>
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <InputCheckbox id="new-tax-code-blocked" class="form-check-input"
+                                               @bind-Value="newTaxCode.IsBlocked" />
+                                <label class="form-check-label" for="new-tax-code-blocked">Blocked</label>
+                            </div>
+                        </div>
+                    </div>
+                </fieldset>
+                <button class="btn btn-primary mt-3" type="submit" disabled="@isSaving">
+                    @(isSaving ? "Saving..." : "Create tax code")
+                </button>
+            </EditForm>
+        </div>
+    </section>
+
+    @if (taxCodes.Count == 0)
+    {
+        <div class="alert alert-info" role="status">No tax codes are configured for this company.</div>
+    }
+    else
+    {
+        @foreach (var taxCode in taxCodes)
+        {
+            var edit = codeEdits[taxCode.Id];
+            var newRate = newRates[taxCode.Id];
+            <section class="card mb-4" @key="taxCode.Id" aria-labelledby="@($"tax-code-heading-{taxCode.Id}")">
+                <div class="card-body">
+                    <div class="d-flex flex-wrap justify-content-between gap-2">
+                        <h2 id="@($"tax-code-heading-{taxCode.Id}")" class="h4">@taxCode.Code — @taxCode.Description</h2>
+                        @if (taxCode.IsBlocked)
+                        {
+                            <span class="badge text-bg-secondary align-self-start">Blocked</span>
+                        }
+                    </div>
+
+                    <EditForm Model="@edit" OnValidSubmit="() => UpdateTaxCodeAsync(taxCode.Id)"
+                              FormName="@($"edit-tax-code-{taxCode.Id:N}")">
+                        <DataAnnotationsValidator />
+                        <fieldset disabled="@isSaving">
+                            <div class="row g-3">
+                                <div class="col-md-3">
+                                    <label class="form-label" for="@($"tax-code-{taxCode.Id}-code")">Code</label>
+                                    <InputText id="@($"tax-code-{taxCode.Id}-code")" class="form-control" maxlength="32"
+                                               @bind-Value="edit.Code" />
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label" for="@($"tax-code-{taxCode.Id}-description")">Description</label>
+                                    <InputText id="@($"tax-code-{taxCode.Id}-description")" class="form-control" maxlength="120"
+                                               @bind-Value="edit.Description" />
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label" for="@($"tax-code-{taxCode.Id}-liability")">Liability account</label>
+                                    <InputSelect id="@($"tax-code-{taxCode.Id}-liability")" class="form-select"
+                                                 @bind-Value="edit.LiabilityAccountId">
+                                        @foreach (var account in accounts.Where(account => account.Category == AccountCategory.Liability))
+                                        {
+                                            <option value="@account.Id">@FormatAccount(account)</option>
+                                        }
+                                    </InputSelect>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label" for="@($"tax-code-{taxCode.Id}-recoverable")">Recoverable account</label>
+                                    <InputSelect id="@($"tax-code-{taxCode.Id}-recoverable")" class="form-select"
+                                                 @bind-Value="edit.RecoverableAccountId">
+                                        @foreach (var account in accounts.Where(account => account.Category == AccountCategory.Asset))
+                                        {
+                                            <option value="@account.Id">@FormatAccount(account)</option>
+                                        }
+                                    </InputSelect>
+                                </div>
+                                <div class="col-12">
+                                    <div class="form-check">
+                                        <InputCheckbox id="@($"tax-code-{taxCode.Id}-blocked")" class="form-check-input"
+                                                       @bind-Value="edit.IsBlocked" />
+                                        <label class="form-check-label" for="@($"tax-code-{taxCode.Id}-blocked")">Blocked</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </fieldset>
+                        <button class="btn btn-outline-primary mt-3" type="submit" disabled="@isSaving">Save tax code</button>
+                    </EditForm>
+
+                    <h3 class="h5 mt-4">Effective-dated rates</h3>
+                    @if (taxCode.Rates.Count == 0)
+                    {
+                        <p class="text-body-secondary">No rates are configured yet.</p>
+                    }
+                    else
+                    {
+                        <div class="table-responsive mb-3">
+                            <table class="table table-sm align-middle">
+                                <caption class="visually-hidden">Rates for @taxCode.Code</caption>
+                                <thead>
+                                    <tr>
+                                        <th scope="col">Rate (%)</th>
+                                        <th scope="col">Effective from</th>
+                                        <th scope="col">Effective through</th>
+                                        <th scope="col"><span class="visually-hidden">Actions</span></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var rate in taxCode.Rates)
+                                    {
+                                        var rateEdit = rateEdits[rate.Id];
+                                        <tr @key="rate.Id">
+                                            <td colspan="4">
+                                                <EditForm Model="@rateEdit" OnValidSubmit="() => UpdateRateAsync(rate.Id)"
+                                                          FormName="@($"edit-tax-rate-{rate.Id:N}")">
+                                                    <DataAnnotationsValidator />
+                                                    <div class="row g-2 align-items-end">
+                                                        <div class="col-md-3">
+                                                            <label class="form-label" for="@($"tax-rate-{rate.Id}-percent")">Rate (%)</label>
+                                                            <InputNumber id="@($"tax-rate-{rate.Id}-percent")" class="form-control"
+                                                                         min="0.0001" step="0.0001" @bind-Value="rateEdit.RatePercent" />
+                                                        </div>
+                                                        <div class="col-md-3">
+                                                            <label class="form-label" for="@($"tax-rate-{rate.Id}-start")">Effective from</label>
+                                                            <InputDate id="@($"tax-rate-{rate.Id}-start")" class="form-control"
+                                                                       TValue="DateOnly" @bind-Value="rateEdit.StartsOn" />
+                                                        </div>
+                                                        <div class="col-md-3">
+                                                            <label class="form-label" for="@($"tax-rate-{rate.Id}-end")">Effective through (optional)</label>
+                                                            <InputDate id="@($"tax-rate-{rate.Id}-end")" class="form-control"
+                                                                       TValue="DateOnly?" @bind-Value="rateEdit.EndsOn" />
+                                                        </div>
+                                                        <div class="col-md-3">
+                                                            <button class="btn btn-outline-primary" type="submit" disabled="@isSaving">
+                                                                Save rate
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </EditForm>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+
+                    <EditForm Model="@newRate" OnValidSubmit="() => CreateRateAsync(taxCode.Id)"
+                              FormName="@($"new-tax-rate-{taxCode.Id:N}")">
+                        <DataAnnotationsValidator />
+                        <fieldset disabled="@isSaving">
+                            <div class="row g-2 align-items-end">
+                                <div class="col-md-3">
+                                    <label class="form-label" for="@($"new-rate-{taxCode.Id}-percent")">New rate (%)</label>
+                                    <InputNumber id="@($"new-rate-{taxCode.Id}-percent")" class="form-control"
+                                                 min="0.0001" step="0.0001" @bind-Value="newRate.RatePercent" />
+                                    <ValidationMessage For="@(() => newRate.RatePercent)" />
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label" for="@($"new-rate-{taxCode.Id}-start")">Effective from</label>
+                                    <InputDate id="@($"new-rate-{taxCode.Id}-start")" class="form-control"
+                                               TValue="DateOnly" @bind-Value="newRate.StartsOn" />
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label" for="@($"new-rate-{taxCode.Id}-end")">Effective through (optional)</label>
+                                    <InputDate id="@($"new-rate-{taxCode.Id}-end")" class="form-control"
+                                               TValue="DateOnly?" @bind-Value="newRate.EndsOn" />
+                                </div>
+                                <div class="col-md-3">
+                                    <button class="btn btn-outline-primary" type="submit" disabled="@isSaving">Add rate</button>
+                                </div>
+                            </div>
+                        </fieldset>
+                    </EditForm>
+                    <p class="form-text mb-0 mt-2">
+                        Rates used by any journal line are immutable; add a new non-overlapping effective period for changes.
+                    </p>
+                </div>
+            </section>
+        }
+    }
+}
+
+@code {
+    private readonly TaxCodeInput newTaxCode = new();
+    private IReadOnlyList<TaxCodeListItem> taxCodes = [];
+    private IReadOnlyList<TaxAccountOption> accounts = [];
+    private readonly Dictionary<Guid, TaxCodeInput> codeEdits = [];
+    private readonly Dictionary<Guid, TaxRateInput> newRates = [];
+    private readonly Dictionary<Guid, TaxRateInput> rateEdits = [];
+    private bool isLoading = true;
+    private bool isSaving;
+    private bool companyContextUnavailable;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+            accounts = await TaxSetupService.GetAccountsAsync(user);
+            SetDefaultTaxAccounts();
+            await LoadTaxCodesAsync(user);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            companyContextUnavailable = true;
+            errorMessage = "Your active company is no longer available. Select an active company and try again.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadTaxCodesAsync(System.Security.Claims.ClaimsPrincipal user)
+    {
+        taxCodes = await TaxSetupService.GetTaxCodesAsync(user);
+        codeEdits.Clear();
+        newRates.Clear();
+        rateEdits.Clear();
+        foreach (var taxCode in taxCodes)
+        {
+            codeEdits.Add(taxCode.Id, new TaxCodeInput
+            {
+                Code = taxCode.Code,
+                Description = taxCode.Description,
+                LiabilityAccountId = taxCode.LiabilityAccountId,
+                RecoverableAccountId = taxCode.RecoverableAccountId,
+                IsBlocked = taxCode.IsBlocked
+            });
+            newRates.Add(taxCode.Id, NewRate(taxCode.Id));
+            foreach (var rate in taxCode.Rates)
+            {
+                rateEdits.Add(rate.Id, new TaxRateInput
+                {
+                    TaxCodeId = taxCode.Id,
+                    RatePercent = rate.RatePercent,
+                    StartsOn = rate.StartsOn,
+                    EndsOn = rate.EndsOn
+                });
+            }
+        }
+    }
+
+    private async Task CreateTaxCodeAsync()
+    {
+        await SaveAsync(async user =>
+        {
+            await TaxSetupService.CreateTaxCodeAsync(user, newTaxCode);
+            newTaxCode.Code = string.Empty;
+            newTaxCode.Description = string.Empty;
+            newTaxCode.IsBlocked = false;
+            SetDefaultTaxAccounts();
+            await LoadTaxCodesAsync(user);
+        });
+    }
+
+    private async Task UpdateTaxCodeAsync(Guid taxCodeId)
+    {
+        await SaveAsync(async user =>
+        {
+            if (!await TaxSetupService.UpdateTaxCodeAsync(user, taxCodeId, codeEdits[taxCodeId]))
+            {
+                errorMessage = "The tax code no longer exists in the active company.";
+                return;
+            }
+
+            await LoadTaxCodesAsync(user);
+        });
+    }
+
+    private async Task CreateRateAsync(Guid taxCodeId)
+    {
+        await SaveAsync(async user =>
+        {
+            await TaxSetupService.CreateRateAsync(user, newRates[taxCodeId]);
+            await LoadTaxCodesAsync(user);
+        });
+    }
+
+    private async Task UpdateRateAsync(Guid rateId)
+    {
+        await SaveAsync(async user =>
+        {
+            if (!await TaxSetupService.UpdateRateAsync(user, rateId, rateEdits[rateId]))
+            {
+                errorMessage = "The tax rate no longer exists in the active company.";
+                return;
+            }
+
+            await LoadTaxCodesAsync(user);
+        });
+    }
+
+    private async Task SaveAsync(Func<System.Security.Claims.ClaimsPrincipal, Task> save)
+    {
+        isSaving = true;
+        errorMessage = null;
+        try
+        {
+            var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+            await save(user);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            companyContextUnavailable = true;
+            errorMessage = "Your active company is no longer available. Select an active company and try again.";
+        }
+        catch (ValidationException exception)
+        {
+            errorMessage = exception.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void SetDefaultTaxAccounts()
+    {
+        newTaxCode.LiabilityAccountId = accounts
+            .FirstOrDefault(account => IsEligible(account, AccountCategory.Liability))?.Id ?? Guid.Empty;
+        newTaxCode.RecoverableAccountId = accounts
+            .FirstOrDefault(account => IsEligible(account, AccountCategory.Asset))?.Id ?? Guid.Empty;
+    }
+
+    private static TaxRateInput NewRate(Guid taxCodeId) => new()
+    {
+        TaxCodeId = taxCodeId,
+        StartsOn = DateOnly.FromDateTime(DateTime.Today)
+    };
+
+    private static bool IsEligible(TaxAccountOption account, AccountCategory category) =>
+        account.Category == category &&
+        account.Type == AccountType.Posting &&
+        account.AllowsDirectPosting &&
+        !account.IsBlocked;
+
+    private static string FormatAccount(TaxAccountOption account) =>
+        $"{account.Number} — {account.Name}" +
+        (account.Type != AccountType.Posting || !account.AllowsDirectPosting || account.IsBlocked
+            ? " (not eligible for posting)"
+            : string.Empty);
+}

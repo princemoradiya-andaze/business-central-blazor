@@ -97,6 +97,27 @@ public sealed class GeneralLedgerAccount
     public bool IsBlocked { get; set; }
 }
 
+public sealed class TaxCode
+{
+    public Guid Id { get; set; }
+    public Guid CompanyId { get; set; }
+    public string Code { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public Guid LiabilityAccountId { get; set; }
+    public Guid RecoverableAccountId { get; set; }
+    public bool IsBlocked { get; set; }
+}
+
+public sealed class TaxRate
+{
+    public Guid Id { get; set; }
+    public Guid CompanyId { get; set; }
+    public Guid TaxCodeId { get; set; }
+    public decimal RatePercent { get; set; }
+    public DateOnly StartsOn { get; set; }
+    public DateOnly? EndsOn { get; set; }
+}
+
 public sealed class Dimension
 {
     public Guid Id { get; set; }
@@ -153,6 +174,11 @@ public sealed class GeneralJournalLine
     public string Description { get; set; } = string.Empty;
     public decimal DebitAmount { get; set; }
     public decimal CreditAmount { get; set; }
+    public Guid? TaxCodeId { get; set; }
+    public Guid? TaxRateId { get; set; }
+    public decimal? TaxRatePercent { get; set; }
+    public decimal? TaxBaseAmount { get; set; }
+    public TaxPostingType? TaxPostingType { get; set; }
     public string? CurrencyCode { get; set; }
     public decimal? CurrencyDebitAmount { get; set; }
     public decimal? CurrencyCreditAmount { get; set; }
@@ -179,6 +205,11 @@ public sealed class GeneralLedgerEntry
     public string Description { get; set; } = string.Empty;
     public decimal DebitAmount { get; set; }
     public decimal CreditAmount { get; set; }
+    public Guid? TaxCodeId { get; set; }
+    public Guid? TaxRateId { get; set; }
+    public decimal? TaxRatePercent { get; set; }
+    public decimal? TaxBaseAmount { get; set; }
+    public TaxPostingType? TaxPostingType { get; set; }
     public string? CurrencyCode { get; set; }
     public decimal? CurrencyDebitAmount { get; set; }
     public decimal? CurrencyCreditAmount { get; set; }
