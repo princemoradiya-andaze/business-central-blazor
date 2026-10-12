@@ -64,6 +64,53 @@ The authenticated financial menu links to company-scoped posted entries at `/fin
 
 These reports read immutable `GeneralLedgerEntries` only. Account and active-company scope is resolved server-side for every operation; posted entries cannot be edited or deleted through inquiry screens. This feature reuses the existing schema and requires no migration.
 
+## Bank accounts, receipts/payments, and manual reconciliation
+
+`/financial/banks` provides company-scoped bank/cash setup; each bank uses one dedicated, unblocked,
+directly-postable Asset G/L account. Configure `CompanySettings.BaseCurrencyCode` and an active matching
+`Currency` first. Bank currency is fixed to that base currency (no FX); identifiers are ordinary account
+references, never online-banking credentials. Bank codes and G/L mappings are company-unique. Names,
+identifiers and blocked status can be edited; G/L remapping is rejected once journals, statements or
+posted activity exist.
+
+The bank detail page creates a balanced draft CashReceipts or Payments journal atomically with its
+bank link. A positive receipt debits the bank and credits the selected offset; a positive payment does
+the reverse. Document numbers are unique per bank. Follow the journal link to review and post through
+the existing journal service, which rechecks bank status, base currency, bank G/L eligibility, document
+trace and signed bank line, as well as the existing journal posting invariants. Posted activity and
+full-batch reversals appear in reconciliation; no separate cash ledger or automatic adjusting entry is
+created. Drafts can be edited in General journals, but must retain their linked document number and one
+correctly signed bank line.
+
+Create a non-overlapping statement period with opening and closing balances, then manually enter
+lines or paste **tab-separated** text without a header: `yyyy-MM-dd`, unique line reference, description,
+signed amount. Use an invariant decimal point, positive receipts and negative payments, no thousands
+separators, maximum four decimals, and no embedded tabs/newlines in fields. Imports are all-or-nothing
+and limited to 1000 lines / 400000 characters; duplicate line references are rejected, not silently
+skipped. Header corrections, removal of unmatched lines, and unmatching are allowed before completion.
+
+Manually select an exact signed-amount posted bank G/L entry through the statement end date. Earlier
+uncleared entries are eligible; future entries, other banks/companies, drafts, amount/sign mismatches,
+and already-matched entries are rejected. Matching is one-to-one, not automatic or many-to-one.
+The screen shows unmatched statement lines, outstanding posted activity, statement arithmetic
+(`closing - opening - lines`), and statement-versus-G/L closing difference. Complete only when every
+statement line is matched and statement arithmetic is zero. Outstanding G/L timing differences may
+remain visible; they do not block completion or trigger adjustment posting. Completed statements and
+matches are locked. Server-side company checks, serializable SQL transactions, unique indexes and
+revision concurrency tokens protect writes; on a duplicate/stale edit reload before retrying. Banking
+changes are audited, including original/new entry IDs on match/unmatch.
+
+Migration `20261012115411_AddCompanyBankingAndReconciliation` adds four banking tables; **it has not
+been applied to the local database**. Full local SQL Server/browser end-to-end testing is deferred, at
+the user's request, until all remaining Phase 2 PRs are merged into `dev`. After integration and approved
+migration application, verify bank setup in two companies, receipt/payment posting and ledger traces,
+header/line corrections, tab import validation/duplicate rejection, matching/unmatching, outstanding
+items and differences, reversal activity, completion locking, and simultaneous attempts to match the
+same entry from two sessions. Automated tests use an isolated in-memory store and SQL Server model/
+generated migration metadata; they do not establish live SQL concurrency or migration application.
+Bank feeds, credential storage, payment initiation, automatic reconciliation, check printing and FX
+remain out of scope.
+
 ## Branch and review workflow
 
 - `main` is production-ready; `dev` is the integration branch.

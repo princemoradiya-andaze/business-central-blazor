@@ -231,4 +231,31 @@ public sealed class ErpDbContextModelTests
 
         return new ErpDbContext(options);
     }
+
+    [Fact]
+    public void BankingForeignKeysAreCompanyScopedAndDuplicateMatchesHaveFilteredUniqueIndex()
+    {
+        using var context = CreateContext();
+        var model = context.GetService<IDesignTimeModel>().Model;
+        foreach (var type in new[] { typeof(BankAccount), typeof(BankJournal), typeof(BankStatement), typeof(BankStatementLine) })
+        {
+            var entity = model.FindEntityType(type)!;
+            foreach (var fk in entity.GetForeignKeys().Where(fk => fk.PrincipalEntityType.ClrType != typeof(Currency)))
+                Assert.Equal("CompanyId", fk.Properties[0].Name);
+        }
+        var bank = model.FindEntityType(typeof(BankAccount))!;
+        Assert.True(bank.FindProperty(nameof(BankAccount.Revision))!.IsConcurrencyToken);
+        Assert.Contains(bank.GetIndexes(), index => index.IsUnique &&
+            index.Properties.Select(property => property.Name).SequenceEqual(["CompanyId", "GeneralLedgerAccountId"]));
+        var statement = model.FindEntityType(typeof(BankStatement))!;
+        Assert.True(statement.FindProperty(nameof(BankStatement.Revision))!.IsConcurrencyToken);
+        var line = model.FindEntityType(typeof(BankStatementLine))!;
+        var matchIndex = Assert.Single(line.GetIndexes(), index =>
+            index.Properties.Select(property => property.Name).SequenceEqual(["CompanyId", "GeneralLedgerEntryId"]));
+        Assert.True(matchIndex.IsUnique);
+        Assert.Equal("[GeneralLedgerEntryId] IS NOT NULL", matchIndex.GetFilter());
+        Assert.Equal(19, line.FindProperty(nameof(BankStatementLine.Amount))!.GetPrecision());
+        Assert.Equal(4, line.FindProperty(nameof(BankStatementLine.Amount))!.GetScale());
+        Assert.Contains(line.GetCheckConstraints(), constraint => constraint.Name == "CK_BankStatementLines_NonzeroAmount");
+    }
 }

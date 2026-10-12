@@ -1,0 +1,107 @@
+@page "/financial/banks"
+@attribute [Authorize(Policy = CompanyAuthorizationPolicies.ActiveCompany)]
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IBankService BankService
+@inject IGeneralLedgerAccountService AccountService
+
+<PageTitle>Bank accounts</PageTitle>
+<h1>Bank accounts</h1>
+<p>Use a dedicated, unblocked, directly-postable Asset G/L account for each bank/cash account.
+    Currency is the company base currency; online banking credentials and FX are not supported.</p>
+@if (error is not null)
+{
+    <div class="alert alert-danger" role="alert">@error</div>
+}
+@if (loading)
+{
+    <p role="status">Loading bank accounts...</p>
+}
+else
+{
+    <table class="table">
+        <caption>Company bank accounts</caption>
+        <thead><tr><th>Code</th><th>Name</th><th>Currency</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody>
+            @foreach (var bank in banks)
+            {
+                <tr>
+                    <td>@bank.Code</td><td>@bank.Name</td><td>@bank.CurrencyCode</td><td>@(bank.IsBlocked ? "Blocked" : "Active")</td>
+                    <td><button class="btn btn-link" disabled="@saving" @onclick="() => Edit(bank)">Edit</button>
+                        <a href="@($"/financial/banks/{bank.Id}")">Receipts, payments and statements</a></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <h2>@(editing is null ? "New bank account" : "Edit bank account")</h2>
+    <EditForm Model="@input" OnValidSubmit="SaveAsync" FormName="bank-account">
+        <DataAnnotationsValidator /><ValidationSummary />
+        <fieldset disabled="@saving">
+            <label for="bank-code">Code</label><InputText id="bank-code" class="form-control" @bind-Value="input.Code" />
+            <label for="bank-name">Name</label><InputText id="bank-name" class="form-control" @bind-Value="input.Name" />
+            <label for="bank-identifier">Account identifier (no credentials)</label>
+            <InputText id="bank-identifier" class="form-control" @bind-Value="input.AccountIdentifier" />
+            <label for="bank-gl">Dedicated bank/cash G/L account</label>
+            <InputSelect id="bank-gl" class="form-select" @bind-Value="input.GeneralLedgerAccountId">
+                <option value="@Guid.Empty">Select account</option>
+                @foreach (var account in accounts.Where(account => account.Category == AccountCategory.Asset &&
+                    account.Type == AccountType.Posting && account.AllowsDirectPosting && !account.IsBlocked ||
+                    account.Id == input.GeneralLedgerAccountId))
+                {
+                    <option value="@account.Id">@account.Number - @account.Name</option>
+                }
+            </InputSelect>
+            <div class="form-check my-3">
+                <InputCheckbox id="bank-blocked" class="form-check-input" @bind-Value="input.IsBlocked" />
+                <label for="bank-blocked">Blocked</label>
+            </div>
+            <button class="btn btn-primary" type="submit">Save bank account</button>
+            <button class="btn btn-outline-secondary" type="button" @onclick="Cancel">Cancel / new account</button>
+        </fieldset>
+    </EditForm>
+}
+
+@code {
+    private IReadOnlyList<BankAccountDetail> banks = [];
+    private IReadOnlyList<GeneralLedgerAccountListItem> accounts = [];
+    private BankAccountInput input = new();
+    private BankAccountDetail? editing;
+    private string? error;
+    private bool loading = true;
+    private bool saving;
+    protected override async Task OnInitializedAsync()
+    {
+        try { await LoadAsync(); }
+        catch (UnauthorizedAccessException exception) { error = exception.Message; }
+        finally { loading = false; }
+    }
+    private async Task LoadAsync()
+    {
+        var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+        banks = await BankService.GetAccountsAsync(user);
+        accounts = await AccountService.GetAllAsync(user);
+    }
+    private void Edit(BankAccountDetail bank)
+    {
+        editing = bank;
+        input = new() { Code = bank.Code, Name = bank.Name, AccountIdentifier = bank.AccountIdentifier,
+            GeneralLedgerAccountId = bank.GeneralLedgerAccountId, IsBlocked = bank.IsBlocked };
+    }
+    private void Cancel() { editing = null; input = new(); }
+    private async Task SaveAsync()
+    {
+        if (saving) return;
+        saving = true;
+        error = null;
+        try
+        {
+            var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+            if (editing is null) await BankService.CreateAccountAsync(user, input);
+            else await BankService.UpdateAccountAsync(user, editing.Id, editing.Revision, input);
+            Cancel();
+            await LoadAsync();
+        }
+        catch (ValidationException exception) { error = exception.Message; }
+        catch (UnauthorizedAccessException exception) { error = exception.Message; }
+        finally { saving = false; }
+    }
+}
