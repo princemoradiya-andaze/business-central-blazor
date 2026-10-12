@@ -1,0 +1,186 @@
+@using BusinessCentralBlazor.Web.Services
+
+<EditForm Model="@Model" OnValidSubmit="SubmitAsync" FormName="general-journal-line">
+    <DataAnnotationsValidator />
+    <ValidationSummary class="alert alert-danger" />
+    @if (!string.IsNullOrWhiteSpace(ErrorMessage))
+    {
+        <div class="alert alert-danger" role="alert">@ErrorMessage</div>
+    }
+
+    <fieldset disabled="@IsSaving">
+        <div class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label" for="journal-line-number">Line number</label>
+                <InputNumber id="journal-line-number" class="form-control" @bind-Value="Model.LineNumber" />
+                <ValidationMessage For="@(() => Model.LineNumber)" />
+            </div>
+            <div class="col-md-5">
+                <label class="form-label" for="journal-line-account">G/L account</label>
+                <InputSelect id="journal-line-account" class="form-select" @bind-Value="Model.AccountId">
+                    <option value="@Guid.Empty">Select an account</option>
+                    @foreach (var account in Accounts)
+                    {
+                        <option value="@account.Id">@account.Number — @account.Name</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label" for="journal-line-period">Accounting period</label>
+                <InputSelect id="journal-line-period" class="form-select" @bind-Value="Model.AccountingPeriodId">
+                    @foreach (var period in OpenPeriods)
+                    {
+                        <option value="@period.Id">@period.Name</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label" for="journal-line-date">Posting date</label>
+                <InputDate id="journal-line-date" class="form-control" TValue="DateOnly" @bind-Value="Model.PostingDate" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label" for="journal-line-document">Document number</label>
+                <InputText id="journal-line-document" class="form-control" maxlength="64"
+                           @bind-Value="Model.DocumentNumber" />
+                <ValidationMessage For="@(() => Model.DocumentNumber)" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label" for="journal-line-description">Description</label>
+                <InputText id="journal-line-description" class="form-control" maxlength="250"
+                           @bind-Value="Model.Description" />
+                <ValidationMessage For="@(() => Model.Description)" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" for="journal-line-debit">Debit</label>
+                <InputNumber id="journal-line-debit" class="form-control" min="0" step="0.0001"
+                             @bind-Value="Model.DebitAmount" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" for="journal-line-credit">Credit</label>
+                <InputNumber id="journal-line-credit" class="form-control" min="0" step="0.0001"
+                             @bind-Value="Model.CreditAmount" />
+            </div>
+        </div>
+
+        <div class="mt-4">
+            <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+                <h2 class="h5 mb-0">Dimensions</h2>
+                <button class="btn btn-sm btn-outline-secondary" type="button"
+                        disabled="@(Model.Dimensions.Count >= AvailableDimensions.Count)"
+                        @onclick="AddDimension">
+                    Add dimension
+                </button>
+            </div>
+            @if (Model.Dimensions.Count == 0)
+            {
+                <p class="text-body-secondary">No dimensions assigned.</p>
+            }
+            else
+            {
+                @foreach (var assignment in Model.Dimensions)
+                {
+                    <div class="row g-2 align-items-end mb-2" @key="assignment">
+                        <div class="col-md-5">
+                            <label class="form-label" for="@($"journal-dimension-{assignment.DimensionId}")">Dimension</label>
+                            <InputSelect id="@($"journal-dimension-{assignment.DimensionId}")"
+                                         class="form-select" @bind-Value="assignment.DimensionId"
+                                         @bind-Value:after="() => ResetDimensionValue(assignment)">
+                                <option value="@Guid.Empty">Select a dimension</option>
+                                @foreach (var dimension in GetAvailableDimensions(assignment))
+                                {
+                                    <option value="@dimension.Id">@dimension.Code — @dimension.Name</option>
+                                }
+                            </InputSelect>
+                        </div>
+                        <div class="col-md-5">
+                            <label class="form-label" for="@($"journal-dimension-value-{assignment.DimensionId}")">Value</label>
+                            <InputSelect id="@($"journal-dimension-value-{assignment.DimensionId}")"
+                                         class="form-select" @bind-Value="assignment.DimensionValueId">
+                                <option value="@Guid.Empty">Select a value</option>
+                                @foreach (var value in GetValues(assignment.DimensionId))
+                                {
+                                    <option value="@value.Id">@value.Code — @value.Name</option>
+                                }
+                            </InputSelect>
+                        </div>
+                        <div class="col-md-2">
+                            <button class="btn btn-outline-danger" type="button"
+                                    @onclick="() => RemoveDimension(assignment)">Remove</button>
+                        </div>
+                    </div>
+                }
+            }
+            @if (AvailableDimensions.Count == 0 && Model.Dimensions.Count == 0)
+            {
+                <p class="text-body-secondary">No dimensions are configured for this company.</p>
+            }
+        </div>
+    </fieldset>
+
+    <div class="d-flex gap-2 mt-4">
+        <button class="btn btn-primary" type="submit" disabled="@IsSaving">
+            @(IsSaving ? "Saving..." : SubmitText)
+        </button>
+        <a class="btn btn-outline-secondary" href="@($"/financial/journals/{BatchId}")">Cancel</a>
+    </div>
+</EditForm>
+
+@code {
+    [Parameter, EditorRequired]
+    public GeneralJournalLineInput Model { get; set; } = new();
+
+    [Parameter, EditorRequired]
+    public Guid BatchId { get; set; }
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<AccountingPeriodListItem> OpenPeriods { get; set; } = [];
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<GeneralJournalAccountOption> Accounts { get; set; } = [];
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<JournalDimensionOption> Dimensions { get; set; } = [];
+
+    [Parameter, EditorRequired]
+    public EventCallback OnValidSubmit { get; set; }
+
+    [Parameter]
+    public string SubmitText { get; set; } = "Save line";
+
+    [Parameter]
+    public bool IsSaving { get; set; }
+
+    [Parameter]
+    public string? ErrorMessage { get; set; }
+
+    private IReadOnlyList<JournalDimensionOption> AvailableDimensions => Dimensions;
+
+    private IEnumerable<JournalDimensionOption> GetAvailableDimensions(
+        JournalDimensionAssignmentInput current) =>
+        AvailableDimensions.Where(dimension =>
+            dimension.Id == current.DimensionId ||
+            Model.Dimensions.All(assignment =>
+                ReferenceEquals(assignment, current) || assignment.DimensionId != dimension.Id));
+
+    private IEnumerable<JournalDimensionValueOption> GetValues(Guid dimensionId) =>
+        AvailableDimensions.FirstOrDefault(dimension => dimension.Id == dimensionId)?.Values
+            .Where(value => !value.IsBlocked) ?? [];
+
+    private void AddDimension()
+    {
+        var dimension = AvailableDimensions.FirstOrDefault(option =>
+            Model.Dimensions.All(assignment => assignment.DimensionId != option.Id));
+        if (dimension is not null)
+        {
+            Model.Dimensions.Add(new JournalDimensionAssignmentInput { DimensionId = dimension.Id });
+        }
+    }
+
+    private void RemoveDimension(JournalDimensionAssignmentInput assignment) =>
+        Model.Dimensions.Remove(assignment);
+
+    private static void ResetDimensionValue(JournalDimensionAssignmentInput assignment) =>
+        assignment.DimensionValueId = Guid.Empty;
+
+    private Task SubmitAsync(EditContext _) => OnValidSubmit.InvokeAsync();
+}

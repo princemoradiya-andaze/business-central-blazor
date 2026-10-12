@@ -387,6 +387,9 @@ namespace BusinessCentralBlazor.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("PostedByUserId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid?>("ReversedByBatchId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
                         .IsRequired()
@@ -403,6 +406,10 @@ namespace BusinessCentralBlazor.Infrastructure.Persistence.Migrations
                     b.HasIndex("PostedByUserId");
 
                     b.HasIndex("CompanyId", "DefaultAccountingPeriodId");
+
+                    b.HasIndex("CompanyId", "ReversedByBatchId")
+                        .IsUnique()
+                        .HasFilter("[ReversedByBatchId] IS NOT NULL");
 
                     b.HasIndex("CompanyId", "JournalTemplateId", "Name")
                         .IsUnique();
@@ -1229,6 +1236,12 @@ namespace BusinessCentralBlazor.Infrastructure.Persistence.Migrations
                         .HasPrincipalKey("CompanyId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.HasOne("BusinessCentralBlazor.Domain.Entities.GeneralJournalBatch", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId", "ReversedByBatchId")
+                        .HasPrincipalKey("CompanyId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("BusinessCentralBlazor.Domain.Entities.GeneralJournalLine", b =>

@@ -5,7 +5,7 @@
 ## Scope and provenance
 
 - Application schema source: this repository's C# domain entities and `ErpDbContext` configuration. All application code and schema decisions remain independently implemented.
-- Migrations: `InitialCompanyAndFinancialSchema`, `AlignJournalAndAccountingFoundation`, and `AddWorkspaceNotes`.
+- Migrations: `InitialCompanyAndFinancialSchema`, `AlignJournalAndAccountingFoundation`, `AddWorkspaceNotes`, and `AddJournalBatchReversal`.
 - Target/provider: SQL Server via EF Core 10.
 - Local smoke-test database: `BusinessCentralBlazor_Phase0` on the user's existing `.\BCDEMO` SQL Server Express instance. The migration was applied to this newly named database only; other databases were not modified.
 - Reference artifact: W1 `28.4.53241.0`, paired by its manifest with platform `28.0.53152.0`; selected table metadata was read from the platform archive's Base Application source ZIP. The user confirmed permission to inspect the local artifact. The archive was read in memory and not modified; no source files, packages, license files, or demo data were copied into this repository.
@@ -18,7 +18,7 @@
 | Authentication | `AspNetUsers`, `AspNetRoles`, `AspNetUserClaims`, `AspNetUserLogins`, `AspNetUserRoles`, `AspNetUserTokens`, `AspNetRoleClaims` | ASP.NET Core Identity uses `Guid` IDs. Login/logout, active-company selection, and application-level authorization are wired into the web host; database row-level security is not implemented. |
 | Tenant/company | `Tenants`, `Companies`, `CompanySettings`, `TenantMemberships`, `CompanyMemberships` | Company code is unique within a tenant. Memberships reference Identity users. Company membership has composite references to the company and tenant membership so a user cannot be linked to a company outside their tenant through these constraints. |
 | Currency and periods | `Currencies`, `CurrencyRates`, `AccountingPeriods` | ISO-style 3-character currency key; minor units 0–4; company-scoped unique rate per base/quote/date, positive rate, date-bounded periods uniquely identified by company and start date, with separate closed and date-locked flags. |
-| General ledger foundation | `GeneralLedgerAccounts`, `GeneralJournalTemplates`, `GeneralJournalBatches`, `GeneralJournalLines`, `GeneralLedgerEntries` | Accounts distinguish posting structure from financial category. Journals follow template → batch → line; each line has its own company-scoped period while a batch carries a default period. Composite FKs prevent cross-company account, template, batch, and period references. Journal/ledger amounts are `decimal(19,4)`; batches use row-version concurrency; a unique `(CompanyId, JournalLineId)` ledger index prevents duplicate posting. |
+| General ledger foundation | `GeneralLedgerAccounts`, `GeneralJournalTemplates`, `GeneralJournalBatches`, `GeneralJournalLines`, `GeneralLedgerEntries` | Accounts distinguish posting structure from financial category. Journals follow template → batch → line; each line has its own company-scoped period while a batch carries a default period. Composite FKs prevent cross-company account, template, batch, period, and reversal references. Journal/ledger amounts are `decimal(19,4)`; batches use row-version concurrency; a unique `(CompanyId, JournalLineId)` ledger index prevents duplicate posting. |
 | Dimensions | `Dimensions`, `DimensionValues`, `JournalLineDimensions` | Dimension/value codes are unique in their company and dimension. Each line assignment has one value per dimension and composite same-company foreign keys. Dimension-set deduplication and reuse remain future work. |
 | Operational master data | `Customers`, `Vendors`, `Items` | Company-scoped unique numbers; optional currency reference; item cost uses `decimal(19,4)` and cannot be negative. |
 | Foundation UI example | `WorkspaceNotes` | Safe generic example records are explicitly tenant/company scoped, with a composite FK to prevent cross-tenant company references. Service operations revalidate the active company and filter reads and writes by the validated tenant/company pair. |
@@ -48,6 +48,7 @@ erDiagram
     COMPANY ||--o{ JOURNAL_BATCH : owns
     ACCOUNTING_PERIOD ||--o{ JOURNAL_BATCH : default_period
     JOURNAL_BATCH ||--|{ JOURNAL_LINE : contains
+    JOURNAL_BATCH ||--o| JOURNAL_BATCH : reverses
     ACCOUNTING_PERIOD ||--o{ JOURNAL_LINE : posting_period
     GL_ACCOUNT ||--o{ JOURNAL_LINE : posts_to
     COMPANY ||--o{ DIMENSION : defines
@@ -71,10 +72,10 @@ The diagram omits Identity's internal claims/login/token relations for readabili
 
 - Monetary columns use fixed precision, never floating point. Local-currency journal/ledger debit and credit amounts are represented as nonnegative `decimal(19,4)` values; a database check requires exactly one side to be positive per line/entry.
 - When a foreign currency is supplied, its currency debit or credit amount must also have exactly one positive side. Currency and exchange rates reference the currency catalogue; rate is positive and stored as `decimal(19,8)`.
-- Each journal batch belongs to a company-scoped template and has a company-scoped default accounting period; each journal line references its own company-scoped period so one batch can contain lines in different periods. Every line also references the same company's batch and account. **Checking the posting date lies within the referenced period is a future application rule**, not a database check.
+- Each journal batch belongs to a company-scoped template and has a company-scoped default accounting period; each journal line references its own company-scoped period so one batch can contain lines in different periods. Every line also references the same company's batch and account. Accounting-period date ranges are checked for overlap when created; journal services validate that posting dates are within the referenced period and reject closed or date-locked periods.
 - Every ledger entry references the source journal batch, source line, and account in the same company. Unique source-line indexing provides database-level duplicate-posting protection.
-- A posting service must, in a single database transaction, validate period/account/dimension/company rules, calculate and round amounts under the company's currency precision, verify batch debit equals credit in local currency, create ledger entries, and transition the batch to posted. Those posting services and rollback/concurrency behavior are not implemented in Phase 0.
-- Posted ledger rows must be append-only from application services; reversal/correction creates new entries. Database permissions/immutability enforcement and reversal workflows are future work.
+- Posting revalidates active-company scope, eligible G/L accounts, periods, dimensions, and local-currency balance. Journal batch status, ledger entries, and the row-versioned G/L entry-number series are saved together; SQL Server `SaveChanges` transactionality, batch/sequence concurrency tokens, and the unique source-line index prevent partial, concurrent, or duplicate posts.
+- Full-batch reversals create a distinct posted batch, link it from the original, and append entries with debit/credit sides swapped, preserving original entries. Only one reversal can link to an original batch; reversals use a selected open period/date and do not mutate original ledger rows. Posted journal lines and ledger rows are immutable through application services. Database permissions/immutability enforcement remains future work.
 - `DateOnly` maps to SQL `date`; timestamps are `DateTimeOffset` and named `...Utc`. Services must normalize timestamps to UTC.
 - `NumberSeries` and journal batches have SQL Server `rowversion` optimistic-concurrency tokens. Allocating numbers still requires a transaction/retry strategy.
 - Audit metadata is optional JSON text; validation, redaction, retention, and tamper protection remain application/operations responsibilities.
@@ -87,7 +88,7 @@ The diagram omits Identity's internal claims/login/token relations for readabili
 - `WorkspaceNotes` is a small generic CRUD example, not an ERP business module; rows are company-owned and the UI creates them only after the user selects a valid active company.
 - The selected metadata review informed the journal template/batch/line hierarchy, the distinction between account structure and financial category, and period start-date plus closed/date-locked concepts. Internal GUID keys, company-scoped tables, and the batch's default period are application choices.
 - This is not a complete Business Central model: journal lines currently post only to G/L accounts; default/global dimensions are not modeled; dimension combinations are assigned directly rather than deduplicated into dimension sets; currency exchange-rate semantics, posting setup, posting groups, document types, and posting workflows are simplified or deferred.
-- No sales/purchase documents, inventory movements/valuation, tax, bank reconciliation, document numbering policies, attachments, localization, or posting engine are implemented.
+- No sales/purchase documents, inventory movements/valuation, tax, bank reconciliation, attachments, or localization are implemented. General journal posting, accounting-period setup, and full-batch reversal are implemented in the current Phase 2 slice; ledger inquiry/reporting remains future work.
 
 ## Local migration workflow
 

@@ -1,0 +1,130 @@
+@page "/financial/journals/{BatchId:guid}/lines/new"
+@attribute [Authorize(Policy = CompanyAuthorizationPolicies.ActiveCompany)]
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IGeneralJournalService GeneralJournalService
+@inject NavigationManager Navigation
+
+<PageTitle>New journal line</PageTitle>
+<h1>New journal line</h1>
+
+@if (isLoading)
+{
+    <p role="status" aria-live="polite">Loading journal setup...</p>
+}
+else if (companyContextUnavailable)
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+    <a href="/account/company" data-enhance-nav="false">Select an active company</a>
+}
+else if (batch is null || batch.Status != JournalBatchStatus.Open)
+{
+    <div class="alert alert-danger" role="alert">An open journal batch was not found in the active company.</div>
+    <a href="/financial/journals">Back to journals</a>
+}
+else if (openPeriods.Count == 0)
+{
+    <div class="alert alert-info" role="status">
+        An open accounting period is required.
+        <a href="/financial/accounting-periods">Set up accounting periods</a>
+    </div>
+}
+else if (accounts.Count == 0)
+{
+    <div class="alert alert-info" role="status">
+        An unblocked posting account that allows direct posting is required.
+        <a href="/financial/general-ledger/accounts">Manage Chart of Accounts</a>
+    </div>
+}
+else
+{
+    <p class="text-body-secondary">Batch: @batch.Name</p>
+    <GeneralJournalLineForm Model="@input" BatchId="@BatchId" OpenPeriods="@openPeriods" Accounts="@accounts"
+                            Dimensions="@dimensions" SubmitText="Create line" IsSaving="@isSaving"
+                            ErrorMessage="@errorMessage" OnValidSubmit="CreateAsync" />
+}
+
+@code {
+    [Parameter]
+    public Guid BatchId { get; set; }
+
+    private readonly GeneralJournalLineInput input = new();
+    private GeneralJournalBatchDetail? batch;
+    private IReadOnlyList<AccountingPeriodListItem> openPeriods = [];
+    private IReadOnlyList<GeneralJournalAccountOption> accounts = [];
+    private IReadOnlyList<JournalDimensionOption> dimensions = [];
+    private bool isLoading = true;
+    private bool isSaving;
+    private bool companyContextUnavailable;
+    private string? errorMessage;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        try
+        {
+            var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+            batch = await GeneralJournalService.GetBatchAsync(user, BatchId);
+            var periods = await GeneralJournalService.GetPeriodsAsync(user);
+            openPeriods = periods.Where(period => !period.IsClosed && !period.DateLocked).ToArray();
+            accounts = await GeneralJournalService.GetPostingAccountsAsync(user);
+            dimensions = await GeneralJournalService.GetDimensionsAsync(user);
+            if (batch is not null)
+            {
+                input.AccountingPeriodId = batch.DefaultAccountingPeriodId;
+                if (!openPeriods.Any(period => period.Id == input.AccountingPeriodId))
+                {
+                    input.AccountingPeriodId = openPeriods.FirstOrDefault()?.Id ?? Guid.Empty;
+                }
+
+                var defaultPeriod = openPeriods.FirstOrDefault(period => period.Id == input.AccountingPeriodId);
+                input.PostingDate = GetDefaultPostingDate(defaultPeriod);
+                input.LineNumber = batch.Lines.Count == 0 ? 10000 : batch.Lines.Max(line => line.LineNumber) + 10000;
+                input.AccountId = accounts.FirstOrDefault()?.Id ?? Guid.Empty;
+            }
+        }
+        catch (UnauthorizedAccessException)
+        {
+            companyContextUnavailable = true;
+            errorMessage = "Your active company is no longer available. Select an active company and try again.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task CreateAsync()
+    {
+        isSaving = true;
+        errorMessage = null;
+        try
+        {
+            var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+            await GeneralJournalService.CreateLineAsync(user, BatchId, input);
+            Navigation.NavigateTo($"/financial/journals/{BatchId}");
+        }
+        catch (UnauthorizedAccessException)
+        {
+            companyContextUnavailable = true;
+            errorMessage = "Your active company is no longer available. Select an active company and try again.";
+        }
+        catch (ValidationException exception)
+        {
+            errorMessage = exception.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private static DateOnly GetDefaultPostingDate(AccountingPeriodListItem? period)
+    {
+        if (period is null)
+        {
+            return DateOnly.FromDateTime(DateTime.Today);
+        }
+
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        return today < period.StartsOn ? period.StartsOn : today > period.EndsOn ? period.EndsOn : today;
+    }
+}
