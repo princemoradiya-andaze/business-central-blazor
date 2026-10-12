@@ -32,12 +32,16 @@ Only mark tasks complete when their acceptance criteria have been verified.
 
 **Merge gate:** Ask the user for explicit approval before merging every PR, even when all CI checks pass.
 
+## Phase 2 — Core financials
+
+- [ ] Phase tracker: [#29](https://github.com/princemoradiya-andaze/business-central-blazor/issues/29) — deliver company-scoped chart of accounts, dimensions, journals/general ledger, bank, and tax.
+- [x] [#30](https://github.com/princemoradiya-andaze/business-central-blazor/issues/30) — Chart of Accounts setup and management (merged into `dev` in PR #31; local merged-`dev` Release build passed with 0 warnings/errors, all 38 tests passed, EF reported no model changes, and the local app smoke checks passed).
+
 ## Later phases
 
-- [ ] **Phase 2 — Core financials:** [#29](https://github.com/princemoradiya-andaze/business-central-blazor/issues/29) tracks chart of accounts, general ledger, dimensions, journals, bank, and tax. The first implementation slice is [#30](https://github.com/princemoradiya-andaze/business-central-blazor/issues/30), Chart of Accounts setup and management, in progress on `feature/30-chart-of-accounts`.
 - [ ] Sales, purchasing, inventory, and document lifecycles.
 - [ ] Advanced capabilities, production operations, and Azure deployment.
 
 ## Current next step
 
-Phase 0 and Phase 1 are complete on `main`. Phase 1 was released in PR #27 and documented in PR #28; the merged `main` commit passed a Release build (0 warnings/errors), all 32 tests, EF model-drift validation, and local HTTP smoke checks. Phase 2 planning is tracked in #29. The Chart of Accounts first slice (#30) is in progress from `dev`; it uses the existing account schema and does not require a migration. Ask the user before merging every PR. Hosted deployment is not part of the agreed workflow.
+Phase 0 and Phase 1 are complete on `main`. Phase 1 was released in PR #27 and documented in PR #28; the merged `main` commit passed a Release build (0 warnings/errors), all 32 tests, EF model-drift validation, and local HTTP smoke checks. Phase 2 is tracked in #29. Its first slice, Chart of Accounts (#30), is implemented and verified on `dev` in PR #31, using the existing account schema without a migration. The next step is to scope the next financial setup feature under #29. Ask the user before merging every PR. Hosted deployment is not part of the agreed workflow.
