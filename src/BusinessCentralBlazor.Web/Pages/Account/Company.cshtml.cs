@@ -17,6 +17,9 @@ public sealed class CompanyModel(
     [BindProperty]
     public Guid SelectedCompanyId { get; set; }
 
+    [BindProperty(SupportsGet = true)]
+    public string? ReturnUrl { get; set; }
+
     public IReadOnlyList<CompanyMembershipOption> AvailableCompanies { get; private set; } = [];
     public CompanyMembershipOption? ActiveCompany { get; private set; }
     public string? StatusMessage { get; private set; }
@@ -50,7 +53,7 @@ public sealed class CompanyModel(
             authentication.Properties?.IsPersistent == true,
             [new Claim(ActiveCompanyClaim.Type, selectedCompany.CompanyId.ToString())]);
 
-        return LocalRedirect("/");
+        return LocalRedirect(GetLocalReturnUrl(ReturnUrl));
     }
 
     private async Task LoadCompaniesAsync()
@@ -62,4 +65,7 @@ public sealed class CompanyModel(
             StatusMessage = "Your previous company selection is no longer valid. Select an available company.";
         }
     }
+
+    private string GetLocalReturnUrl(string? returnUrl) =>
+        Url.IsLocalUrl(returnUrl) ? returnUrl : "/";
 }

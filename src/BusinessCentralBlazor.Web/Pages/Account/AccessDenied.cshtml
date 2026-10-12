@@ -10,19 +10,40 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] - Business Central Blazor</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/app.css" />
+    <link rel="stylesheet" href="~/account.css" asp-append-version="true" />
 </head>
-<body>
-    <main>
-        <h1>Access denied</h1>
-        <p>Your account is not authorized to access this resource.</p>
-        @if (User.Identity?.IsAuthenticated == true)
-        {
-            <p><a href="/account/company">Select an available company</a></p>
-        }
-        else
-        {
-            <p><a href="/account/login">Sign in</a></p>
-        }
+<body class="account-body">
+    <main class="account-page">
+        <section class="account-card" aria-labelledby="page-title">
+            <a class="account-brand" href="/" aria-label="Business Central Blazor home">
+                <span class="account-brand-mark" aria-hidden="true">BC</span>
+                <span>Business Central <span class="account-brand-light">Blazor</span></span>
+            </a>
+            <div class="account-card-content">
+                <p class="account-eyebrow">Company workspace</p>
+                <h1 id="page-title">Access unavailable</h1>
+                @if (User.Identity?.IsAuthenticated == true)
+                {
+                    <p class="account-description">Your account is signed in, but it does not currently have an active company selection for this page.</p>
+                    <a class="btn btn-primary btn-lg w-100" href="/account/company">View available companies</a>
+                    <p class="account-help">If no companies are listed, contact your system administrator to request access.</p>
+                    <div class="account-secondary-action">
+                        <form method="post" action="/account/logout">
+                            @Html.AntiForgeryToken()
+                            <button class="btn btn-link" type="submit">Sign out</button>
+                        </form>
+                    </div>
+                }
+                else
+                {
+                    <p class="account-description">Sign in with an account provided by your administrator to continue.</p>
+                    <a class="btn btn-primary btn-lg w-100" href="/account/login">Go to sign in</a>
+                }
+            </div>
+        </section>
+        <p class="account-footer">Secure access to your company workspace</p>
     </main>
 </body>
 </html>

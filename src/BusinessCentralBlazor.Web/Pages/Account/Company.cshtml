@@ -1,44 +1,83 @@
-@page
+@page "/account/company"
 @model BusinessCentralBlazor.Web.Pages.Account.CompanyModel
 @{
+    Layout = null;
     ViewData["Title"] = "Select company";
 }
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Business Central Blazor</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/app.css" />
+    <link rel="stylesheet" href="~/account.css" asp-append-version="true" />
+</head>
+<body class="account-body">
+    <main class="account-page">
+        <section class="account-card account-card-wide" aria-labelledby="page-title">
+            <a class="account-brand" href="/" aria-label="Business Central Blazor home">
+                <span class="account-brand-mark" aria-hidden="true">BC</span>
+                <span>Business Central <span class="account-brand-light">Blazor</span></span>
+            </a>
+            <div class="account-card-content">
+                <p class="account-eyebrow">Company workspace</p>
+                <h1 id="page-title">Select a company</h1>
+                <p class="account-description">Choose the company workspace you want to continue to.</p>
 
-<h1>Select company</h1>
-<p>Choose a company you are authorized to access.</p>
+                @if (!string.IsNullOrEmpty(Model.StatusMessage))
+                {
+                    <div class="alert alert-warning" role="alert">@Model.StatusMessage</div>
+                }
 
-@if (!string.IsNullOrEmpty(Model.StatusMessage))
-{
-    <div class="alert alert-warning" role="alert">@Model.StatusMessage</div>
-}
+                @if (Model.AvailableCompanies.Count == 0)
+                {
+                    <div class="account-empty-state" role="status">
+                        <span class="account-empty-icon" aria-hidden="true">!</span>
+                        <h2>No company access yet</h2>
+                        <p>No active company memberships are assigned to your account. Contact an administrator for access.</p>
+                    </div>
+                }
+                else
+                {
+                    @if (Model.ActiveCompany is not null)
+                    {
+                        <p class="account-current-company">
+                            Current selection: <strong>@Model.ActiveCompany.Name (@Model.ActiveCompany.Code)</strong>
+                        </p>
+                    }
+                    else
+                    {
+                        <p class="account-description">Your account can access multiple companies. Select one to continue.</p>
+                    }
 
-@if (Model.AvailableCompanies.Count == 0)
-{
-    <div class="alert alert-info" role="status">
-        No active company memberships are assigned to your account. Contact an administrator for access.
-    </div>
-}
-else
-{
-    @if (Model.ActiveCompany is not null)
-    {
-        <p>Current company: <strong>@Model.ActiveCompany.Name (@Model.ActiveCompany.Code)</strong></p>
-    }
-    else
-    {
-        <p class="text-warning">No valid active company is selected. Choose an available company to continue.</p>
-    }
-
-    <form method="post">
-        <div asp-validation-summary="ModelOnly" class="text-danger" role="alert"></div>
-        <label asp-for="SelectedCompanyId" class="form-label">Available companies</label>
-        <select asp-for="SelectedCompanyId" class="form-select" required>
-            <option value="">Select a company</option>
-            @foreach (var company in Model.AvailableCompanies)
-            {
-                <option value="@company.CompanyId">@company.Name (@company.Code)</option>
-            }
-        </select>
-        <button class="btn btn-primary mt-3" type="submit">Set active company</button>
-    </form>
-}
+                    <form method="post">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" asp-for="ReturnUrl" />
+                        <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
+                        <div class="mb-3">
+                            <label asp-for="SelectedCompanyId" class="form-label">Available companies</label>
+                            <select asp-for="SelectedCompanyId" class="form-select form-select-lg" required>
+                                <option value="">Select a company</option>
+                                @foreach (var company in Model.AvailableCompanies)
+                                {
+                                    <option value="@company.CompanyId">@company.Name (@company.Code)</option>
+                                }
+                            </select>
+                        </div>
+                        <button class="btn btn-primary btn-lg w-100" type="submit">Continue to company</button>
+                    </form>
+                }
+                <div class="account-secondary-action">
+                    <form method="post" action="/account/logout">
+                        @Html.AntiForgeryToken()
+                        <button class="btn btn-link" type="submit">Sign out</button>
+                    </form>
+                </div>
+            </div>
+        </section>
+        <p class="account-footer">Secure access to your company workspace</p>
+    </main>
+</body>
+</html>

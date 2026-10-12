@@ -1,5 +1,7 @@
 using System.ComponentModel.DataAnnotations;
+using System.Security.Claims;
 using BusinessCentralBlazor.Infrastructure.Identity;
+using BusinessCentralBlazor.Web.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -8,7 +10,9 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 namespace BusinessCentralBlazor.Web.Pages.Account;
 
 [AllowAnonymous]
-public sealed class LoginModel(SignInManager<ErpUser> signInManager) : PageModel
+public sealed class LoginModel(
+    SignInManager<ErpUser> signInManager,
+    IActiveCompanyContext activeCompanyContext) : PageModel
 {
     [BindProperty]
     public LoginInput Input { get; set; } = new();
@@ -39,6 +43,26 @@ public sealed class LoginModel(SignInManager<ErpUser> signInManager) : PageModel
             lockoutOnFailure: true);
         if (result.Succeeded)
         {
+            var user = await signInManager.UserManager.FindByEmailAsync(Input.Email)
+                ?? throw new InvalidOperationException("The signed-in account could not be loaded.");
+            var userPrincipal = new ClaimsPrincipal(new ClaimsIdentity(
+                [new Claim(ClaimTypes.NameIdentifier, user.Id.ToString())],
+                IdentityConstants.ApplicationScheme));
+            var availableCompanies = await activeCompanyContext.GetEligibleCompaniesAsync(userPrincipal);
+            if (availableCompanies.Count == 1)
+            {
+                await signInManager.SignInWithClaimsAsync(
+                    user,
+                    Input.RememberMe,
+                    [new Claim(ActiveCompanyClaim.Type, availableCompanies[0].CompanyId.ToString())]);
+                return LocalRedirect(ReturnUrl);
+            }
+
+            if (availableCompanies.Count > 1)
+            {
+                return RedirectToPage("/Account/Company", new { returnUrl = ReturnUrl });
+            }
+
             return LocalRedirect(ReturnUrl);
         }
 

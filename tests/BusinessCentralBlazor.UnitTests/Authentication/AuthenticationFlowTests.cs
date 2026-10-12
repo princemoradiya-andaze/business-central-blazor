@@ -76,6 +76,80 @@ public sealed class AuthenticationFlowTests(AuthenticationWebApplicationFactory 
     }
 
     [Fact]
+    public async Task LoginAutomaticallySelectsTheOnlyEligibleCompanyAndReturnsToRequestedLocalPage()
+    {
+        var email = $"single-company-login-{Guid.NewGuid():N}@example.invalid";
+        await factory.CreateTestUserAsync(email, TestPassword);
+        var company = await factory.AddCompanyMembershipAsync(email, "SINGLE", "Single Company");
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false
+        });
+
+        using var response = await PostLoginAsync(client, email, TestPassword, "/workspace/notes");
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal("/workspace/notes", response.Headers.Location?.OriginalString);
+        using var home = await client.GetAsync("/");
+        Assert.Equal(HttpStatusCode.OK, home.StatusCode);
+        Assert.Contains(
+            $"Company: {company.Name} ({company.Code})",
+            await home.Content.ReadAsStringAsync(),
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task LoginWithoutEligibleCompaniesDoesNotSelectACompany()
+    {
+        var email = $"no-company-login-{Guid.NewGuid():N}@example.invalid";
+        await factory.CreateTestUserAsync(email, TestPassword);
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false
+        });
+
+        using var response = await PostLoginAsync(client, email, TestPassword);
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal("/", response.Headers.Location?.OriginalString);
+        using var home = await client.GetAsync("/");
+        Assert.Equal(HttpStatusCode.Redirect, home.StatusCode);
+        Assert.Equal("/account/access-denied", home.Headers.Location?.AbsolutePath);
+    }
+
+    [Fact]
+    public async Task LoginRequiresSelectionWhenMultipleCompaniesAreEligibleAndPreservesLocalReturnUrl()
+    {
+        var email = $"multiple-company-login-{Guid.NewGuid():N}@example.invalid";
+        await factory.CreateTestUserAsync(email, TestPassword);
+        var company = await factory.AddCompanyMembershipAsync(email, "MULTI1", "First Company");
+        await factory.AddCompanyMembershipAsync(email, "MULTI2", "Second Company");
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false
+        });
+
+        using var signIn = await PostLoginAsync(client, email, TestPassword, "/workspace/notes");
+
+        Assert.Equal(HttpStatusCode.Redirect, signIn.StatusCode);
+        Assert.Equal("/account/company?returnUrl=%2Fworkspace%2Fnotes", signIn.Headers.Location?.OriginalString);
+        var companyPage = await client.GetAsync(signIn.Headers.Location);
+        var html = await companyPage.Content.ReadAsStringAsync();
+        var token = GetAntiforgeryToken(html);
+        using var selection = await client.PostAsync(
+            "/account/company",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = token,
+                ["SelectedCompanyId"] = company.CompanyId.ToString(),
+                ["ReturnUrl"] = "/workspace/notes"
+            }));
+
+        Assert.Equal(HttpStatusCode.Redirect, selection.StatusCode);
+        Assert.Equal("/workspace/notes", selection.Headers.Location?.OriginalString);
+    }
+
+    [Fact]
     public async Task InvalidCredentialsUseTheSameGenericError()
     {
         using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
@@ -156,20 +230,7 @@ public sealed class AuthenticationFlowTests(AuthenticationWebApplicationFactory 
 
     private static async Task<HttpResponseMessage> SignInAsync(HttpClient client)
     {
-        var loginPage = await client.GetAsync("/account/login");
-        var loginHtml = await loginPage.Content.ReadAsStringAsync();
-        var token = GetAntiforgeryToken(loginHtml);
-
-        return await client.PostAsync(
-            "/account/login",
-            new FormUrlEncodedContent(new Dictionary<string, string>
-            {
-                ["__RequestVerificationToken"] = token,
-                ["ReturnUrl"] = "/",
-                ["Input.Email"] = TestEmail,
-                ["Input.Password"] = TestPassword,
-                ["Input.RememberMe"] = "false"
-            }));
+        return await PostLoginAsync(client, TestEmail, TestPassword, "/");
     }
 
     private static async Task SelectCompanyAsync(HttpClient client, Guid companyId)
@@ -188,21 +249,29 @@ public sealed class AuthenticationFlowTests(AuthenticationWebApplicationFactory 
 
     private static async Task<string> SubmitLoginAsync(HttpClient client, string email, string password)
     {
+        using var response = await PostLoginAsync(client, email, password);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return await response.Content.ReadAsStringAsync();
+    }
+
+    private static async Task<HttpResponseMessage> PostLoginAsync(
+        HttpClient client,
+        string email,
+        string password,
+        string returnUrl = "/")
+    {
         var loginPage = await client.GetAsync("/account/login");
         var token = GetAntiforgeryToken(await loginPage.Content.ReadAsStringAsync());
-        using var response = await client.PostAsync(
+        return await client.PostAsync(
             "/account/login",
             new FormUrlEncodedContent(new Dictionary<string, string>
             {
                 ["__RequestVerificationToken"] = token,
-                ["ReturnUrl"] = "/",
+                ["ReturnUrl"] = returnUrl,
                 ["Input.Email"] = email,
                 ["Input.Password"] = password,
                 ["Input.RememberMe"] = "false"
             }));
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        return await response.Content.ReadAsStringAsync();
     }
 
     private static string GetAntiforgeryToken(string html)
