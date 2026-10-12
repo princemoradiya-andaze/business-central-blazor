@@ -36,7 +36,7 @@ Only mark tasks complete when their acceptance criteria have been verified.
 
 - [ ] Phase tracker: [#29](https://github.com/princemoradiya-andaze/business-central-blazor/issues/29) — deliver company-scoped chart of accounts, dimensions, journals/general ledger, bank, and tax.
 - [x] [#30](https://github.com/princemoradiya-andaze/business-central-blazor/issues/30) — Chart of Accounts setup and management (merged into `dev` in PR #31; local merged-`dev` Release build passed with 0 warnings/errors, all 38 tests passed, EF reported no model changes, and the local app smoke checks passed).
-- [ ] [#33](https://github.com/princemoradiya-andaze/business-central-blazor/issues/33) — manage company-scoped dimensions and values; implementation in progress.
+- [x] [#33](https://github.com/princemoradiya-andaze/business-central-blazor/issues/33) — company-scoped dimension and value management (merged into `dev` in PR #34; local merged-`dev` Release build passed with 0 warnings/errors, all 44 tests passed, EF reported no model changes, expected migration state and HTTP smoke checks verified).
 
 ## Later phases
 
@@ -45,4 +45,4 @@ Only mark tasks complete when their acceptance criteria have been verified.
 
 ## Current next step
 
-Phase 0 and Phase 1 are complete on `main`. Phase 1 was released in PR #27 and documented in PR #28; the merged `main` commit passed a Release build (0 warnings/errors), all 32 tests, EF model-drift validation, and local HTTP smoke checks. Phase 2 is tracked in #29. Chart of Accounts (#30) is implemented and verified on `dev` in PR #31. Dimension setup (#33) is now in progress, reusing the existing dimension schema; no migration is expected. Journal assignments, default dimensions, and dimension sets remain later work. Ask the user before merging every PR. Hosted deployment is not part of the agreed workflow.
+Phase 0 and Phase 1 are complete on `main`. Phase 1 was released in PR #27 and documented in PR #28; the merged `main` commit passed a Release build (0 warnings/errors), all 32 tests, EF model-drift validation, and local HTTP smoke checks. Phase 2 is tracked in #29. Chart of Accounts (#30, PR #31) and dimensions/values (#33, PR #34) are implemented and verified on `dev` without schema migrations. The next planned slice is general journal entry and transactional posting, including dimension assignment validation and ledger entry creation. Ask the user before merging every PR. Hosted deployment is not part of the agreed workflow.
