@@ -1,0 +1,41 @@
+# Build outputs
+**/bin/
+**/obj/
+**/TestResults/
+
+# IDE and local tooling
+.vs/
+.idea/
+*.user
+*.suo
+.copilot/
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+**/appsettings.*.local.json
+**/secrets*.json
+*.publishsettings
+*.pfx
+*.key
+
+# Local databases and Business Central artifacts
+*.mdf
+*.ldf
+*.bak
+*.bclicense
+*.app
+*.zip
+*.cab
+*.exe
+*.dll
+*.iso
+*.msi
+*.dacpac
+/artifacts/*
+!/artifacts/README.md
+
+# OS files
+.DS_Store
+Thumbs.db
