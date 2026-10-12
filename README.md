@@ -4,7 +4,7 @@ An independently implemented, modular-monolith ERP application using Blazor Serv
 
 ## Status
 
-Phase 0 is complete on `main`. All four Phase 1 implementation issues are merged into `dev`; the authenticated shell and SQL-backed Workspace notes CRUD example are locally verified. Public self-registration is disabled. Phase 1 still requires its release checks and an approved release PR to `main`. Hosted deployment is not part of the current workflow.
+Phase 0 is complete on `main`: the application-owned EF Core/Identity schema and selected Business Central concept alignment are verified locally against SQL Server Express. All four Phase 1 implementation issues are merged into `dev`; authentication, company context/authorization, the shell, and the generic Workspace notes example are verified locally. Public self-registration is disabled. Phase 1 release verification on `main` is pending. Hosted deployment is not part of the current workflow.
 
 ## Prerequisites
 

@@ -24,7 +24,7 @@ Only mark tasks complete when their acceptance criteria have been verified.
 
 ## Phase 1 — Foundation framework
 
-- [ ] Phase tracker: [#10](https://github.com/princemoradiya-andaze/business-central-blazor/issues/10) — complete all four scoped issues below, then verify on `dev` and release to `main`.
+- [ ] Phase tracker: [#10](https://github.com/princemoradiya-andaze/business-central-blazor/issues/10) — all four implementation issues are complete and verified on `dev`; pass the release PR/CI and verify locally on `main` before closing.
 - [x] [#11](https://github.com/princemoradiya-andaze/business-central-blazor/issues/11) — ASP.NET Core Identity sign-in/out and administrator-managed accounts; no public self-registration (merged in PRs #16 and #17; local sign-in verified).
 - [x] [#13](https://github.com/princemoradiya-andaze/business-central-blazor/issues/13) — tenant/company memberships and validated active-company context (merged in PR #18; local verification passed).
 - [x] [#14](https://github.com/princemoradiya-andaze/business-central-blazor/issues/14) — authorization policies and cross-tenant/company data isolation (merged in PR #19; CI and local Release build/22 tests passed).
@@ -40,4 +40,4 @@ Only mark tasks complete when their acceptance criteria have been verified.
 
 ## Current next step
 
-Phase 0 is complete on `main`. All four Phase 1 implementation issues (#11–#14) are merged into `dev`: authentication through PRs #16 and #17, company context through PR #18, authorization/isolation through PR #19, and the authenticated shell/Workspace notes through PR #20. Local `dev` Release build passed with 0 warnings/errors, all 28 tests passed, EF reported no pending model changes, and the local app returned HTTP 200 for `/account/login` (anonymous `/` redirects to sign-in). With the user's approval, `AddWorkspaceNotes` was applied to `BusinessCentralBlazor_Phase0` on `.\BCDEMO`; its migration history, table, composite company FK, and index were verified, with no note rows inserted. Issue #12 is closed. Issue #10 remains open until the Phase 1 release checks pass on `main` through an approved release PR. Ask the user before merging every PR. Hosted deployment is not part of the agreed workflow.
+Phase 0 is complete on `main`. All four Phase 1 implementation issues (#11–#14) are merged into `dev`; local account, company selection, authorization, shell, and Workspace notes flows have been verified by the user. On the latest `dev`, the Release build passed with 0 warnings/errors, all 32 tests passed, EF reported no pending model changes, and the approved local database `BusinessCentralBlazor_Phase0` has all three expected migrations applied. The release PR to `main` is pending; after its CI and explicit merge approval, repeat local verification on `main` before closing issue #10. Ask the user before merging every PR. Hosted deployment is not part of the agreed workflow.
