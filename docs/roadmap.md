@@ -24,9 +24,13 @@ Only mark tasks complete when their acceptance criteria have been verified.
 
 ## Phase 1 — Foundation framework
 
-- [ ] Implement ASP.NET Core Identity authentication and authorization.
-- [ ] Enforce tenant/company membership boundaries.
-- [ ] Build the application shell and reusable page/CRUD framework.
+- [ ] Phase tracker: [#10](https://github.com/princemoradiya-andaze/business-central-blazor/issues/10) — complete all four scoped issues below, then verify on `dev` and release to `main`.
+- [ ] [#11](https://github.com/princemoradiya-andaze/business-central-blazor/issues/11) — ASP.NET Core Identity sign-in/out and administrator-managed accounts; no public self-registration.
+- [ ] [#13](https://github.com/princemoradiya-andaze/business-central-blazor/issues/13) — tenant/company memberships and validated active-company context.
+- [ ] [#14](https://github.com/princemoradiya-andaze/business-central-blazor/issues/14) — authorization policies and cross-tenant/company data isolation.
+- [ ] [#12](https://github.com/princemoradiya-andaze/business-central-blazor/issues/12) — authenticated application shell, navigation, and reusable CRUD foundation.
+
+**Merge gate:** Ask the user for explicit approval before merging every PR, even when all CI checks pass.
 
 ## Later phases
 
@@ -36,4 +40,4 @@ Only mark tasks complete when their acceptance criteria have been verified.
 
 ## Current next step
 
-Phase 0 is complete on `main`. The user authorized read-only inspection of selected metadata from the local Business Central 28.4 source archive, and the schema was revised to align key journal, account, and accounting-period concepts without copying Microsoft implementation code. The release PR and CI passed; the local `BusinessCentralBlazor_Phase0` database has both migrations applied and was reverified from `main`, including the rollback-only SQL smoke test and app startup. Hosted deployment is not part of the agreed workflow. Begin Phase 1 with authentication/authorization and tenant/company boundaries.
+Phase 0 is complete on `main`. Phase 1 is planned and tracked by issue #10 with four implementation issues (#11–#14); no Phase 1 implementation has started. Account creation is administrator-managed with no public self-registration. Create each feature branch from the latest `dev`, link its issue in the PR, verify locally and in CI, and ask the user before merging. Hosted deployment is not part of the agreed workflow.
