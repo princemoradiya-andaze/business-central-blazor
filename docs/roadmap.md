@@ -9,12 +9,13 @@ Only mark tasks complete when their acceptance criteria have been verified.
 - [x] Scaffold the .NET 10 modular solution, CI workflow, and architecture/data-model documentation.
 - [x] Verify solution restore/build and the initial architecture test.
 - [x] Document the issue/branch/PR lifecycle and dated project change history in `docs/project-playbook.md`.
+- [x] Create `dev` from `main`; merge the initial foundation through a PR and verify local dev-branch build/tests and GitHub CI.
+- [ ] Configure repository branch protections when the plan and permissions allow; no production release or deployment has occurred.
 - [ ] Verify applicable artifact licensing before inspecting or extracting AL source.
 - [ ] Catalogue selected source metadata with provenance and identify version/coverage gaps.
 - [ ] Review and finalize the application-owned schema, posting invariants, and ER diagram.
 - [ ] Implement initial EF Core entities and migrations where appropriate; create the database using a supported development environment.
 - [ ] Verify restore, build, tests, migration/database creation, and secret/artifact exclusion.
-- [ ] Establish the `dev` integration branch and land the tested foundation through a reviewed PR; enforce required CI/review protections when repository plan and permissions permit.
 
 ## Phase 1 — Foundation framework
 
