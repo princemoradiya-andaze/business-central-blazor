@@ -67,6 +67,8 @@ Record each material update newest-first. Use the local project timezone (Asia/K
 
 ### 2026-10-12
 
+- **Issue #14 authorization started:** based on synchronized `dev` in `feature/14-company-authorization`. The implementation adds an active-company policy for Blazor components and a reusable per-operation scope authorizer; test-only HTTP read/write operations exercise allowed and cross-tenant/company denial without adding placeholder production endpoints. The issue remains open pending PR/CI and local verification.
+- **Company-context issue #13 merged:** PR #18 is merged into `dev`; local Release build and all 18 tests passed, with no EF model change or migration required. Issue #13 was closed after verification.
 - **12:43 IST — Company-context issue started:** issue #13 is being implemented on `feature/13-company-context`, based on synchronized `dev`. Active company selection is stored in the protected authentication cookie and revalidated against tenant/company membership and company activity whenever server context is resolved; no EF schema change is planned.
 - **12:06 IST — AdminTool bootstrap fix merged to `dev`:** PR #17 registered ASP.NET Core Data Protection required by Identity's default token providers. CI passed; local build and all 12 tests passed. The user successfully bootstrapped an administrator and verified sign-in against the local Phase 0 database.
 - **11:36 IST — Administrator-managed authentication merged to `dev`:** PR #16 added Identity sign-in/sign-out, protected routes, password/lockout policy, and CLI account provisioning with no public registration. CI passed. The user verified local sign-in.

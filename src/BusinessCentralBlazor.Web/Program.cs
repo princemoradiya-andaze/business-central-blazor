@@ -2,6 +2,7 @@ using BusinessCentralBlazor.Web.Components;
 using BusinessCentralBlazor.Infrastructure.Identity;
 using BusinessCentralBlazor.Infrastructure.Persistence;
 using BusinessCentralBlazor.Web.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
@@ -28,9 +29,16 @@ builder.Services.ConfigureApplicationCookie(options =>
     options.SlidingExpiration = true;
     options.ExpireTimeSpan = TimeSpan.FromHours(8);
 });
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+    options.AddPolicy(
+        CompanyAuthorizationPolicies.ActiveCompany,
+        policy => policy
+            .RequireAuthenticatedUser()
+            .AddRequirements(new ActiveCompanyRequirement())));
+builder.Services.AddScoped<IAuthorizationHandler, ActiveCompanyAuthorizationHandler>();
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddScoped<IActiveCompanyContext, ActiveCompanyContext>();
+builder.Services.AddScoped<ICompanyScopeAuthorizer, CompanyScopeAuthorizer>();
 builder.Services.AddRazorPages();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
@@ -54,7 +62,7 @@ app.UseAntiforgery();
 app.MapStaticAssets();
 app.MapRazorPages();
 app.MapRazorComponents<App>()
-    .RequireAuthorization()
+    .RequireAuthorization(CompanyAuthorizationPolicies.ActiveCompany)
     .AddInteractiveServerRenderMode();
 
 app.Run();

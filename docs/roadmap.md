@@ -26,8 +26,8 @@ Only mark tasks complete when their acceptance criteria have been verified.
 
 - [ ] Phase tracker: [#10](https://github.com/princemoradiya-andaze/business-central-blazor/issues/10) — complete all four scoped issues below, then verify on `dev` and release to `main`.
 - [ ] [#11](https://github.com/princemoradiya-andaze/business-central-blazor/issues/11) — ASP.NET Core Identity sign-in/out and administrator-managed accounts; no public self-registration.
-- [ ] [#13](https://github.com/princemoradiya-andaze/business-central-blazor/issues/13) — tenant/company memberships and validated active-company context.
-- [ ] [#14](https://github.com/princemoradiya-andaze/business-central-blazor/issues/14) — authorization policies and cross-tenant/company data isolation.
+- [x] [#13](https://github.com/princemoradiya-andaze/business-central-blazor/issues/13) — tenant/company memberships and validated active-company context (merged in PR #18; local verification passed).
+- [ ] [#14](https://github.com/princemoradiya-andaze/business-central-blazor/issues/14) — authorization policies and cross-tenant/company data isolation (in progress).
 - [ ] [#12](https://github.com/princemoradiya-andaze/business-central-blazor/issues/12) — authenticated application shell, navigation, and reusable CRUD foundation.
 
 **Merge gate:** Ask the user for explicit approval before merging every PR, even when all CI checks pass.
@@ -40,4 +40,4 @@ Only mark tasks complete when their acceptance criteria have been verified.
 
 ## Current next step
 
-Phase 0 is complete on `main`. Phase 1 is tracked by issue #10 and four implementation issues (#11–#14). Administrator-managed authentication and CLI provisioning are merged into `dev` through PRs #16 and #17; the user verified local administrator sign-in. Issue #13 (company membership/context) is now in progress; issues #12 and #14 remain open for the app shell/CRUD foundation and authorization/isolation. Ask the user before merging every PR. Hosted deployment is not part of the agreed workflow.
+Phase 0 is complete on `main`. Phase 1 is tracked by issue #10 and four implementation issues (#11–#14). Administrator-managed authentication and CLI provisioning are merged into `dev` through PRs #16 and #17; the user verified local administrator sign-in. Issue #13 (company membership/context) is merged in PR #18 and locally verified. Issue #14 (authorization/isolation) is in progress; issue #12 (app shell/CRUD) follows it. Ask the user before merging every PR. Hosted deployment is not part of the agreed workflow.

@@ -1,5 +1,5 @@
 ﻿@page "/"
-@attribute [Authorize]
+@attribute [Authorize(Policy = CompanyAuthorizationPolicies.ActiveCompany)]
 
 <PageTitle>Business Central Blazor</PageTitle>
 
