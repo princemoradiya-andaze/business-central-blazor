@@ -1,0 +1,120 @@
+@page "/financial/general-ledger/accounts/{AccountId:guid}/edit"
+@attribute [Authorize(Policy = CompanyAuthorizationPolicies.ActiveCompany)]
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IGeneralLedgerAccountService AccountService
+@inject NavigationManager Navigation
+
+<PageTitle>Edit account</PageTitle>
+
+<nav aria-label="Breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/financial/general-ledger/accounts">Chart of Accounts</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Edit account</li>
+    </ol>
+</nav>
+
+@if (isLoading)
+{
+    <p role="status" aria-live="polite">Loading account...</p>
+}
+else if (companyContextUnavailable)
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+    <a href="/account/company" data-enhance-nav="false">Select an active company</a>
+}
+else if (notFound)
+{
+    <h1>Account not found</h1>
+    <p>The account does not exist in the active company.</p>
+    <a href="/financial/general-ledger/accounts">Back to Chart of Accounts</a>
+}
+else
+{
+    <h1>Edit account</h1>
+    <p class="text-body-secondary">Update the account details. Block accounts instead of deleting them.</p>
+
+    <GeneralLedgerAccountForm Model="@input"
+                              ParentAccounts="@parentAccounts"
+                              SubmitText="Save changes"
+                              IsSaving="@isSaving"
+                              ErrorMessage="@errorMessage"
+                              OnValidSubmit="SaveAsync" />
+
+}
+
+@code {
+    [Parameter]
+    public Guid AccountId { get; set; }
+
+    private readonly GeneralLedgerAccountInput input = new();
+    private IReadOnlyList<GeneralLedgerAccountListItem> parentAccounts = [];
+    private bool isLoading = true;
+    private bool isSaving;
+    private bool notFound;
+    private bool companyContextUnavailable;
+    private string? errorMessage;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        try
+        {
+            var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+            var account = await AccountService.GetAsync(user, AccountId);
+            if (account is null)
+            {
+                notFound = true;
+                return;
+            }
+
+            input.Number = account.Number;
+            input.Name = account.Name;
+            input.Category = account.Category;
+            input.Type = account.Type;
+            input.ParentAccountId = account.ParentAccountId;
+            input.AllowsDirectPosting = account.AllowsDirectPosting;
+            input.IsBlocked = account.IsBlocked;
+            parentAccounts = (await AccountService.GetAllAsync(user))
+                .Where(item => item.Id != AccountId)
+                .ToArray();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            companyContextUnavailable = true;
+            errorMessage = "Your active company is no longer available. Select an active company and try again.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        isSaving = true;
+        errorMessage = null;
+        try
+        {
+            var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+            if (!await AccountService.UpdateAsync(user, AccountId, input))
+            {
+                notFound = true;
+                return;
+            }
+
+            Navigation.NavigateTo("/financial/general-ledger/accounts");
+        }
+        catch (UnauthorizedAccessException)
+        {
+            companyContextUnavailable = true;
+            errorMessage = "Your active company is no longer available. Select an active company and try again.";
+        }
+        catch (ValidationException exception)
+        {
+            errorMessage = exception.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}

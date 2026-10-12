@@ -24,7 +24,7 @@ Only mark tasks complete when their acceptance criteria have been verified.
 
 ## Phase 1 — Foundation framework
 
-- [ ] Phase tracker: [#10](https://github.com/princemoradiya-andaze/business-central-blazor/issues/10) — complete all four scoped issues below, then verify on `dev` and release to `main`.
+- [x] Phase tracker: [#10](https://github.com/princemoradiya-andaze/business-central-blazor/issues/10) — all four scoped issues complete; Phase 1 released and verified on `main` in PR #27, with completion recorded in PR #28.
 - [x] [#11](https://github.com/princemoradiya-andaze/business-central-blazor/issues/11) — ASP.NET Core Identity sign-in/out and administrator-managed accounts; no public self-registration (merged in PRs #16 and #17; local sign-in verified).
 - [x] [#13](https://github.com/princemoradiya-andaze/business-central-blazor/issues/13) — tenant/company memberships and validated active-company context (merged in PR #18; local verification passed).
 - [x] [#14](https://github.com/princemoradiya-andaze/business-central-blazor/issues/14) — authorization policies and cross-tenant/company data isolation (merged in PR #19; CI and local Release build/22 tests passed).
@@ -34,10 +34,10 @@ Only mark tasks complete when their acceptance criteria have been verified.
 
 ## Later phases
 
-- [ ] Core financials: chart of accounts, general ledger, dimensions, journals, bank, and tax.
+- [ ] **Phase 2 — Core financials:** [#29](https://github.com/princemoradiya-andaze/business-central-blazor/issues/29) tracks chart of accounts, general ledger, dimensions, journals, bank, and tax. The first implementation slice is [#30](https://github.com/princemoradiya-andaze/business-central-blazor/issues/30), Chart of Accounts setup and management, in progress on `feature/30-chart-of-accounts`.
 - [ ] Sales, purchasing, inventory, and document lifecycles.
 - [ ] Advanced capabilities, production operations, and Azure deployment.
 
 ## Current next step
 
-Phase 0 is complete on `main`. All four Phase 1 implementation issues (#11–#14) are merged into `dev`: authentication through PRs #16 and #17, company context through PR #18, authorization/isolation through PR #19, and the authenticated shell/Workspace notes through PR #20. Local `dev` Release build passed with 0 warnings/errors, all 28 tests passed, EF reported no pending model changes, and the local app returned HTTP 200 for `/account/login` (anonymous `/` redirects to sign-in). With the user's approval, `AddWorkspaceNotes` was applied to `BusinessCentralBlazor_Phase0` on `.\BCDEMO`; its migration history, table, composite company FK, and index were verified, with no note rows inserted. Issue #12 is closed. Issue #10 remains open until the Phase 1 release checks pass on `main` through an approved release PR. Ask the user before merging every PR. Hosted deployment is not part of the agreed workflow.
+Phase 0 and Phase 1 are complete on `main`. Phase 1 was released in PR #27 and documented in PR #28; the merged `main` commit passed a Release build (0 warnings/errors), all 32 tests, EF model-drift validation, and local HTTP smoke checks. Phase 2 planning is tracked in #29. The Chart of Accounts first slice (#30) is in progress from `dev`; it uses the existing account schema and does not require a migration. Ask the user before merging every PR. Hosted deployment is not part of the agreed workflow.

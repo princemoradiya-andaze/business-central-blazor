@@ -54,8 +54,8 @@ Update this table when phase status materially changes. Link issues, PRs, commit
 | Phase | Status | Exit gate |
 |---|---|---|
 | Phase 0 — Repository setup and schema discovery | Complete | Completed on `main`; local SQL Server migration, SQL smoke, build/tests, and app startup verified. |
-| Phase 1 — Foundation framework | In progress | Issues #11–#14 are complete and verified on `dev`; pass release PR/CI and local verification on `main`. Ask the user before merging every PR. |
-| Phase 2 — Core financials | Not started | Financial workflows and transaction invariants pass unit, integration, and environment tests. |
+| Phase 1 — Foundation framework | Complete | Issues #11–#14 and tracker #10 are complete; release PR #27 and completion-docs PR #28 passed required approval and verification. |
+| Phase 2 — Core financials | In progress | Financial workflows and transaction invariants pass unit, integration, and environment tests. |
 | Phase 3 — Sales, purchasing, and inventory | Not started | Document lifecycles and stock/financial consistency are verified. |
 | Phase 4 — Advanced capabilities and operations | Not started | Production, deployment, monitoring, recovery, and advanced capabilities meet release criteria. |
 
@@ -67,6 +67,8 @@ Record each material update newest-first. Use the local project timezone (Asia/K
 
 ### 2026-10-12
 
+- **Phase 2 started:** tracker #29 defines the proposed core-financials sequence; Chart of Accounts setup and management is the first implementation slice in issue #30, based on `dev`. Its company-scoped service, list/create/edit UI, hierarchy validation, and focused tests are in progress. No schema migration is expected because the account table and constraints already exist. Shared UI patterns will be extracted only when concrete feature workflows establish reuse.
+- **Phase 1 complete on `main`:** PR #27 released the implementation after explicit user approval and CI passed; completion documentation merged in PR #28 and closed tracker #10. The merged `main` code passed Release build, all 32 tests, EF model-drift validation, and local HTTP smoke checks.
 - **Issue #12 merged and locally verified:** PR #20 merged into `dev` after explicit user approval; CI passed. The synchronized local `dev` Release build passed with 0 warnings/errors and all 28 tests passed; EF reported no pending model changes. The local app returned HTTP 200 for `/account/login`, and anonymous `/` redirected to sign-in. With explicit approval, `AddWorkspaceNotes` was applied to `BusinessCentralBlazor_Phase0` on `.\BCDEMO`; migration history, table, composite company FK, and index were verified. No note rows or company memberships were inserted. Issue #12 was closed.
 - **Issue #12 implementation started:** based on PR #19's merged `dev` commit in `feature/12-app-shell-crud`. The user selected a SQL-backed generic Workspace notes example (not an ERP module); the `AddWorkspaceNotes` migration was scaffolded. No sample note data is seeded.
 - **Issue #14 authorization merged:** PR #19 merged into `dev` after explicit user approval; CI passed. The synchronized local `dev` Release build passed with 0 warnings/errors and all 22 tests passed. Issue #14 was closed.
