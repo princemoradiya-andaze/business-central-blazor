@@ -1,0 +1,157 @@
+@page "/financial/general-ledger/accounts/{AccountId:guid}/activity"
+@attribute [Authorize(Policy = CompanyAuthorizationPolicies.ActiveCompany)]
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IGeneralLedgerInquiryService InquiryService
+
+<PageTitle>Account Activity</PageTitle>
+
+<div class="mb-4">
+    <h1>Account activity</h1>
+    <p class="text-body-secondary mb-0">Posted activity and balances for the active company.</p>
+</div>
+
+<EditForm Model="filter" OnValidSubmit="ApplyFilters">
+    <div class="row g-3 align-items-end mb-4">
+        <div class="col-sm-6 col-lg-3">
+            <label class="form-label" for="from-date">From date</label>
+            <InputDate id="from-date" class="form-control" @bind-Value="filter.FromDate" />
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <label class="form-label" for="through-date">Through date</label>
+            <InputDate id="through-date" class="form-control" @bind-Value="filter.ThroughDate" />
+        </div>
+        <div class="col-lg-2">
+            <button class="btn btn-primary" type="submit">Apply filters</button>
+        </div>
+    </div>
+</EditForm>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+}
+else if (activity is null)
+{
+    <div class="alert alert-warning" role="status">Account not found in the active company.</div>
+}
+else
+{
+    <h2>@activity.AccountNumber — @activity.AccountName</h2>
+    <div class="table-responsive">
+        <table class="table table-bordered">
+            <caption class="visually-hidden">Account opening, period, and closing balances</caption>
+            <thead>
+                <tr>
+                    <th scope="col">Opening debit</th>
+                    <th scope="col">Opening credit</th>
+                    <th scope="col">Period debit</th>
+                    <th scope="col">Period credit</th>
+                    <th scope="col">Closing debit</th>
+                    <th scope="col">Closing credit</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>@activity.OpeningDebit.ToString("N4")</td>
+                    <td>@activity.OpeningCredit.ToString("N4")</td>
+                    <td>@activity.PeriodDebit.ToString("N4")</td>
+                    <td>@activity.PeriodCredit.ToString("N4")</td>
+                    <td>@activity.ClosingDebit.ToString("N4")</td>
+                    <td>@activity.ClosingCredit.ToString("N4")</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    @if (entryReport is not null && entryReport.Entries.Count == 0)
+    {
+        <div class="alert alert-info" role="status">No posted activity matches this date range.</div>
+    }
+    else if (entryReport is not null)
+    {
+        <div class="table-responsive">
+            <table class="table table-striped align-middle">
+                <caption class="visually-hidden">Posted account activity for the selected date range</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">Entry</th>
+                        <th scope="col">Posting date</th>
+                        <th scope="col">Document</th>
+                        <th scope="col">Description</th>
+                        <th scope="col" class="text-end">Debit</th>
+                        <th scope="col" class="text-end">Credit</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var entry in entryReport.Entries)
+                    {
+                        <tr>
+                            <th scope="row">@entry.EntryNumber</th>
+                            <td>@entry.PostingDate.ToString("yyyy-MM-dd")</td>
+                            <td>@entry.DocumentNumber</td>
+                            <td>@entry.Description</td>
+                            <td class="text-end">@entry.DebitAmount.ToString("N4")</td>
+                            <td class="text-end">@entry.CreditAmount.ToString("N4")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    <a class="btn btn-outline-secondary"
+       href="@($"/financial/general-ledger/entries?accountId={AccountId}")">View account entries</a>
+}
+
+@code {
+    [Parameter]
+    public Guid AccountId { get; set; }
+
+    private GeneralLedgerEntryFilter filter = new();
+    private GeneralLedgerAccountActivityReport? activity;
+    private GeneralLedgerEntryReport? entryReport;
+    private string? errorMessage;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+        await LoadActivityAsync(user);
+    }
+
+    private async Task ApplyFilters()
+    {
+        errorMessage = null;
+        var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+        await LoadActivityAsync(user);
+    }
+
+    private async Task LoadActivityAsync(System.Security.Claims.ClaimsPrincipal user)
+    {
+        try
+        {
+            activity = await InquiryService.GetAccountActivityAsync(
+                user,
+                AccountId,
+                filter.FromDate,
+                filter.ThroughDate);
+            entryReport = activity is null
+                ? null
+                : await InquiryService.GetEntriesAsync(user, new GeneralLedgerEntryFilter
+                {
+                    FromDate = filter.FromDate,
+                    ThroughDate = filter.ThroughDate,
+                    AccountId = AccountId
+                });
+        }
+        catch (ValidationException exception)
+        {
+            activity = null;
+            entryReport = null;
+            errorMessage = exception.Message;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            activity = null;
+            entryReport = null;
+            errorMessage = "Your active company is no longer available. Select an active company and try again.";
+        }
+    }
+}

@@ -1,0 +1,146 @@
+@page "/financial/general-ledger/entries"
+@attribute [Authorize(Policy = CompanyAuthorizationPolicies.ActiveCompany)]
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IGeneralLedgerInquiryService InquiryService
+
+<PageTitle>General Ledger Entries</PageTitle>
+
+<div class="mb-4">
+    <h1>General ledger entries</h1>
+    <p class="text-body-secondary mb-0">Search immutable posted activity for the active company.</p>
+</div>
+
+<EditForm Model="filter" OnValidSubmit="ApplyFilters">
+    <DataAnnotationsValidator />
+    <div class="row g-3 align-items-end mb-4">
+        <div class="col-sm-6 col-lg-2">
+            <label class="form-label" for="from-date">From date</label>
+            <InputDate id="from-date" class="form-control" @bind-Value="filter.FromDate" />
+        </div>
+        <div class="col-sm-6 col-lg-2">
+            <label class="form-label" for="through-date">Through date</label>
+            <InputDate id="through-date" class="form-control" @bind-Value="filter.ThroughDate" />
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <label class="form-label" for="account-filter">Account</label>
+            <InputSelect id="account-filter" class="form-select" @bind-Value="filter.AccountId">
+                <option value="">All accounts</option>
+                @foreach (var account in accounts)
+                {
+                    <option value="@account.Id">@account.Number — @account.Name</option>
+                }
+            </InputSelect>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <label class="form-label" for="document-filter">Document number contains</label>
+            <InputText id="document-filter" class="form-control" @bind-Value="filter.DocumentNumber" />
+            <ValidationMessage For="() => filter.DocumentNumber" />
+        </div>
+        <div class="col-lg-2">
+            <button class="btn btn-primary" type="submit">Apply filters</button>
+        </div>
+    </div>
+    <ValidationSummary />
+</EditForm>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+}
+else if (report is not null && report.Entries.Count == 0)
+{
+    <div class="alert alert-info" role="status">No posted entries match these filters.</div>
+}
+else if (report is not null)
+{
+    <div class="d-flex gap-4 mb-3">
+        <span><strong>Debits:</strong> @report.TotalDebit.ToString("N4")</span>
+        <span><strong>Credits:</strong> @report.TotalCredit.ToString("N4")</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-striped align-middle">
+            <caption class="visually-hidden">Posted general ledger entries for the active company</caption>
+            <thead>
+                <tr>
+                    <th scope="col">Entry</th>
+                    <th scope="col">Posting date</th>
+                    <th scope="col">Account</th>
+                    <th scope="col">Document</th>
+                    <th scope="col">Description</th>
+                    <th scope="col" class="text-end">Debit</th>
+                    <th scope="col" class="text-end">Credit</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var entry in report.Entries)
+                {
+                    <tr>
+                        <th scope="row">@entry.EntryNumber</th>
+                        <td>@entry.PostingDate.ToString("yyyy-MM-dd")</td>
+                        <td>
+                            <a href="@($"/financial/general-ledger/accounts/{entry.AccountId}/activity")">
+                                @entry.AccountNumber — @entry.AccountName
+                            </a>
+                        </td>
+                        <td>@entry.DocumentNumber</td>
+                        <td>@entry.Description</td>
+                        <td class="text-end">@entry.DebitAmount.ToString("N4")</td>
+                        <td class="text-end">@entry.CreditAmount.ToString("N4")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "accountId")]
+    public Guid? AccountFilter { get; set; }
+
+    private GeneralLedgerEntryFilter filter = new();
+    private IReadOnlyList<GeneralLedgerAccountOption> accounts = [];
+    private GeneralLedgerEntryReport? report;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        filter.AccountId = AccountFilter;
+        var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+        try
+        {
+            accounts = await InquiryService.GetAccountsAsync(user);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            errorMessage = "Your active company is no longer available. Select an active company and try again.";
+            return;
+        }
+
+        await LoadReportAsync(user);
+    }
+
+    private async Task ApplyFilters()
+    {
+        errorMessage = null;
+        var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+        await LoadReportAsync(user);
+    }
+
+    private async Task LoadReportAsync(System.Security.Claims.ClaimsPrincipal user)
+    {
+        try
+        {
+            report = await InquiryService.GetEntriesAsync(user, filter);
+        }
+        catch (ValidationException exception)
+        {
+            report = null;
+            errorMessage = exception.Message;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            report = null;
+            errorMessage = "Your active company is no longer available. Select an active company and try again.";
+        }
+    }
+}
