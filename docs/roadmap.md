@@ -18,8 +18,9 @@ Only mark tasks complete when their acceptance criteria have been verified.
 - [x] Verify model mappings, SQL constraints/indexes, migration history, and dependency vulnerability status.
 - [x] Run the SQL persistence/constraint smoke test; verify all test rows roll back.
 - [x] Re-run final local restore/build/tests, EF migration drift check, SQL smoke test, dependency audit, app HTTP smoke test, and secret/artifact exclusion on this issue branch.
-- [ ] Merge schema work through a PR to `dev`, then verify the merged build/tests in CI and an available hosted dev environment.
-- [ ] Promote completed Phase 0 through a release PR to `main` and verify the production/main release before closing the issue.
+- [x] Merge the independently designed schema branch through a PR into `dev`; verify merged restore/build/tests, migration drift, and SQL smoke test locally and in CI.
+- [ ] Verify Phase 0 in an available hosted dev environment.
+- [ ] Promote the completed, metadata-reviewed Phase 0 release to `main` through an approved release PR and verify production/main before closing the issue.
 
 ## Phase 1 — Foundation framework
 
@@ -35,4 +36,4 @@ Only mark tasks complete when their acceptance criteria have been verified.
 
 ## Current next step
 
-Verify the applicable license terms and entitlement for the locally available Business Central 28.4 artifacts before inspecting AL source. The independent schema and initial SQL Server migration are now implemented; next finish local verification, then use PR/CI and available dev/release environment gates. Keep the Phase 0 issue open until all applicable acceptance criteria are verified.
+Verify applicable on-premises license terms and entitlement for the locally available Business Central 28.4 artifacts before inspecting AL source. The independent schema and initial SQL Server migration are implemented and verified locally/in CI on `dev`; next unblock permitted metadata discovery and identify/provision hosted dev and production release environments. Keep the Phase 0 issue open and do not promote it to `main` until these gates are verified.
