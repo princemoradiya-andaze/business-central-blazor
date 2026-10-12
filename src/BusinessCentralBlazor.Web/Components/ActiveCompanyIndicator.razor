@@ -2,7 +2,7 @@
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject IActiveCompanyContext ActiveCompanyContext
 
-<div class="nav-item px-3 small" aria-live="polite">
+<div class="nav-item px-3 small text-light" aria-live="polite">
     @if (activeCompany is null)
     {
         <span>No active company</span>
@@ -12,7 +12,7 @@
         <span>Company: @activeCompany.Name (@activeCompany.Code)</span>
     }
     <div>
-        <a href="/account/company" data-enhance-nav="false">Select company</a>
+        <a class="link-light" href="/account/company" data-enhance-nav="false">Select company</a>
     </div>
 </div>
 

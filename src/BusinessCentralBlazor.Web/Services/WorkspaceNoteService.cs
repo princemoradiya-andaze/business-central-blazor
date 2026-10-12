@@ -36,12 +36,13 @@ public interface IWorkspaceNoteService
 }
 
 public sealed class WorkspaceNoteService(
-    ErpDbContext dbContext,
+    IDbContextFactory<ErpDbContext> dbContextFactory,
     ICompanyScopeAuthorizer companyScopeAuthorizer) : IWorkspaceNoteService
 {
     public async Task<IReadOnlyList<WorkspaceNoteListItem>> GetAllAsync(ClaimsPrincipal user)
     {
         var company = await GetRequiredCompanyAsync(user);
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync();
         return await dbContext.WorkspaceNotes
             .AsNoTracking()
             .Where(note => note.TenantId == company.TenantId && note.CompanyId == company.CompanyId)
@@ -54,6 +55,7 @@ public sealed class WorkspaceNoteService(
     public async Task<WorkspaceNoteDetail?> GetAsync(ClaimsPrincipal user, Guid noteId)
     {
         var company = await GetRequiredCompanyAsync(user);
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync();
         return await dbContext.WorkspaceNotes
             .AsNoTracking()
             .Where(note =>
@@ -73,6 +75,7 @@ public sealed class WorkspaceNoteService(
     {
         var company = await GetRequiredCompanyAsync(user);
         Validate(input);
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync();
 
         var now = DateTimeOffset.UtcNow;
         var note = new WorkspaceNote
@@ -95,6 +98,7 @@ public sealed class WorkspaceNoteService(
     {
         var company = await GetRequiredCompanyAsync(user);
         Validate(input);
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync();
 
         var note = await dbContext.WorkspaceNotes.SingleOrDefaultAsync(item =>
             item.TenantId == company.TenantId &&
@@ -115,6 +119,7 @@ public sealed class WorkspaceNoteService(
     public async Task<bool> DeleteAsync(ClaimsPrincipal user, Guid noteId)
     {
         var company = await GetRequiredCompanyAsync(user);
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync();
         var note = await dbContext.WorkspaceNotes.SingleOrDefaultAsync(item =>
             item.TenantId == company.TenantId &&
             item.CompanyId == company.CompanyId &&

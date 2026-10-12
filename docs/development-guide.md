@@ -48,6 +48,8 @@ The Blazor component endpoint and company-owned pages use the `ActiveCompany` au
 
 This route policy is not a substitute for per-operation checks. Every company-owned API or service operation must resolve scope through `ICompanyScopeAuthorizer`: call `ResolveAuthorizedCompanyAsync` with the requested tenant/company IDs when a request identifies its target, or `ResolveActiveCompanyAsync` when the operation is scoped to the current selection. Use only the returned validated IDs in database filters and writes. These methods return no scope for anonymous users, absent/stale selections, revoked memberships, inactive companies, or a tenant/company pair other than the validated active selection. Never query or mutate data using only an ID supplied by the client. The authorization boundary is application-level; database row-level security is not implemented.
 
+Blazor Server circuits can run component operations concurrently. Web services therefore create a separate `ErpDbContext` from `IDbContextFactory<ErpDbContext>` for each database operation; do not retain a context in a circuit-scoped service or share one across awaited operations.
+
 ## Shared shell and workspace notes
 
 The authenticated Blazor shell shows the active company and links to a SQL-backed Workspace notes example. Notes are stored in the `WorkspaceNotes` table, and the service derives the tenant/company scope from the authenticated principal for every list, detail, create, edit, or delete operation. Company and tenant IDs are never accepted from the note form. A note ID from another company is treated as not found. The example is generic foundation UI, not an ERP module; no sample notes are seeded automatically.

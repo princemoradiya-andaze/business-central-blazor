@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddDbContext<ErpDbContext>((services, options) =>
+builder.Services.AddDbContextFactory<ErpDbContext>((services, options) =>
 {
     var connectionString = services.GetRequiredService<IConfiguration>().GetConnectionString("ErpDatabase");
     if (string.IsNullOrWhiteSpace(connectionString))
