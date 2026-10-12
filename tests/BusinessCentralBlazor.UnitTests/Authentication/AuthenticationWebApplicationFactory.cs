@@ -31,7 +31,8 @@ public sealed class AuthenticationWebApplicationFactory : WebApplicationFactory<
             services.RemoveAll<IDbContextOptionsConfiguration<ErpDbContext>>();
             services.RemoveAll<DbContextOptions<ErpDbContext>>();
             services.RemoveAll<ErpDbContext>();
-            services.AddDbContext<ErpDbContext>(options => options.UseInMemoryDatabase(databaseName));
+            services.RemoveAll<IDbContextFactory<ErpDbContext>>();
+            services.AddDbContextFactory<ErpDbContext>(options => options.UseInMemoryDatabase(databaseName));
             services.AddTransient<IStartupFilter, CompanyAuthorizationTestApiStartupFilter>();
         });
     }

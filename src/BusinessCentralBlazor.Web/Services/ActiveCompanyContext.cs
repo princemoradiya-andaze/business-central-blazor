@@ -22,7 +22,7 @@ public interface IActiveCompanyContext
     Task<CompanyMembershipOption?> ResolveAsync(ClaimsPrincipal user);
 }
 
-public sealed class ActiveCompanyContext(ErpDbContext dbContext) : IActiveCompanyContext
+public sealed class ActiveCompanyContext(IDbContextFactory<ErpDbContext> dbContextFactory) : IActiveCompanyContext
 {
     public async Task<IReadOnlyList<CompanyMembershipOption>> GetEligibleCompaniesAsync(ClaimsPrincipal user)
     {
@@ -37,6 +37,7 @@ public sealed class ActiveCompanyContext(ErpDbContext dbContext) : IActiveCompan
 
     private async Task<IReadOnlyList<CompanyMembershipOption>> GetEligibleCompaniesForUserAsync(Guid userId)
     {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync();
         var eligibleCompanies =
             from membership in dbContext.CompanyMemberships.AsNoTracking()
             join tenantMembership in dbContext.TenantMemberships.AsNoTracking()

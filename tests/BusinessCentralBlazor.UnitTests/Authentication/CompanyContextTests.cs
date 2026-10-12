@@ -71,6 +71,29 @@ public sealed class CompanyContextTests(AuthenticationWebApplicationFactory fact
     }
 
     [Fact]
+    public async Task ConcurrentCompanyContextLookupsUseIndependentDbContexts()
+    {
+        var email = $"concurrent-company-{Guid.NewGuid():N}@example.invalid";
+        await factory.CreateTestUserAsync(email, TestPassword);
+        var company = await factory.AddCompanyMembershipAsync(email, "CONCURRENT", "Concurrent Company");
+        var userId = await GetUserIdAsync(email);
+        var user = new ClaimsPrincipal(new ClaimsIdentity(
+        [
+            new Claim(ClaimTypes.NameIdentifier, userId.ToString()),
+            new Claim(ActiveCompanyClaim.Type, company.CompanyId.ToString())
+        ], "test"));
+        using var serviceScope = factory.Services.CreateScope();
+        var context = serviceScope.ServiceProvider.GetRequiredService<IActiveCompanyContext>();
+
+        var eligibleCompaniesTask = context.GetEligibleCompaniesAsync(user);
+        var resolvedCompanyTask = context.ResolveAsync(user);
+        await Task.WhenAll(eligibleCompaniesTask, resolvedCompanyTask);
+
+        Assert.Single(await eligibleCompaniesTask);
+        Assert.Equal(company.CompanyId, (await resolvedCompanyTask)?.CompanyId);
+    }
+
+    [Fact]
     public async Task UserWithoutMembershipSeesSafeNoCompanyState()
     {
         var email = $"no-company-{Guid.NewGuid():N}@example.invalid";
