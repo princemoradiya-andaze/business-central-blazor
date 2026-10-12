@@ -54,7 +54,7 @@ Update this table when phase status materially changes. Link issues, PRs, commit
 | Phase | Status | Exit gate |
 |---|---|---|
 | Phase 0 — Repository setup and schema discovery | Complete | Completed on `main`; local SQL Server migration, SQL smoke, build/tests, and app startup verified. |
-| Phase 1 — Foundation framework | In progress | Complete issues #11–#14, verify on `dev`, then pass release PR/CI and local verification on `main`. Ask the user before merging every PR. |
+| Phase 1 — Foundation framework | In progress | Issues #11–#14 are complete and verified on `dev`; pass release PR/CI and local verification on `main`. Ask the user before merging every PR. |
 | Phase 2 — Core financials | Not started | Financial workflows and transaction invariants pass unit, integration, and environment tests. |
 | Phase 3 — Sales, purchasing, and inventory | Not started | Document lifecycles and stock/financial consistency are verified. |
 | Phase 4 — Advanced capabilities and operations | Not started | Production, deployment, monitoring, recovery, and advanced capabilities meet release criteria. |
@@ -67,7 +67,8 @@ Record each material update newest-first. Use the local project timezone (Asia/K
 
 ### 2026-10-12
 
-- **Issue #12 started:** based on PR #19's merged `dev` commit in `feature/12-app-shell-crud`. The user selected a SQL-backed generic Workspace notes example (not an ERP module); the `AddWorkspaceNotes` migration is scaffolded but has not been applied to the user's local database. No sample note data is seeded.
+- **Issue #12 merged and locally verified:** PR #20 merged into `dev` after explicit user approval; CI passed. The synchronized local `dev` Release build passed with 0 warnings/errors and all 28 tests passed; EF reported no pending model changes. The local app returned HTTP 200 for `/account/login`, and anonymous `/` redirected to sign-in. With explicit approval, `AddWorkspaceNotes` was applied to `BusinessCentralBlazor_Phase0` on `.\BCDEMO`; migration history, table, composite company FK, and index were verified. No note rows or company memberships were inserted. Issue #12 was closed.
+- **Issue #12 implementation started:** based on PR #19's merged `dev` commit in `feature/12-app-shell-crud`. The user selected a SQL-backed generic Workspace notes example (not an ERP module); the `AddWorkspaceNotes` migration was scaffolded. No sample note data is seeded.
 - **Issue #14 authorization merged:** PR #19 merged into `dev` after explicit user approval; CI passed. The synchronized local `dev` Release build passed with 0 warnings/errors and all 22 tests passed. Issue #14 was closed.
 - **Issue #14 authorization implementation:** based on synchronized `dev` in `feature/14-company-authorization`. The change added an active-company policy for Blazor components and a reusable per-operation scope authorizer; test-only HTTP read/write operations exercised allowed and cross-tenant/company denial without adding placeholder production endpoints.
 - **Company-context issue #13 merged:** PR #18 is merged into `dev`; local Release build and all 18 tests passed, with no EF model change or migration required. Issue #13 was closed after verification.

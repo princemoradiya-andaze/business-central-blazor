@@ -24,7 +24,7 @@
 | Foundation UI example | `WorkspaceNotes` | Safe generic example records are explicitly tenant/company scoped, with a composite FK to prevent cross-tenant company references. Service operations revalidate the active company and filter reads and writes by the validated tenant/company pair. |
 | Controls and audit | `NumberSeries`, `AuditEntries` | Number-series code unique per company, positive next number, bounded digit width, row-version concurrency; audit rows are company-scoped and indexed by occurrence time. |
 
-The schema now defines 22 application-owned domain tables, 7 ASP.NET Core Identity tables, and the EF migration-history table (30 tables total after all migrations are applied). `AddWorkspaceNotes` creates the table for the foundation UI example. That migration has been scaffolded but not applied to the user's local SQL database; inspect/update migration history after an authorized local application.
+The schema now defines 22 application-owned domain tables, 7 ASP.NET Core Identity tables, and the EF migration-history table (30 tables total after all migrations are applied). With the user's approval, `AddWorkspaceNotes` was applied to `BusinessCentralBlazor_Phase0` on `.\BCDEMO`. The migration-history row, `WorkspaceNotes` table, composite company FK, and index were verified; the table contains no seeded notes. Other databases require their own reviewed migration application.
 
 ## Relationships
 

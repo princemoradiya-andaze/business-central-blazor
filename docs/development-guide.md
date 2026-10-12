@@ -50,7 +50,7 @@ This route policy is not a substitute for per-operation checks. Every company-ow
 
 The authenticated Blazor shell shows the active company and links to a SQL-backed Workspace notes example. Notes are stored in the `WorkspaceNotes` table, and the service derives the tenant/company scope from the authenticated principal for every list, detail, create, edit, or delete operation. Company and tenant IDs are never accepted from the note form. A note ID from another company is treated as not found. The example is generic foundation UI, not an ERP module; no sample notes are seeded automatically.
 
-The `AddWorkspaceNotes` EF migration must be applied before using the example against a SQL Server database. Check the target database name before running `dotnet ef database update`; the repository's documented local development database is `BusinessCentralBlazor_Phase0`. Users also need an active company membership before the Blazor workspace is available.
+The `AddWorkspaceNotes` EF migration has been applied to the documented local development database, `BusinessCentralBlazor_Phase0` on `.\BCDEMO`. For another SQL Server database, check the target database name before running `dotnet ef database update`. Users also need an active company membership before the Blazor workspace is available.
 
 ## Branch and review workflow
 
