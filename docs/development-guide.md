@@ -58,6 +58,12 @@ The authenticated Blazor shell shows the active company and links to a SQL-backe
 
 The `AddWorkspaceNotes` EF migration has been applied to the documented local development database, `BusinessCentralBlazor_Phase0` on `.\BCDEMO`. For another SQL Server database, check the target database name before running `dotnet ef database update`. Users also need an active company membership before the Blazor workspace is available.
 
+## General-ledger inquiry and trial balance
+
+The authenticated financial menu links to company-scoped posted entries at `/financial/general-ledger/entries`, account activity at `/financial/general-ledger/accounts/{accountId}/activity`, and the trial balance at `/financial/general-ledger/trial-balance`. Entry search supports inclusive posting-date bounds, account selection, and a document-number substring. Account activity reports opening debit/credit balances before the start date, debit/credit totals within the selected range, and the resulting closing balance. The trial balance includes posting accounts and their net debit or credit balances through the selected date, inclusive, with reconciling totals.
+
+These reports read immutable `GeneralLedgerEntries` only. Account and active-company scope is resolved server-side for every operation; posted entries cannot be edited or deleted through inquiry screens. This feature reuses the existing schema and requires no migration.
+
 ## Branch and review workflow
 
 - `main` is production-ready; `dev` is the integration branch.

@@ -69,6 +69,9 @@ else
                             }
                         </td>
                         <td>
+                            <a class="btn btn-sm btn-outline-secondary me-1"
+                               href="@($"/financial/general-ledger/accounts/{account.Id}/activity")"
+                               aria-label="@($"View activity: {account.Number} {account.Name}")">Activity</a>
                             <a class="btn btn-sm btn-outline-primary"
                                href="@($"/financial/general-ledger/accounts/{account.Id}/edit")"
                                aria-label="@($"Edit account: {account.Number} {account.Name}")">Edit</a>

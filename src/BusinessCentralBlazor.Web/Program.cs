@@ -43,6 +43,7 @@ builder.Services.AddScoped<IWorkspaceNoteService, WorkspaceNoteService>();
 builder.Services.AddScoped<IGeneralLedgerAccountService, GeneralLedgerAccountService>();
 builder.Services.AddScoped<IDimensionService, DimensionService>();
 builder.Services.AddScoped<IGeneralJournalService, GeneralJournalService>();
+builder.Services.AddScoped<IGeneralLedgerInquiryService, GeneralLedgerInquiryService>();
 builder.Services.AddRazorPages();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();

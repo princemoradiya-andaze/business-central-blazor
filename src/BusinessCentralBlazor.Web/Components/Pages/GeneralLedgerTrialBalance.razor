@@ -1,0 +1,123 @@
+@page "/financial/general-ledger/trial-balance"
+@attribute [Authorize(Policy = CompanyAuthorizationPolicies.ActiveCompany)]
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IGeneralLedgerInquiryService InquiryService
+
+<PageTitle>Trial Balance</PageTitle>
+
+<div class="mb-4">
+    <h1>Trial balance</h1>
+    <p class="text-body-secondary mb-0">Posting-account balances through the selected date for the active company.</p>
+</div>
+
+<EditForm Model="filter" OnValidSubmit="ApplyFilters">
+    <div class="row g-3 align-items-end mb-4">
+        <div class="col-sm-6 col-lg-3">
+            <label class="form-label" for="as-of-date">As of date</label>
+            <InputDate id="as-of-date" class="form-control" @bind-Value="filter.AsOfDate" />
+        </div>
+        <div class="col-lg-2">
+            <button class="btn btn-primary" type="submit">Run report</button>
+        </div>
+    </div>
+</EditForm>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+}
+else if (report is not null)
+{
+    <p><strong>As of:</strong> @report.AsOfDate.ToString("yyyy-MM-dd")</p>
+    @if (report.TotalDebit != report.TotalCredit)
+    {
+        <div class="alert alert-warning" role="alert">
+            Trial balance does not reconcile.             Difference: @Math.Abs(report.TotalDebit - report.TotalCredit).ToString("N4")
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-success" role="status">Debits and credits reconcile.</div>
+    }
+    @if (report.Lines.Count == 0)
+    {
+        <div class="alert alert-info" role="status">No posting accounts are set up for this company.</div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-striped align-middle">
+                <caption class="visually-hidden">Trial balance for the active company</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">Account</th>
+                        <th scope="col">Name</th>
+                        <th scope="col">Category</th>
+                        <th scope="col" class="text-end">Debit balance</th>
+                        <th scope="col" class="text-end">Credit balance</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var line in report.Lines)
+                    {
+                        <tr>
+                            <th scope="row">@line.AccountNumber</th>
+                            <td>
+                                <a href="@($"/financial/general-ledger/accounts/{line.AccountId}/activity")">
+                                    @line.AccountName
+                                </a>
+                            </td>
+                            <td>@line.Category</td>
+                            <td class="text-end">@line.DebitBalance.ToString("N4")</td>
+                            <td class="text-end">@line.CreditBalance.ToString("N4")</td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <th scope="row" colspan="3">Total</th>
+                        <td class="text-end"><strong>@report.TotalDebit.ToString("N4")</strong></td>
+                        <td class="text-end"><strong>@report.TotalCredit.ToString("N4")</strong></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    }
+}
+
+@code {
+    private sealed class TrialBalanceFilter
+    {
+        public DateOnly AsOfDate { get; set; } = DateOnly.FromDateTime(DateTime.Today);
+    }
+
+    private TrialBalanceFilter filter = new();
+    private TrialBalanceReport? report;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+        await LoadReportAsync(user);
+    }
+
+    private async Task ApplyFilters()
+    {
+        errorMessage = null;
+        var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+        await LoadReportAsync(user);
+    }
+
+    private async Task LoadReportAsync(System.Security.Claims.ClaimsPrincipal user)
+    {
+        try
+        {
+            report = await InquiryService.GetTrialBalanceAsync(user, filter.AsOfDate);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            report = null;
+            errorMessage = "Your active company is no longer available. Select an active company and try again.";
+        }
+    }
+}
