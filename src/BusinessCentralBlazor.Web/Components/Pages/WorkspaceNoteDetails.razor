@@ -1,0 +1,137 @@
+@page "/workspace/notes/{NoteId:guid}"
+@attribute [Authorize(Policy = CompanyAuthorizationPolicies.ActiveCompany)]
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IWorkspaceNoteService WorkspaceNoteService
+@inject NavigationManager Navigation
+
+<PageTitle>@(note?.Title ?? "Workspace note")</PageTitle>
+
+<nav aria-label="Breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/workspace/notes">Workspace notes</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Details</li>
+    </ol>
+</nav>
+
+@if (isLoading)
+{
+    <p role="status" aria-live="polite">Loading note...</p>
+}
+else if (companyContextUnavailable)
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+    <a href="/account/company" data-enhance-nav="false">Select an active company</a>
+}
+else if (note is null)
+{
+    <h1>Note not found</h1>
+    <p>This note is not available in the active company.</p>
+    <a class="btn btn-outline-secondary" href="/workspace/notes">Back to notes</a>
+}
+else
+{
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+        <div>
+            <h1>@note.Title</h1>
+            <p class="text-body-secondary">
+                Created @note.CreatedAtUtc.ToLocalTime().ToString("g")
+                · Updated @note.UpdatedAtUtc.ToLocalTime().ToString("g")
+            </p>
+        </div>
+        <div class="d-flex gap-2">
+            <a class="btn btn-primary" href="@($"/workspace/notes/{NoteId}/edit")">Edit</a>
+            @if (!isConfirmingDelete)
+            {
+                <button class="btn btn-outline-danger" type="button" @onclick="() => isConfirmingDelete = true">
+                    Delete
+                </button>
+            }
+        </div>
+    </div>
+
+    @if (isConfirmingDelete)
+    {
+        <div class="alert alert-warning" role="alert">
+            <p>Delete this note? This action cannot be undone.</p>
+            <div class="d-flex gap-2">
+                <button class="btn btn-danger" type="button" disabled="@isDeleting" @onclick="DeleteAsync">
+                    @(isDeleting ? "Deleting..." : "Confirm delete")
+                </button>
+                <button class="btn btn-outline-secondary"
+                        type="button"
+                        disabled="@isDeleting"
+                        @onclick="() => isConfirmingDelete = false">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert alert-danger" role="alert">@errorMessage</div>
+    }
+
+    <section aria-label="Note content">
+        <p class="workspace-note-body">@note.Body</p>
+    </section>
+}
+
+@code {
+    [Parameter]
+    public Guid NoteId { get; set; }
+
+    private WorkspaceNoteDetail? note;
+    private bool isLoading = true;
+    private bool isConfirmingDelete;
+    private bool isDeleting;
+    private bool companyContextUnavailable;
+    private string? errorMessage;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        companyContextUnavailable = false;
+        errorMessage = null;
+        try
+        {
+            var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+            note = await WorkspaceNoteService.GetAsync(user, NoteId);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            companyContextUnavailable = true;
+            errorMessage = "Your active company is no longer available. Select an active company and try again.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task DeleteAsync()
+    {
+        isDeleting = true;
+        errorMessage = null;
+        try
+        {
+            var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+            if (await WorkspaceNoteService.DeleteAsync(user, NoteId))
+            {
+                Navigation.NavigateTo("/workspace/notes");
+                return;
+            }
+
+            note = null;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            companyContextUnavailable = true;
+            errorMessage = "Your active company is no longer available. Select an active company and try again.";
+        }
+        finally
+        {
+            isDeleting = false;
+        }
+    }
+}

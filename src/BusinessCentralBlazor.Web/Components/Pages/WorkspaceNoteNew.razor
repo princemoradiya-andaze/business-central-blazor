@@ -1,0 +1,56 @@
+@page "/workspace/notes/new"
+@attribute [Authorize(Policy = CompanyAuthorizationPolicies.ActiveCompany)]
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IWorkspaceNoteService WorkspaceNoteService
+@inject NavigationManager Navigation
+
+<PageTitle>Create workspace note</PageTitle>
+
+<nav aria-label="Breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/workspace/notes">Workspace notes</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Create</li>
+    </ol>
+</nav>
+
+<h1>Create workspace note</h1>
+<p class="text-body-secondary">This note will be stored only in the active company workspace.</p>
+
+<WorkspaceNoteForm Model="@input"
+                   SubmitText="Create note"
+                   IsSaving="@isSaving"
+                   ErrorMessage="@errorMessage"
+                   OnValidSubmit="CreateAsync" />
+
+@if (companyContextUnavailable)
+{
+    <p class="mt-3"><a href="/account/company" data-enhance-nav="false">Select an active company</a></p>
+}
+
+@code {
+    private readonly WorkspaceNoteInput input = new();
+    private bool isSaving;
+    private bool companyContextUnavailable;
+    private string? errorMessage;
+
+    private async Task CreateAsync()
+    {
+        isSaving = true;
+        errorMessage = null;
+        try
+        {
+            var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+            var noteId = await WorkspaceNoteService.CreateAsync(user, input);
+            Navigation.NavigateTo($"/workspace/notes/{noteId}");
+        }
+        catch (UnauthorizedAccessException)
+        {
+            companyContextUnavailable = true;
+            errorMessage = "Your active company is no longer available. Select an active company and try again.";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}

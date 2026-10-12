@@ -27,6 +27,17 @@ public sealed class CompanySettings
     public int FirstDayOfWeek { get; set; }
 }
 
+public sealed class WorkspaceNote
+{
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public Guid CompanyId { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public string Body { get; set; } = string.Empty;
+    public DateTimeOffset CreatedAtUtc { get; set; }
+    public DateTimeOffset UpdatedAtUtc { get; set; }
+}
+
 public sealed class TenantMembership
 {
     public Guid TenantId { get; set; }

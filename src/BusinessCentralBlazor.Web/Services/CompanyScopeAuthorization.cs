@@ -26,6 +26,8 @@ public sealed class ActiveCompanyAuthorizationHandler(IActiveCompanyContext acti
 
 public interface ICompanyScopeAuthorizer
 {
+    Task<CompanyMembershipOption?> ResolveActiveCompanyAsync(ClaimsPrincipal user);
+
     Task<CompanyMembershipOption?> ResolveAuthorizedCompanyAsync(
         ClaimsPrincipal user,
         Guid tenantId,
@@ -35,6 +37,9 @@ public interface ICompanyScopeAuthorizer
 public sealed class CompanyScopeAuthorizer(IActiveCompanyContext activeCompanyContext)
     : ICompanyScopeAuthorizer
 {
+    public Task<CompanyMembershipOption?> ResolveActiveCompanyAsync(ClaimsPrincipal user) =>
+        activeCompanyContext.ResolveAsync(user);
+
     public async Task<CompanyMembershipOption?> ResolveAuthorizedCompanyAsync(
         ClaimsPrincipal user,
         Guid tenantId,

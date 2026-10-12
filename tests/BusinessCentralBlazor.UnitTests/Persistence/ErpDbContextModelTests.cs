@@ -23,6 +23,7 @@ public sealed class ErpDbContextModelTests
             "Tenants",
             "Companies",
             "CompanySettings",
+            "WorkspaceNotes",
             "TenantMemberships",
             "CompanyMemberships",
             "Currencies",
@@ -126,6 +127,23 @@ public sealed class ErpDbContextModelTests
         Assert.Equal(4, line.FindProperty(nameof(GeneralJournalLine.DebitAmount))!.GetScale());
         Assert.True(batch.FindProperty(nameof(GeneralJournalBatch.RowVersion))!.IsConcurrencyToken);
         Assert.True(numberSeries.FindProperty(nameof(NumberSeries.RowVersion))!.IsConcurrencyToken);
+    }
+
+    [Fact]
+    public void WorkspaceNotesHaveCompanyAndTenantScopedRelationships()
+    {
+        using var context = CreateContext();
+        var model = context.GetService<IDesignTimeModel>().Model;
+        var note = model.FindEntityType(typeof(WorkspaceNote))!;
+        var companyForeignKey = Assert.Single(note.GetForeignKeys(), foreignKey =>
+            foreignKey.Properties.Select(property => property.Name)
+                .SequenceEqual(["TenantId", "CompanyId"]));
+
+        Assert.Equal(
+            ["TenantId", "Id"],
+            companyForeignKey.PrincipalKey.Properties.Select(property => property.Name));
+        Assert.Equal(120, note.FindProperty(nameof(WorkspaceNote.Title))!.GetMaxLength());
+        Assert.Equal(4000, note.FindProperty(nameof(WorkspaceNote.Body))!.GetMaxLength());
     }
 
     private static ErpDbContext CreateContext()

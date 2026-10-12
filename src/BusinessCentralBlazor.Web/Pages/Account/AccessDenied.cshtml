@@ -15,6 +15,14 @@
     <main>
         <h1>Access denied</h1>
         <p>Your account is not authorized to access this resource.</p>
+        @if (User.Identity?.IsAuthenticated == true)
+        {
+            <p><a href="/account/company">Select an available company</a></p>
+        }
+        else
+        {
+            <p><a href="/account/login">Sign in</a></p>
+        }
     </main>
 </body>
 </html>

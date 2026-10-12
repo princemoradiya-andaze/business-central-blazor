@@ -4,7 +4,7 @@ An independently implemented, modular-monolith ERP application using Blazor Serv
 
 ## Status
 
-Phase 0 is complete on `main`. Phase 1 authentication work is in progress on an issue branch: users sign in with administrator-provisioned accounts; public self-registration is disabled. Company membership enforcement and reusable business screens remain future Phase 1 work. Hosted deployment is not part of the current workflow.
+Phase 0 is complete on `main`. Phase 1 authentication, company context, and application-level company authorization are merged into `dev`; public self-registration is disabled. The shared authenticated shell and SQL-backed Workspace notes CRUD example are in progress on an issue branch. Hosted deployment is not part of the current workflow.
 
 ## Prerequisites
 
