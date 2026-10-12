@@ -38,6 +38,7 @@ if (string.IsNullOrWhiteSpace(connectionString))
 }
 
 builder.Services.AddDbContext<ErpDbContext>(options => options.UseSqlServer(connectionString));
+builder.Services.AddDataProtection();
 builder.Services.AddIdentityCore<ErpUser>(ErpIdentityDefaults.Configure)
     .AddRoles<ErpRole>()
     .AddEntityFrameworkStores<ErpDbContext>()
