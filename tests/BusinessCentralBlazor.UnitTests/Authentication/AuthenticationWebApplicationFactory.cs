@@ -1,5 +1,7 @@
 using BusinessCentralBlazor.Infrastructure.Identity;
 using BusinessCentralBlazor.Infrastructure.Persistence;
+using BusinessCentralBlazor.Domain.Entities;
+using BusinessCentralBlazor.Web.Services;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -80,5 +82,75 @@ public sealed class AuthenticationWebApplicationFactory : WebApplicationFactory<
                     $"Could not assign the test account role: {string.Join(", ", assignmentResult.Errors.Select(error => error.Code))}");
             }
         }
+    }
+
+    public async Task<CompanyMembershipOption> AddCompanyMembershipAsync(
+        string email,
+        string companyCode,
+        string companyName,
+        bool companyIsActive = true)
+    {
+        await using var scope = Services.CreateAsyncScope();
+        var services = scope.ServiceProvider;
+        var dbContext = services.GetRequiredService<ErpDbContext>();
+        var userManager = services.GetRequiredService<UserManager<ErpUser>>();
+        var user = await userManager.FindByEmailAsync(email)
+            ?? throw new InvalidOperationException($"The test account '{email}' does not exist.");
+        var tenantId = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+
+        dbContext.AddRange(
+            new Tenant
+            {
+                Id = tenantId,
+                Name = $"Tenant {companyCode}",
+                CreatedAtUtc = DateTimeOffset.UtcNow
+            },
+            new Company
+            {
+                Id = companyId,
+                TenantId = tenantId,
+                Code = companyCode,
+                Name = companyName,
+                IsActive = companyIsActive,
+                CreatedAtUtc = DateTimeOffset.UtcNow
+            },
+            new TenantMembership
+            {
+                TenantId = tenantId,
+                UserId = user.Id,
+                RoleName = "TenantUser",
+                CreatedAtUtc = DateTimeOffset.UtcNow
+            },
+            new CompanyMembership
+            {
+                TenantId = tenantId,
+                CompanyId = companyId,
+                UserId = user.Id,
+                RoleName = "CompanyUser",
+                CreatedAtUtc = DateTimeOffset.UtcNow
+            });
+        await dbContext.SaveChangesAsync();
+
+        return new CompanyMembershipOption(tenantId, companyId, companyCode, companyName, "CompanyUser");
+    }
+
+    public async Task RemoveCompanyMembershipAsync(Guid userId, Guid companyId)
+    {
+        await using var scope = Services.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ErpDbContext>();
+        var membership = await dbContext.CompanyMemberships.SingleAsync(
+            item => item.UserId == userId && item.CompanyId == companyId);
+        dbContext.CompanyMemberships.Remove(membership);
+        await dbContext.SaveChangesAsync();
+    }
+
+    public async Task SetCompanyActiveAsync(Guid companyId, bool isActive)
+    {
+        await using var scope = Services.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ErpDbContext>();
+        var company = await dbContext.Companies.SingleAsync(item => item.Id == companyId);
+        company.IsActive = isActive;
+        await dbContext.SaveChangesAsync();
     }
 }

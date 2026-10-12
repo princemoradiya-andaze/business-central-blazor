@@ -1,0 +1,44 @@
+@page
+@model BusinessCentralBlazor.Web.Pages.Account.CompanyModel
+@{
+    ViewData["Title"] = "Select company";
+}
+
+<h1>Select company</h1>
+<p>Choose a company you are authorized to access.</p>
+
+@if (!string.IsNullOrEmpty(Model.StatusMessage))
+{
+    <div class="alert alert-warning" role="alert">@Model.StatusMessage</div>
+}
+
+@if (Model.AvailableCompanies.Count == 0)
+{
+    <div class="alert alert-info" role="status">
+        No active company memberships are assigned to your account. Contact an administrator for access.
+    </div>
+}
+else
+{
+    @if (Model.ActiveCompany is not null)
+    {
+        <p>Current company: <strong>@Model.ActiveCompany.Name (@Model.ActiveCompany.Code)</strong></p>
+    }
+    else
+    {
+        <p class="text-warning">No valid active company is selected. Choose an available company to continue.</p>
+    }
+
+    <form method="post">
+        <div asp-validation-summary="ModelOnly" class="text-danger" role="alert"></div>
+        <label asp-for="SelectedCompanyId" class="form-label">Available companies</label>
+        <select asp-for="SelectedCompanyId" class="form-select" required>
+            <option value="">Select a company</option>
+            @foreach (var company in Model.AvailableCompanies)
+            {
+                <option value="@company.CompanyId">@company.Name (@company.Code)</option>
+            }
+        </select>
+        <button class="btn btn-primary mt-3" type="submit">Set active company</button>
+    </form>
+}
