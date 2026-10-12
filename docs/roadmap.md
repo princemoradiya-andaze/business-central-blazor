@@ -10,12 +10,16 @@ Only mark tasks complete when their acceptance criteria have been verified.
 - [x] Verify solution restore/build and the initial architecture test.
 - [x] Document the issue/branch/PR lifecycle and dated project change history in `docs/project-playbook.md`.
 - [x] Create `dev` from `main`; merge the initial foundation through a PR and verify local dev-branch build/tests and GitHub CI.
-- [ ] Configure repository branch protections when the plan and permissions allow; no production release or deployment has occurred.
-- [ ] Verify applicable artifact licensing before inspecting or extracting AL source.
+- [x] Require PRs and passing strict `build-and-test` checks on `main` and `dev`; disable administrator bypass, force-push, and branch deletion.
+- [ ] Verify applicable on-premises artifact source-use terms and user entitlement before inspecting or extracting AL source.
 - [ ] Catalogue selected source metadata with provenance and identify version/coverage gaps.
-- [ ] Review and finalize the application-owned schema, posting invariants, and ER diagram.
-- [ ] Implement initial EF Core entities and migrations where appropriate; create the database using a supported development environment.
-- [ ] Verify restore, build, tests, migration/database creation, and secret/artifact exclusion.
+- [x] Design and document the initial independent application schema, relationships, posting invariants, and ER diagram.
+- [x] Implement initial EF Core/Identity entities and SQL Server migration; apply to a new local development database.
+- [x] Verify model mappings, SQL constraints/indexes, migration history, and dependency vulnerability status.
+- [x] Run the SQL persistence/constraint smoke test; verify all test rows roll back.
+- [x] Re-run final local restore/build/tests, EF migration drift check, SQL smoke test, dependency audit, app HTTP smoke test, and secret/artifact exclusion on this issue branch.
+- [ ] Merge schema work through a PR to `dev`, then verify the merged build/tests in CI and an available hosted dev environment.
+- [ ] Promote completed Phase 0 through a release PR to `main` and verify the production/main release before closing the issue.
 
 ## Phase 1 — Foundation framework
 
@@ -31,4 +35,4 @@ Only mark tasks complete when their acceptance criteria have been verified.
 
 ## Current next step
 
-Verify the applicable license terms for the locally available Business Central 28.4 artifacts. Then complete the narrow source metadata catalogue and finalize the independently designed initial schema before creating EF entities or migrations. Track all remaining Phase 0 acceptance criteria in the Phase 0 GitHub issue and complete dev/release verification before closing it.
+Verify the applicable license terms and entitlement for the locally available Business Central 28.4 artifacts before inspecting AL source. The independent schema and initial SQL Server migration are now implemented; next finish local verification, then use PR/CI and available dev/release environment gates. Keep the Phase 0 issue open until all applicable acceptance criteria are verified.
