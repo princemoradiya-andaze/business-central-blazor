@@ -17,13 +17,13 @@ SQL Server is not required for a build, but the initial schema has been migrated
 
 - `main` is production-ready; `dev` is the integration branch.
 - Create short-lived feature/fix branches from `dev`; open pull requests into `dev`.
-- Promote a tested release from `dev` to `main` through a pull request.
-- Require CI to pass and a human review before merging. Restrict direct pushes, protect release tags, and require production environment approval before deployment.
-- Do not force-push, commit secrets, or deploy production from a feature branch.
-- Create one GitHub issue per bounded task, then create `feature/#<issue-number>-<short-description>` or `fix/#<issue-number>-<short-description>` from `dev`. Link the issue in its PR and keep it open until local, dev, and applicable release verification are complete.
+- Verify merged `dev` locally against SQL Server, then promote a tested release from `dev` to `main` through a pull request and verify `main` locally.
+- Require the configured CI check to pass before merging; follow repository PR protections.
+- Do not force-push or commit secrets. Hosted deployment is not part of the current workflow.
+- Create one GitHub issue per bounded task, then create `feature/#<issue-number>-<short-description>` or `fix/#<issue-number>-<short-description>` from `dev`. Link the issue in its PR and keep it open until local checks, merged `dev` verification, and applicable `main` verification are complete.
 
-At the initial inspection, `dev` did not exist and GitHub reported a plan restriction when reading repository rulesets. The `dev` branch was subsequently created from `main`. The repository currently reports itself as public (the user confirmed this is intentional). Both `main` and `dev` now require PRs and the `build-and-test` status check, with strict up-to-date checks and administrator enforcement; zero approving reviews are configured, as requested. Direct force-pushes and deletion are disabled. Do not change repository visibility without authorization.
+The `dev` branch was created from `main`. The repository is public by the user's choice. Both `main` and `dev` require PRs and the `build-and-test` status check, with strict up-to-date checks and administrator enforcement; zero approving reviews are configured, as requested. Direct force-pushes and deletion are disabled. Do not change repository visibility without authorization.
 
 ## CI/CD
 
-`.github/workflows/ci.yml` restores, builds, and tests the solution for `main`, `dev`, and pull requests targeting those branches. CI has passed for the initial `dev` integration. The repository has no configured GitHub deployment environments, Azure CLI is not installed, and Azure resources/credentials were not verified; therefore no hosted dev or production deployment is configured or claimed. Production deployment requires environment approvals and secret-managed credentials. See [the project playbook](project-playbook.md) for phase gates and dated history.
+`.github/workflows/ci.yml` restores, builds, and tests the solution for `main`, `dev`, and pull requests targeting those branches. CI has passed for earlier `dev` integrations; the current schema-alignment changes still need their PR checks. The agreed workflow uses local SQL Server Express and does not include hosted dev or production deployment. See [the project playbook](project-playbook.md) for phase gates and dated history.

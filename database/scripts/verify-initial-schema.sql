@@ -2,7 +2,14 @@ SET NOCOUNT ON;
 SET XACT_ABORT OFF;
 
 IF OBJECT_ID(N'dbo.__EFMigrationsHistory', N'U') IS NULL
-    THROW 51100, 'EF Core migration history is missing. Apply the initial migration first.', 1;
+    THROW 51100, 'EF Core migration history is missing. Apply the schema migrations first.', 1;
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM dbo.__EFMigrationsHistory
+    WHERE MigrationId = N'20261012051809_AlignJournalAndAccountingFoundation'
+)
+    THROW 51104, 'Apply the schema-alignment migration before running this smoke test.', 1;
 
 DECLARE @tenantId uniqueidentifier = NEWID();
 DECLARE @companyId uniqueidentifier = NEWID();
@@ -10,6 +17,7 @@ DECLARE @otherCompanyId uniqueidentifier = NEWID();
 DECLARE @periodId uniqueidentifier = NEWID();
 DECLARE @accountId uniqueidentifier = NEWID();
 DECLARE @otherAccountId uniqueidentifier = NEWID();
+DECLARE @templateId uniqueidentifier = NEWID();
 DECLARE @batchId uniqueidentifier = NEWID();
 DECLARE @lineId uniqueidentifier = NEWID();
 DECLARE @ledgerEntryId uniqueidentifier = NEWID();
@@ -38,31 +46,34 @@ VALUES
     (@otherCompanyId, @currencyCode, N'UTC', 1);
 
 INSERT dbo.GeneralLedgerAccounts
-    (Id, CompanyId, Number, Name, Type, ParentAccountId, AllowsDirectPosting, IsBlocked)
+    (Id, CompanyId, Number, Name, Category, Type, ParentAccountId, AllowsDirectPosting, IsBlocked)
 VALUES
-    (@accountId, @companyId, N'1000', N'Cash', N'Asset', NULL, 1, 0),
-    (@otherAccountId, @otherCompanyId, N'1000', N'Cash', N'Asset', NULL, 1, 0);
+    (@accountId, @companyId, N'1000', N'Cash', N'Asset', N'Posting', NULL, 1, 0),
+    (@otherAccountId, @otherCompanyId, N'1000', N'Cash', N'Asset', N'Posting', NULL, 1, 0);
 
-INSERT dbo.AccountingPeriods (Id, CompanyId, Code, StartsOn, EndsOn, Status)
-VALUES (@periodId, @companyId, N'FY26', '20260101', '20261231', N'Open');
+INSERT dbo.AccountingPeriods (Id, CompanyId, Name, StartsOn, EndsOn, IsClosed, DateLocked)
+VALUES (@periodId, @companyId, N'FY26', '20260101', '20261231', 0, 0);
+
+INSERT dbo.GeneralJournalTemplates (Id, CompanyId, Code, Description, Type)
+VALUES (@templateId, @companyId, N'GENERAL', N'General journal', N'General');
 
 INSERT dbo.GeneralJournalBatches
-    (Id, CompanyId, AccountingPeriodId, Number, Status, CreatedAtUtc)
-VALUES (@batchId, @companyId, @periodId, N'GEN', N'Open', @now);
+    (Id, CompanyId, JournalTemplateId, DefaultAccountingPeriodId, Name, Description, Status, CreatedAtUtc)
+VALUES (@batchId, @companyId, @templateId, @periodId, N'DEFAULT', N'Default journal batch', N'Open', @now);
 
 INSERT dbo.GeneralJournalLines
-    (Id, CompanyId, JournalBatchId, AccountId, LineNumber, PostingDate, DocumentNumber,
+    (Id, CompanyId, JournalBatchId, AccountingPeriodId, AccountId, LineNumber, PostingDate, DocumentNumber,
      Description, DebitAmount, CreditAmount, CurrencyCode, CurrencyDebitAmount, CurrencyCreditAmount)
 VALUES
-    (@lineId, @companyId, @batchId, @accountId, 1, '20261012', N'SMOKE-1',
+    (@lineId, @companyId, @batchId, @periodId, @accountId, 1, '20261012', N'SMOKE-1',
      N'Valid debit line', 10, 0, NULL, NULL, NULL);
 
 BEGIN TRY
     INSERT dbo.GeneralJournalLines
-        (Id, CompanyId, JournalBatchId, AccountId, LineNumber, PostingDate, DocumentNumber,
+        (Id, CompanyId, JournalBatchId, AccountingPeriodId, AccountId, LineNumber, PostingDate, DocumentNumber,
          Description, DebitAmount, CreditAmount, CurrencyCode, CurrencyDebitAmount, CurrencyCreditAmount)
     VALUES
-        (NEWID(), @companyId, @batchId, @accountId, 2, '20261012', N'SMOKE-BAD',
+        (NEWID(), @companyId, @batchId, @periodId, @accountId, 2, '20261012', N'SMOKE-BAD',
          N'Invalid zero line', 0, 0, NULL, NULL, NULL);
     THROW 51101, 'Debit/credit check constraint did not reject an invalid line.', 1;
 END TRY
@@ -75,10 +86,10 @@ END CATCH;
 
 BEGIN TRY
     INSERT dbo.GeneralJournalLines
-        (Id, CompanyId, JournalBatchId, AccountId, LineNumber, PostingDate, DocumentNumber,
+        (Id, CompanyId, JournalBatchId, AccountingPeriodId, AccountId, LineNumber, PostingDate, DocumentNumber,
          Description, DebitAmount, CreditAmount, CurrencyCode, CurrencyDebitAmount, CurrencyCreditAmount)
     VALUES
-        (NEWID(), @otherCompanyId, @batchId, @otherAccountId, 2, '20261012', N'SMOKE-XCO',
+        (NEWID(), @otherCompanyId, @batchId, @periodId, @otherAccountId, 2, '20261012', N'SMOKE-XCO',
          N'Cross-company batch reference', 10, 0, NULL, NULL, NULL);
     THROW 51102, 'Composite company FK did not reject a cross-company batch reference.', 1;
 END TRY
@@ -114,6 +125,6 @@ BEGIN CATCH
     PRINT 'PASS: unique source-line index rejected duplicate ledger posting.';
 END CATCH;
 
-PRINT 'PASS: valid tenant, company, currency, settings, period, account, batch, line, and entry persisted.';
+PRINT 'PASS: valid tenant, company, currency, settings, period, account, template, batch, line, and entry persisted.';
 ROLLBACK TRANSACTION;
 PRINT 'PASS: all test rows rolled back; no sample records were retained.';

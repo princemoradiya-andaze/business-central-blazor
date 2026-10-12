@@ -20,6 +20,7 @@ public sealed class ErpDbContext(DbContextOptions<ErpDbContext> options)
     public DbSet<GeneralLedgerAccount> GeneralLedgerAccounts => Set<GeneralLedgerAccount>();
     public DbSet<Dimension> Dimensions => Set<Dimension>();
     public DbSet<DimensionValue> DimensionValues => Set<DimensionValue>();
+    public DbSet<GeneralJournalTemplate> GeneralJournalTemplates => Set<GeneralJournalTemplate>();
     public DbSet<GeneralJournalBatch> GeneralJournalBatches => Set<GeneralJournalBatch>();
     public DbSet<GeneralJournalLine> GeneralJournalLines => Set<GeneralJournalLine>();
     public DbSet<JournalLineDimension> JournalLineDimensions => Set<JournalLineDimension>();
@@ -145,9 +146,8 @@ public sealed class ErpDbContext(DbContextOptions<ErpDbContext> options)
         modelBuilder.Entity<AccountingPeriod>(entity =>
         {
             ConfigureCompanyEntity(entity);
-            entity.HasIndex(period => new { period.CompanyId, period.Code }).IsUnique();
-            entity.Property(period => period.Code).HasMaxLength(32).IsRequired();
-            entity.Property(period => period.Status).HasConversion<string>().HasMaxLength(16);
+            entity.HasIndex(period => new { period.CompanyId, period.StartsOn }).IsUnique();
+            entity.Property(period => period.Name).HasMaxLength(32).IsRequired();
             entity.ToTable(table => table.HasCheckConstraint(
                 "CK_AccountingPeriods_DateRange",
                 "[StartsOn] <= [EndsOn]"));
@@ -159,6 +159,7 @@ public sealed class ErpDbContext(DbContextOptions<ErpDbContext> options)
             entity.HasIndex(account => new { account.CompanyId, account.Number }).IsUnique();
             entity.Property(account => account.Number).HasMaxLength(32).IsRequired();
             entity.Property(account => account.Name).HasMaxLength(160).IsRequired();
+            entity.Property(account => account.Category).HasConversion<string>().HasMaxLength(16);
             entity.Property(account => account.Type).HasConversion<string>().HasMaxLength(16);
             entity.HasOne<GeneralLedgerAccount>().WithMany()
                 .HasForeignKey(account => new { account.CompanyId, account.ParentAccountId })
@@ -187,18 +188,32 @@ public sealed class ErpDbContext(DbContextOptions<ErpDbContext> options)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
+        modelBuilder.Entity<GeneralJournalTemplate>(entity =>
+        {
+            ConfigureCompanyEntity(entity);
+            entity.HasIndex(template => new { template.CompanyId, template.Code }).IsUnique();
+            entity.Property(template => template.Code).HasMaxLength(10).IsRequired();
+            entity.Property(template => template.Description).HasMaxLength(100).IsRequired();
+            entity.Property(template => template.Type).HasConversion<string>().HasMaxLength(16);
+        });
+
         modelBuilder.Entity<GeneralJournalBatch>(entity =>
         {
             ConfigureCompanyEntity(entity);
-            entity.HasIndex(batch => new { batch.CompanyId, batch.Number }).IsUnique();
-            entity.Property(batch => batch.Number).HasMaxLength(32).IsRequired();
+            entity.HasIndex(batch => new { batch.CompanyId, batch.JournalTemplateId, batch.Name }).IsUnique();
+            entity.Property(batch => batch.Name).HasMaxLength(32).IsRequired();
+            entity.Property(batch => batch.Description).HasMaxLength(100).IsRequired();
             entity.Property(batch => batch.Status).HasConversion<string>().HasMaxLength(16);
             entity.Property(batch => batch.CreatedAtUtc).HasColumnType("datetimeoffset");
             entity.Property(batch => batch.PostedAtUtc).HasColumnType("datetimeoffset");
             entity.Property(batch => batch.RowVersion).IsRowVersion();
             entity.HasOne<AccountingPeriod>().WithMany()
-                .HasForeignKey(batch => new { batch.CompanyId, batch.AccountingPeriodId })
+                .HasForeignKey(batch => new { batch.CompanyId, batch.DefaultAccountingPeriodId })
                 .HasPrincipalKey(period => new { period.CompanyId, period.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<GeneralJournalTemplate>().WithMany()
+                .HasForeignKey(batch => new { batch.CompanyId, batch.JournalTemplateId })
+                .HasPrincipalKey(template => new { template.CompanyId, template.Id })
                 .OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<ErpUser>().WithMany().HasForeignKey(batch => batch.PostedByUserId)
                 .OnDelete(DeleteBehavior.Restrict);
@@ -230,6 +245,10 @@ public sealed class ErpDbContext(DbContextOptions<ErpDbContext> options)
             entity.HasOne<GeneralJournalBatch>().WithMany()
                 .HasForeignKey(line => new { line.CompanyId, line.JournalBatchId })
                 .HasPrincipalKey(batch => new { batch.CompanyId, batch.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<AccountingPeriod>().WithMany()
+                .HasForeignKey(line => new { line.CompanyId, line.AccountingPeriodId })
+                .HasPrincipalKey(period => new { period.CompanyId, period.Id })
                 .OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<GeneralLedgerAccount>().WithMany()
                 .HasForeignKey(line => new { line.CompanyId, line.AccountId })

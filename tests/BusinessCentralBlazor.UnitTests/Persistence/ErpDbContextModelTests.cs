@@ -1,4 +1,5 @@
 using BusinessCentralBlazor.Domain.Entities;
+using BusinessCentralBlazor.Domain.Enums;
 using BusinessCentralBlazor.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -28,6 +29,7 @@ public sealed class ErpDbContextModelTests
             "CurrencyRates",
             "AccountingPeriods",
             "GeneralLedgerAccounts",
+            "GeneralJournalTemplates",
             "GeneralJournalBatches",
             "GeneralJournalLines",
             "JournalLineDimensions",
@@ -57,12 +59,59 @@ public sealed class ErpDbContextModelTests
         var accountForeignKey = Assert.Single(line.GetForeignKeys(), foreignKey =>
             foreignKey.Properties.Select(property => property.Name)
                 .SequenceEqual(["CompanyId", "AccountId"]));
+        var periodForeignKey = Assert.Single(line.GetForeignKeys(), foreignKey =>
+            foreignKey.Properties.Select(property => property.Name)
+                .SequenceEqual(["CompanyId", "AccountingPeriodId"]));
 
         Assert.Equal(
             ["CompanyId", "Id"],
             accountForeignKey.PrincipalKey.Properties.Select(property => property.Name));
+        Assert.Equal(
+            ["CompanyId", "Id"],
+            periodForeignKey.PrincipalKey.Properties.Select(property => property.Name));
         Assert.Contains(line.GetCheckConstraints(), constraint => constraint.Name == "CK_GeneralJournalLines_DebitOrCredit");
         Assert.Contains(line.GetCheckConstraints(), constraint => constraint.Name == "CK_GeneralJournalLines_ForeignAmounts");
+    }
+
+    [Fact]
+    public void JournalBatchesBelongToACompanyScopedTemplate()
+    {
+        using var context = CreateContext();
+        var model = context.GetService<IDesignTimeModel>().Model;
+        var batch = model.FindEntityType(typeof(GeneralJournalBatch))!;
+        var templateForeignKey = Assert.Single(batch.GetForeignKeys(), foreignKey =>
+            foreignKey.Properties.Select(property => property.Name)
+                .SequenceEqual(["CompanyId", "JournalTemplateId"]));
+
+        Assert.Equal(
+            ["CompanyId", "Id"],
+            templateForeignKey.PrincipalKey.Properties.Select(property => property.Name));
+        Assert.Contains(batch.GetIndexes(), index =>
+            index.IsUnique &&
+            index.Properties.Select(property => property.Name)
+                .SequenceEqual(["CompanyId", "JournalTemplateId", "Name"]));
+    }
+
+    [Fact]
+    public void AccountingAndGeneralLedgerModelsSeparateBusinessCentralConcepts()
+    {
+        using var context = CreateContext();
+        var period = context.Model.FindEntityType(typeof(AccountingPeriod))!;
+        var account = context.Model.FindEntityType(typeof(GeneralLedgerAccount))!;
+
+        Assert.NotNull(period.FindProperty(nameof(AccountingPeriod.StartsOn)));
+        Assert.NotNull(period.FindProperty(nameof(AccountingPeriod.IsClosed)));
+        Assert.NotNull(period.FindProperty(nameof(AccountingPeriod.DateLocked)));
+        Assert.Contains(period.GetIndexes(), index =>
+            index.IsUnique &&
+            index.Properties.Select(property => property.Name)
+                .SequenceEqual(["CompanyId", "StartsOn"]));
+        Assert.Equal(
+            typeof(AccountCategory),
+            account.FindProperty(nameof(GeneralLedgerAccount.Category))!.ClrType);
+        Assert.Equal(
+            typeof(AccountType),
+            account.FindProperty(nameof(GeneralLedgerAccount.Type))!.ClrType);
     }
 
     [Fact]
