@@ -1,6 +1,7 @@
 using BusinessCentralBlazor.Web.Components;
 using BusinessCentralBlazor.Infrastructure.Identity;
 using BusinessCentralBlazor.Infrastructure.Persistence;
+using BusinessCentralBlazor.Web.Services;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
@@ -29,6 +30,7 @@ builder.Services.ConfigureApplicationCookie(options =>
 });
 builder.Services.AddAuthorization();
 builder.Services.AddCascadingAuthenticationState();
+builder.Services.AddScoped<IActiveCompanyContext, ActiveCompanyContext>();
 builder.Services.AddRazorPages();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();

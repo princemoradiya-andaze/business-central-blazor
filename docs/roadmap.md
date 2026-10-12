@@ -40,4 +40,4 @@ Only mark tasks complete when their acceptance criteria have been verified.
 
 ## Current next step
 
-Phase 0 is complete on `main`. Phase 1 is tracked by issue #10 and four implementation issues (#11–#14). Authentication uses administrator-managed users with no public self-registration; the user selected a one-time CLI bootstrap with credentials supplied through environment variables. Issue #11 is in progress on its issue branch. Ask the user before merging this or any later PR. Hosted deployment is not part of the agreed workflow.
+Phase 0 is complete on `main`. Phase 1 is tracked by issue #10 and four implementation issues (#11–#14). Administrator-managed authentication and CLI provisioning are merged into `dev` through PRs #16 and #17; the user verified local administrator sign-in. Issue #13 (company membership/context) is now in progress; issues #12 and #14 remain open for the app shell/CRUD foundation and authorization/isolation. Ask the user before merging every PR. Hosted deployment is not part of the agreed workflow.
