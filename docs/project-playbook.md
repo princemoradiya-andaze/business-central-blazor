@@ -67,11 +67,13 @@ Record each material update newest-first. Use the local project timezone (Asia/K
 
 ### 2026-10-12
 
+- **09:58–10:00 IST — Initial integration branch:** created `dev` from `main` and merged the Phase 0 foundation through its issue PR at merge commit `9ec1a4d4c6e294a45b42b00dcabfd4144dae21e5`. PR CI and the subsequent `dev` push CI both passed. On the merged local `dev` branch, restore succeeded, Release build succeeded with 0 warnings and 0 errors, and unit tests passed (1/1). This verifies the branch locally; it does not claim a deployment or test in a separate hosted development environment.
+- **Workflow boundary:** `main` remains unchanged. Phase 0 remains in progress and its issue remains open; no production verification, migration, or deployment has occurred.
+- **09:53 IST — Workflow documentation:** the wiki-ready project playbook was added to the repository for publishing or copying into the GitHub Wiki. It does not itself create or publish a GitHub Wiki page.
 - **09:30–09:53 IST — Phase 0 foundation:** inspected the clean repository and local tools; inventoried the locally available W1/platform archives without extracting them; scaffolded the .NET 10 modular solution, initial CI workflow, architecture/schema documentation, and PR template. Commit `c268788` (`Set up .NET ERP foundation`) was created on the phase-0 feature branch.
 - **Local verification:** `dotnet restore BusinessCentralBlazor.sln` succeeded; Release build succeeded with 0 warnings and 0 errors; unit tests passed (1/1). The user also reported that the app was listening locally and shared a browser screenshot of the home page.
-- **Boundaries:** no AL source was inspected; no database or migration was created; no GitHub Actions result, development deployment, production deployment, or main merge is claimed.
+- **Boundaries at the initial commit:** no AL source was inspected; no database or migration was created. The CI, merge, and dev branch verification results are recorded above; no development-environment deployment, production deployment, or main merge is claimed.
 - **Issue workflow:** the Phase 0 completion issue tracks the remaining work. Keep it open until its license/schema/database criteria and the required local, dev, and release checks are completed.
-- **09:53 IST — Workflow documentation:** this playbook was added to the repository for publishing or copying into the GitHub Wiki. It does not itself create or publish a GitHub Wiki page.
 
 ## Operational constraints and blockers
 
