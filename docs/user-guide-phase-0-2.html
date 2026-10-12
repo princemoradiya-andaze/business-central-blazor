@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Business Central Blazor - User Guide: Phases 0-2</title>
+  <style>
+    :root {
+      --ink: #17263c;
+      --muted: #52647a;
+      --brand: #1359a6;
+      --brand-dark: #0d315d;
+      --pale: #eef5fc;
+      --line: #d8e2ee;
+      --green: #176447;
+      --amber: #8a5200;
+      --red: #9a3434;
+    }
+    @page {
+      size: A4;
+      margin: 17mm 17mm 18mm;
+      @bottom-left {
+        content: "Business Central Blazor | User guide | 12 October 2026";
+        color: #65758a;
+        font: 8pt Arial, sans-serif;
+      }
+      @bottom-right {
+        content: "Page " counter(page) " of " counter(pages);
+        color: #65758a;
+        font: 8pt Arial, sans-serif;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      font: 10pt/1.48 Arial, Helvetica, sans-serif;
+    }
+    h1, h2, h3 { color: var(--brand-dark); line-height: 1.2; }
+    h1 { margin: 0 0 10pt; font-size: 28pt; }
+    h2 { margin: 0 0 10pt; font-size: 19pt; }
+    h3 { margin: 15pt 0 5pt; font-size: 12pt; }
+    p { margin: 5pt 0 8pt; }
+    ul, ol { margin: 5pt 0 10pt; padding-left: 20pt; }
+    li { margin: 3pt 0; }
+    a { color: var(--brand); text-decoration: none; }
+    .cover {
+      height: 245mm;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 18mm 12mm;
+      color: white;
+      background: linear-gradient(145deg, #0d315d, #1766b4);
+      page-break-after: always;
+    }
+    .cover h1, .cover h2, .cover p { color: white; }
+    .cover .eyebrow { font-size: 11pt; letter-spacing: 2px; text-transform: uppercase; opacity: .84; }
+    .cover h1 { max-width: 145mm; margin: 16pt 0; font-size: 34pt; }
+    .cover .subtitle { max-width: 145mm; font-size: 15pt; line-height: 1.45; }
+    .cover .rule { width: 34mm; height: 4px; margin: 13pt 0; background: #8ec7ff; }
+    .cover .meta { margin-top: 34pt; font-size: 10pt; opacity: .9; }
+    .page { page-break-before: always; }
+    .page:first-of-type { page-break-before: auto; }
+    .kicker {
+      margin: 0 0 5pt;
+      color: var(--brand);
+      font-size: 8pt;
+      font-weight: bold;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+    }
+    .lead { margin: 0 0 15pt; color: var(--muted); font-size: 12pt; }
+    .callout {
+      margin: 10pt 0;
+      padding: 9pt 11pt;
+      border-left: 4px solid var(--brand);
+      background: var(--pale);
+    }
+    .callout strong { color: var(--brand-dark); }
+    .callout.warning { border-color: #d49326; background: #fff7e8; }
+    .callout.success { border-color: #30926b; background: #edf8f3; }
+    .callout.danger { border-color: #bf5656; background: #fff0f0; }
+    .steps { counter-reset: step; list-style: none; padding: 0; }
+    .steps > li {
+      position: relative;
+      min-height: 28pt;
+      margin: 8pt 0;
+      padding: 2pt 0 2pt 36pt;
+      break-inside: avoid;
+    }
+    .steps > li::before {
+      counter-increment: step;
+      content: counter(step);
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 25pt;
+      height: 25pt;
+      border-radius: 50%;
+      color: white;
+      background: var(--brand);
+      font-weight: bold;
+      line-height: 25pt;
+      text-align: center;
+    }
+    .route {
+      display: inline-block;
+      padding: 1pt 5pt;
+      border: 1px solid var(--line);
+      border-radius: 3px;
+      color: var(--brand-dark);
+      background: #f7f9fc;
+      font: 9pt Consolas, "Courier New", monospace;
+      overflow-wrap: anywhere;
+    }
+    .grid { display: table; width: 100%; border-collapse: separate; border-spacing: 7pt; margin: 5pt -7pt; }
+    .card {
+      display: table-cell;
+      width: 50%;
+      padding: 9pt;
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      vertical-align: top;
+    }
+    .card h3 { margin-top: 0; }
+    table { width: 100%; margin: 8pt 0 12pt; border-collapse: collapse; }
+    th, td { padding: 6pt 7pt; border: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { color: var(--brand-dark); background: var(--pale); }
+    .small { color: var(--muted); font-size: 8.5pt; }
+    .flow {
+      margin: 12pt 0;
+      padding: 12pt;
+      border-radius: 5px;
+      color: var(--brand-dark);
+      background: var(--pale);
+      font-size: 11pt;
+      font-weight: bold;
+      text-align: center;
+    }
+    .checklist { list-style: none; padding: 0; }
+    .checklist li { margin: 5pt 0; padding-left: 22pt; position: relative; }
+    .checklist li::before { content: "[ ]"; position: absolute; left: 0; color: var(--brand); font-size: 10pt; line-height: 13pt; }
+    .end-note { margin-top: 18pt; padding-top: 9pt; border-top: 1px solid var(--line); color: var(--muted); font-size: 8.5pt; }
+    .keep { break-inside: avoid; }
+  </style>
+</head>
+<body>
+  <header class="cover">
+    <p class="eyebrow">Business Central Blazor</p>
+    <div class="rule"></div>
+    <h1>Getting started and using the application</h1>
+    <p class="subtitle">A practical walkthrough of the foundation and core financial features delivered in Phases 0, 1, and 2.</p>
+    <p class="meta">User guide | 12 October 2026<br>For the current application before Phase 3</p>
+  </header>
+
+  <main>
+    <section class="page">
+      <p class="kicker">Start here</p>
+      <h2>What this guide covers</h2>
+      <p class="lead">Follow the everyday user journey: sign in, enter the right company workspace, configure the financial foundation, record activity, and review the results.</p>
+
+      <div class="grid">
+        <div class="card">
+          <h3>Phase 0 - Foundation</h3>
+          <p>Application and database foundation, tenant/company structure, and the initial schema. A system administrator prepares the environment and provisions access.</p>
+        </div>
+        <div class="card">
+          <h3>Phase 1 - Access and workspace</h3>
+          <p>Administrator-managed sign-in, company membership and selection, an authenticated application shell, and a generic company-scoped Workspace notes example.</p>
+        </div>
+      </div>
+      <div class="card" style="display:block;width:auto">
+        <h3>Phase 2 - Core financials</h3>
+        <p>Chart of Accounts, dimensions, accounting periods, general journals, posted ledger inquiry, account activity and trial balance, manual tax setup, company base currency, bank accounts, and manual statement reconciliation.</p>
+      </div>
+
+      <div class="callout warning">
+        <strong>Important:</strong> This is an independently implemented ERP application inspired by common accounting workflows. It is not Microsoft Dynamics 365 Business Central, and it does not include Microsoft code or assets.
+      </div>
+
+      <h3>Before you begin</h3>
+      <ul>
+        <li>Your administrator must provide your sign-in account and assign membership in at least one active tenant/company. There is no public self-registration.</li>
+        <li>For the locally tested application, open <span class="route">http://localhost:5212</span> while the local web app is running. Your organization's deployed address may be different.</li>
+        <li>Use the correct company before creating or reviewing financial data. Financial records are scoped to the active company.</li>
+        <li>Use your organization's accounting policies for account setup, dates, tax treatment, and reconciliation. The examples in this guide are illustrative, not accounting advice.</li>
+      </ul>
+
+      <h3>At a glance</h3>
+      <div class="flow">Sign in &gt; Select company &gt; Configure &gt; Record and post &gt; Review reports &gt; Reconcile bank</div>
+    </section>
+
+    <section class="page">
+      <p class="kicker">Access and navigation</p>
+      <h2>Sign in and choose a company</h2>
+      <ol class="steps">
+        <li><strong>Open the application.</strong> Go to your organization's application address (for the local test environment, <span class="route">http://localhost:5212</span>).</li>
+        <li><strong>Sign in.</strong> Enter the email address and password supplied by your administrator, then choose <em>Sign in</em>. If you need access or cannot sign in, contact the administrator. Accounts can be locked temporarily after repeated failed attempts.</li>
+        <li><strong>Choose the workspace.</strong> If you have more than one eligible company, choose one from <em>Select a company</em>, then choose <em>Continue to company</em>. With exactly one eligible company, the app can select it automatically.</li>
+        <li><strong>Confirm the active company.</strong> The navigation area displays <em>Company: Name (Code)</em>. Choose <em>Select company</em> there whenever you need to switch to another company.</li>
+        <li><strong>Sign out when finished.</strong> Use <em>Sign out</em> in the navigation.</li>
+      </ol>
+      <div class="callout danger">
+        <strong>No company access?</strong> The application cannot grant membership to itself. Ask an administrator to confirm that your account has both tenant and company membership and that the company is active.
+      </div>
+
+      <h3>What you see in the authenticated menu</h3>
+      <table>
+        <thead><tr><th>Navigation item</th><th>Purpose</th></tr></thead>
+        <tbody>
+          <tr><td>Home</td><td>Entry point with guidance to available company financial modules.</td></tr>
+          <tr><td>Workspace notes</td><td>Generic Phase 1 example for company-scoped notes; it is not a financial ledger feature.</td></tr>
+          <tr><td>Chart of Accounts</td><td>Set up and maintain company G/L accounts.</td></tr>
+          <tr><td>General ledger entries / Trial balance</td><td>Review posted transactions and balances.</td></tr>
+          <tr><td>Dimensions / General journals</td><td>Set up analysis dimensions and prepare, post, or reverse journals.</td></tr>
+          <tr><td>Tax setup / Banking &amp; reconciliation</td><td>Maintain manual tax configuration and bank accounts/statements.</td></tr>
+          <tr><td>Accounting periods</td><td>Define periods and control whether posting is closed or date-locked.</td></tr>
+        </tbody>
+      </table>
+      <p class="small">A module may require an active company. If the selection is missing or has become invalid, use <em>Select company</em> and choose an eligible workspace again.</p>
+    </section>
+
+    <section class="page">
+      <p class="kicker">Company setup</p>
+      <h2>Prepare the financial workspace</h2>
+      <p class="lead">Set up the essentials before entering journals or creating bank accounts. Menu labels below are shown as they appear in the application.</p>
+
+      <ol class="steps">
+        <li>
+          <strong>Set company base currency first.</strong> From the top header choose <em>Company workspace settings</em>. If the needed currency is absent, add it to the shared catalog using a three-letter code, name, and minor-unit precision (0-4). Select it as this company's base currency and choose <em>Save base currency</em>. Currency catalog entries are shared; the base-currency setting belongs to the active company.
+        </li>
+        <li>
+          <strong>Create posting accounts.</strong> Open <em>Chart of Accounts</em> &gt; <em>New account</em>. Give each account a unique number and name, choose its category and type, and configure whether direct posting is allowed or the account is blocked. Use posting accounts for journal lines. Plan account categories carefully - tax mappings and bank-account mappings require eligible accounts of the appropriate category.
+        </li>
+        <li>
+          <strong>Define the accounting periods.</strong> Open <em>Accounting periods</em>, enter a name, start date, and end date, and choose <em>Create period</em>. Periods must not overlap. Keep the relevant period open and not date-locked while you enter and post transactions. Closed/locked periods prevent posting for dates they cover.
+        </li>
+        <li>
+          <strong>Set up dimensions when you need analysis tags.</strong> Open <em>Dimensions</em> &gt; <em>New dimension</em>; then open the dimension and use <em>New value</em> to add its allowed values. For example, a Department dimension might have values such as SALES or OPERATIONS. Select dimension/value pairs on journal lines.
+        </li>
+        <li>
+          <strong>Set up tax mappings if required.</strong> Open <em>Tax setup</em>. Create an unblocked tax code with eligible liability and recoverable posting accounts, then add a rate and its effective-from/through dates. Rates for the same code must not overlap.
+        </li>
+        <li>
+          <strong>Create bank accounts after base currency and G/L setup.</strong> Open <em>Banking &amp; reconciliation</em> &gt; choose a dedicated, unblocked, directly-postable Asset posting account, provide a unique bank code/name and optional ordinary account identifier, then choose <em>Save bank account</em>.
+        </li>
+      </ol>
+      <div class="callout warning">
+        <strong>Currency setting is an early setup decision.</strong> The bank workflow uses the company's base currency and does not support foreign exchange. Changing base currency is blocked after the company has dependent journal, bank, ledger, or currency-rate activity.
+      </div>
+      <p class="small">Account numbers, period dates, tax treatment, and dimensions should follow your organization's chart-of-accounts and accounting policies. The app validates posting eligibility and company boundaries, but it does not determine whether your accounting policy is correct.</p>
+    </section>
+
+    <section class="page">
+      <p class="kicker">Journals and ledger</p>
+      <h2>Enter, post, and correct journal activity</h2>
+      <ol class="steps">
+        <li><strong>Open General journals.</strong> Choose <em>New journal batch</em>; select a batch name, template and default accounting period, and save the draft batch.</li>
+        <li><strong>Add journal lines.</strong> From the batch choose <em>Add line</em>. Enter a unique line number, posting account, period, posting date, document number, description, and either a debit or credit. Add dimensions when relevant. Ensure the posting date is inside an open, unlocked accounting period.</li>
+        <li><strong>Balance the batch.</strong> Add all required lines and confirm total debits equal total credits. A batch must have at least one valid line. Correct validation messages before posting.</li>
+        <li><strong>Post the batch.</strong> On the batch page choose <em>Post batch</em>. Posting validates the accounts, dates, dimensions, and balance again, then creates ledger entries together. Posted lines and entries are immutable.</li>
+        <li><strong>Correct a posted batch using a full reversal.</strong> Open the posted batch and choose <em>Reverse entire batch</em>. Provide the reversing batch name, an open period and posting date, and description; then post the reversal. The app preserves and links the original batch and creates equal-and-opposite lines with debit and credit sides swapped.</li>
+      </ol>
+      <div class="callout danger">
+        <strong>Posting is not an edit.</strong> Review company, date, accounts, document numbers, tax, dimensions, and debit/credit totals before posting. Do not attempt to change posted transactions; use the supported full-batch reversal workflow when correction is necessary.
+      </div>
+
+      <h3>Manual tax on a journal</h3>
+      <p>Tax is entered on journal lines; it is not calculated automatically on sales or purchase documents. When preparing a line, select the tax code and enter its taxable base. The page displays the rate effective on the posting date and a calculated tax amount. The debit/credit side determines whether the mapped recoverable or liability account is used. Review the displayed amount and mapped account, then post a balanced batch.</p>
+      <p class="small">Tax rates must be effective on the line's posting date. Tax calculation in the journal helper does not replace a review of your organization's tax policy and required rounding.</p>
+
+      <h3>Review the posted result</h3>
+      <p>Open <em>General ledger entries</em> to search posted entries by date range, account, or a document-number substring. Select an account name to open its activity view, which presents opening balances, activity for the selected dates, and the closing balance. From <em>Trial balance</em>, choose an <em>As of date</em> and select <em>Run report</em>. Debits and credits should reconcile; use account activity and entry inquiry to investigate differences.</p>
+    </section>
+
+    <section class="page">
+      <p class="kicker">Banking and reconciliation</p>
+      <h2>Record receipts/payments and reconcile a statement</h2>
+      <p class="lead">Bank transactions are recorded through balanced general-journal drafts and reconciled manually to statement lines.</p>
+      <ol class="steps">
+        <li><strong>Open the bank account.</strong> In <em>Banking &amp; reconciliation</em>, follow <em>Receipts, payments and statements</em> for the selected bank.</li>
+        <li><strong>Create a receipt or payment draft.</strong> Choose receipt for money received or clear the receipt option for a payment. Enter a unique document number for that bank, description, posting date, positive amount, open accounting period, and offset G/L account; choose <em>Create draft journal</em>.</li>
+        <li><strong>Review and post the linked journal.</strong> Follow its General journals link, verify the two balanced lines and signs, then choose <em>Post batch</em>. A receipt debits the bank and credits the offset account; a payment debits the offset account and credits the bank.</li>
+        <li><strong>Create a statement.</strong> Return to the bank activity page. Enter a unique statement reference, statement start/end dates, opening balance, and closing balance; choose <em>Create statement</em>.</li>
+        <li><strong>Add statement lines.</strong> Enter each bank transaction with a unique line reference, transaction date, description, and signed amount. Receipts are positive; payments are negative. Alternatively paste tab-separated rows with no header in the format <span class="route">yyyy-MM-dd[TAB]reference[TAB]description[TAB]signed amount</span>. Imports are all-or-nothing, limited to 1,000 lines, and reject duplicate references.</li>
+        <li><strong>Match each line manually.</strong> Select the exact signed-amount posted bank entry offered for that line, then choose <em>Match</em>. Matching is one-to-one; drafts, wrong-sign/amount entries, other companies/banks, and already-matched entries cannot be selected.</li>
+        <li><strong>Check differences and complete.</strong> The screen shows statement arithmetic difference and statement-versus-G/L closing difference. Correct header/line issues until statement arithmetic is zero and every statement line is matched, then choose <em>Complete reconciliation</em>. The completed statement and its matches are locked.</li>
+      </ol>
+      <div class="callout success">
+        <strong>Understand the two balances.</strong> Statement arithmetic is closing balance minus opening balance minus statement lines; it must be zero to complete. Unmatched earlier posted book activity can remain as a visible timing difference. The app does not create adjusting entries automatically.
+      </div>
+      <div class="callout warning">
+        <strong>Banking scope:</strong> base currency only. Online bank feeds, stored banking credentials, payment initiation, automatic matching/reconciliation, checks, and foreign exchange are not included.
+      </div>
+    </section>
+
+    <section class="page">
+      <p class="kicker">Reports, checklist, and scope</p>
+      <h2>Review results and finish the workflow</h2>
+      <ul>
+        <li><strong>General ledger entries:</strong> Find posted transactions with date, account, or document filters. Check account, posting date, document number, description, and debit/credit side.</li>
+        <li><strong>Account activity:</strong> Review one account over a selected date range. Opening balance plus period activity should equal the closing balance.</li>
+        <li><strong>Trial balance:</strong> Review posting-account debit/credit balances through an as-of date. Total debits should equal total credits; investigate any displayed difference.</li>
+        <li><strong>Bank activity:</strong> Review a bank's receipts, payments, statements, and posted account activity. Check the bank closing balance and any unreconciled items or timing differences.</li>
+        <li><strong>Statement reconciliation:</strong> Match statement lines to posted bank ledger entries. All statement lines must be matched and statement arithmetic difference must be zero before completion.</li>
+      </ul>
+
+      <h3>Suggested close-out checklist</h3>
+      <ul class="checklist">
+        <li>Confirm the active company shown in the navigation is the intended company.</li>
+        <li>Confirm the company's base currency, chart of accounts, open accounting periods, and any needed dimensions/tax mappings.</li>
+        <li>Review each journal draft and confirm it balances before posting.</li>
+        <li>Verify posted entries, account activity, and trial-balance totals for the correct date range.</li>
+        <li>For each bank statement, reconcile every line and review both displayed differences before completing.</li>
+        <li>Sign out when you have finished using the application.</li>
+      </ul>
+
+      <h3>What is not in Phases 0-2</h3>
+      <ul>
+        <li>Sales and purchasing document lifecycles, invoicing, and automatic document tax calculation (planned for later work).</li>
+        <li>Inventory workflows, bank integrations/feeds, payment initiation, automatic reconciliation, foreign exchange, and check printing.</li>
+        <li>Public self-registration, user/company administration screens, and hosted production deployment.</li>
+        <li>General-purpose report export/download is not documented here; use the on-screen inquiry and report views currently available.</li>
+      </ul>
+      <p class="end-note">Prepared from the application's current Phase 0-2 screens and repository documentation on 12 October 2026. Screen labels may evolve as later phases are developed. For account access, configuration permissions, or accounting-policy questions, contact your system administrator or accounting owner.</p>
+    </section>
+  </main>
+</body>
+</html>
