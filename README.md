@@ -4,12 +4,12 @@ An independently implemented, modular-monolith ERP application using Blazor Serv
 
 ## Status
 
-The repository is at the Phase 0 foundation stage. The solution and layer boundaries are scaffolded; authentication, persistence, business modules, and database migrations have not been implemented.
+The repository is at the Phase 0 foundation stage. The .NET solution, initial EF Core/Identity schema, SQL Server migration, and local database verification are in place. Login/authorization wiring, posting services, business modules, and deployment pipelines have not been implemented.
 
 ## Prerequisites
 
 - .NET 10 SDK
-- SQL Server for database-backed development (not yet required to build the current scaffold)
+- SQL Server 2019 or a supported later release for database-backed development
 
 ## Build and run
 
@@ -20,6 +20,8 @@ dotnet test BusinessCentralBlazor.sln --no-build
 dotnet run --project src/BusinessCentralBlazor.Web
 ```
 
+For the local SQL Server migration, restore the repository-local EF tool and follow the [schema migration instructions](docs/schema/initial-schema.md). Never commit local connection strings containing credentials.
+
 ## Architecture
 
 - `BusinessCentralBlazor.Domain` holds business rules and has no dependencies on outer layers.
@@ -28,8 +30,8 @@ dotnet run --project src/BusinessCentralBlazor.Web
 - `BusinessCentralBlazor.Web` hosts the Blazor Server interface.
 - `tests/` contains automated test projects.
 
-See [the architecture overview](docs/architecture/overview.md), [the schema discovery report](docs/schema/discovery-report.md), and [the roadmap](docs/roadmap.md).
+See [the architecture overview](docs/architecture/overview.md), [the schema discovery report](docs/schema/discovery-report.md), [the initial application schema](docs/schema/initial-schema.md), and [the roadmap](docs/roadmap.md).
 
 ## Development workflow
 
-Use short-lived feature branches and pull requests into `dev`; promote reviewed, CI-passing releases from `dev` to `main`. The GitHub repository currently has only `main`; existing branch-protection status could not be verified. See [the development guide](docs/development-guide.md).
+Use short-lived issue branches and pull requests into `dev`; promote only completed, reviewed, CI-passing releases from `dev` to `main`. See [the development guide](docs/development-guide.md).

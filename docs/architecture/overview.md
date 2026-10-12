@@ -42,4 +42,4 @@ erDiagram
     COMPANY ||--o{ AUDIT_ENTRY : records
 ```
 
-The diagram is a design sketch, not a final schema. Identity user storage, membership constraints, fiscal-period rules, currency precision, posted-entry immutability, and transactional posting invariants must be specified before generating entities or migrations. Catalogue/reference currencies may be shared while exchange rates remain company-scoped.
+The initial ER model has been implemented as EF Core entities and a SQL Server migration. See [the schema catalogue, constraints, and verification record](../schema/initial-schema.md). Identity storage and company-scoped membership constraints are in the migration, but Identity login/authorization wiring and tenant-aware query authorization remain Phase 1 work. Period-date validation, balanced posting transactions, posted-entry immutability, and reversal workflows are documented future application invariants, not yet implemented business behavior. Catalogue currencies are shared while exchange rates remain company-scoped.

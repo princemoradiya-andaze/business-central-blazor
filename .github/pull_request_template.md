@@ -6,6 +6,7 @@
 
 - [ ] `dotnet build BusinessCentralBlazor.sln --no-restore`
 - [ ] `dotnet test BusinessCentralBlazor.sln --no-build`
+- [ ] `dotnet ef migrations has-pending-model-changes` (for EF model changes)
 - [ ] Relevant migration or manual verification documented
 
 ## Review checklist

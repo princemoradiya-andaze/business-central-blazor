@@ -23,7 +23,13 @@ jobs:
           dotnet-version: 10.0.x
       - name: Restore
         run: dotnet restore BusinessCentralBlazor.sln
+      - name: Restore EF Core tools
+        run: dotnet tool restore
       - name: Build
         run: dotnet build BusinessCentralBlazor.sln --no-restore --configuration Release
       - name: Test
         run: dotnet test BusinessCentralBlazor.sln --no-build --configuration Release
+      - name: Check EF Core migration model
+        env:
+          ConnectionStrings__ErpDatabase: Server=localhost;Database=ModelValidation;Integrated Security=True;TrustServerCertificate=True
+        run: dotnet ef migrations has-pending-model-changes --project src/BusinessCentralBlazor.Infrastructure --startup-project src/BusinessCentralBlazor.Web

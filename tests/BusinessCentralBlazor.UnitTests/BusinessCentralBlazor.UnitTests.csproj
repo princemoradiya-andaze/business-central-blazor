@@ -21,6 +21,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\BusinessCentralBlazor.Domain\BusinessCentralBlazor.Domain.csproj" />
     <ProjectReference Include="..\..\src\BusinessCentralBlazor.Application\BusinessCentralBlazor.Application.csproj" />
+    <ProjectReference Include="..\..\src\BusinessCentralBlazor.Infrastructure\BusinessCentralBlazor.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>
