@@ -4,7 +4,7 @@ An independently implemented, modular-monolith ERP application using Blazor Serv
 
 ## Status
 
-Phase 0 is complete on `main`. All four Phase 1 implementation issues are merged into `dev`; the authenticated shell and SQL-backed Workspace notes CRUD example are locally verified. Public self-registration is disabled. Phase 1 still requires its release checks and an approved release PR to `main`. Hosted deployment is not part of the current workflow.
+Phase 0 and Phase 1 are complete on `main`. Phase 1 delivers administrator-managed authentication, tenant/company context and authorization, the authenticated application shell, and a generic company-scoped Workspace notes example. Workspace notes is foundation UI, not an equivalent Business Central feature. Public self-registration is disabled. Hosted deployment is not part of the current workflow.
 
 ## Prerequisites
 
