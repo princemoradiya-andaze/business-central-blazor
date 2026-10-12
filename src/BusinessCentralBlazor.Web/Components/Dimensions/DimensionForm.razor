@@ -1,0 +1,52 @@
+@using BusinessCentralBlazor.Web.Services
+
+<EditForm Model="@Model" OnValidSubmit="SubmitAsync" FormName="dimension">
+    <DataAnnotationsValidator />
+    <ValidationSummary class="alert alert-danger" />
+
+    @if (!string.IsNullOrWhiteSpace(ErrorMessage))
+    {
+        <div class="alert alert-danger" role="alert">@ErrorMessage</div>
+    }
+
+    <fieldset disabled="@IsSaving">
+        <div class="mb-3">
+            <label class="form-label" for="dimension-code">Code</label>
+            <InputText id="dimension-code" class="form-control" maxlength="32"
+                       autocomplete="off" @bind-Value="Model.Code" />
+            <ValidationMessage For="@(() => Model.Code)" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label" for="dimension-name">Name</label>
+            <InputText id="dimension-name" class="form-control" maxlength="120"
+                       @bind-Value="Model.Name" />
+            <ValidationMessage For="@(() => Model.Name)" />
+        </div>
+    </fieldset>
+
+    <div class="d-flex gap-2">
+        <button class="btn btn-primary" type="submit" disabled="@IsSaving">
+            @(IsSaving ? "Saving..." : SubmitText)
+        </button>
+        <a class="btn btn-outline-secondary" href="/financial/dimensions">Cancel</a>
+    </div>
+</EditForm>
+
+@code {
+    [Parameter, EditorRequired]
+    public DimensionInput Model { get; set; } = new();
+
+    [Parameter, EditorRequired]
+    public EventCallback OnValidSubmit { get; set; }
+
+    [Parameter]
+    public string SubmitText { get; set; } = "Save";
+
+    [Parameter]
+    public bool IsSaving { get; set; }
+
+    [Parameter]
+    public string? ErrorMessage { get; set; }
+
+    private Task SubmitAsync(EditContext _) => OnValidSubmit.InvokeAsync();
+}

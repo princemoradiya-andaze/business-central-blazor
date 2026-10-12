@@ -1,0 +1,90 @@
+@page "/financial/dimensions"
+@attribute [Authorize(Policy = CompanyAuthorizationPolicies.ActiveCompany)]
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IDimensionService DimensionService
+
+<PageTitle>Dimensions</PageTitle>
+
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+    <div>
+        <h1>Dimensions</h1>
+        <p class="text-body-secondary mb-0">Organize financial analysis for the active company.</p>
+    </div>
+    <a class="btn btn-primary" href="/financial/dimensions/new">New dimension</a>
+</div>
+
+@if (isLoading)
+{
+    <p role="status" aria-live="polite">Loading dimensions...</p>
+}
+else if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+    @if (companyContextUnavailable)
+    {
+        <a href="/account/company" data-enhance-nav="false">Select an active company</a>
+    }
+}
+else if (dimensions.Count == 0)
+{
+    <div class="alert alert-info" role="status">
+        No dimensions have been set up for this company yet.
+    </div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped align-middle">
+            <caption class="visually-hidden">Dimensions for the active company</caption>
+            <thead>
+                <tr>
+                    <th scope="col">Code</th>
+                    <th scope="col">Name</th>
+                    <th scope="col">Values</th>
+                    <th scope="col"><span class="visually-hidden">Actions</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var dimension in dimensions)
+                {
+                    <tr>
+                        <th scope="row">@dimension.Code</th>
+                        <td>@dimension.Name</td>
+                        <td>@dimension.ValueCount</td>
+                        <td>
+                            <a class="btn btn-sm btn-outline-primary"
+                               href="@($"/financial/dimensions/{dimension.Id}")">Manage values</a>
+                            <a class="btn btn-sm btn-outline-secondary ms-1"
+                               href="@($"/financial/dimensions/{dimension.Id}/edit")">Edit</a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private IReadOnlyList<DimensionListItem> dimensions = [];
+    private bool isLoading = true;
+    private bool companyContextUnavailable;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+            dimensions = await DimensionService.GetAllAsync(user);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            companyContextUnavailable = true;
+            errorMessage = "Your active company is no longer available. Select an active company and try again.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}
