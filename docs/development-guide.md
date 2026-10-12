@@ -44,7 +44,13 @@ Authenticated users can choose only active companies for which both a tenant mem
 
 The Blazor component endpoint and company-owned pages use the `ActiveCompany` authorization policy. It requires a signed-in user whose selected company still has an active company membership and tenant membership. The Razor Page at `/account/company` remains available to signed-in users without an active selection so they can choose an eligible company.
 
-This route policy is not a substitute for per-operation checks. Every company-owned API or service operation must call `ICompanyScopeAuthorizer.ResolveAuthorizedCompanyAsync` with the authenticated principal and the requested tenant/company IDs, then use the returned validated IDs in all database filters and writes. It returns no scope for anonymous users, absent/stale selections, revoked memberships, inactive companies, or a tenant/company pair other than the validated active selection. Never query or mutate data using only an ID supplied by the client. The authorization boundary is application-level; database row-level security is not implemented.
+This route policy is not a substitute for per-operation checks. Every company-owned API or service operation must resolve scope through `ICompanyScopeAuthorizer`: call `ResolveAuthorizedCompanyAsync` with the requested tenant/company IDs when a request identifies its target, or `ResolveActiveCompanyAsync` when the operation is scoped to the current selection. Use only the returned validated IDs in database filters and writes. These methods return no scope for anonymous users, absent/stale selections, revoked memberships, inactive companies, or a tenant/company pair other than the validated active selection. Never query or mutate data using only an ID supplied by the client. The authorization boundary is application-level; database row-level security is not implemented.
+
+## Shared shell and workspace notes
+
+The authenticated Blazor shell shows the active company and links to a SQL-backed Workspace notes example. Notes are stored in the `WorkspaceNotes` table, and the service derives the tenant/company scope from the authenticated principal for every list, detail, create, edit, or delete operation. Company and tenant IDs are never accepted from the note form. A note ID from another company is treated as not found. The example is generic foundation UI, not an ERP module; no sample notes are seeded automatically.
+
+The `AddWorkspaceNotes` EF migration must be applied before using the example against a SQL Server database. Check the target database name before running `dotnet ef database update`; the repository's documented local development database is `BusinessCentralBlazor_Phase0`. Users also need an active company membership before the Blazor workspace is available.
 
 ## Branch and review workflow
 

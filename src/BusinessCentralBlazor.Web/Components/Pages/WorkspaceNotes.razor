@@ -1,0 +1,89 @@
+@page "/workspace/notes"
+@attribute [Authorize(Policy = CompanyAuthorizationPolicies.ActiveCompany)]
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IWorkspaceNoteService WorkspaceNoteService
+
+<PageTitle>Workspace notes</PageTitle>
+
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+    <div>
+        <h1>Workspace notes</h1>
+        <p class="text-body-secondary mb-0">Private notes for the active company.</p>
+    </div>
+    <a class="btn btn-primary" href="/workspace/notes/new">Create note</a>
+</div>
+
+@if (isLoading)
+{
+    <p role="status" aria-live="polite">Loading workspace notes...</p>
+}
+else if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+    @if (companyContextUnavailable)
+    {
+        <a href="/account/company" data-enhance-nav="false">Select an active company</a>
+    }
+}
+else if (notes.Count == 0)
+{
+    <div class="alert alert-info" role="status">
+        No workspace notes yet. Create a note to get started.
+    </div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped align-middle">
+            <caption class="visually-hidden">Notes in the active company workspace</caption>
+            <thead>
+                <tr>
+                    <th scope="col">Title</th>
+                    <th scope="col">Last updated</th>
+                    <th scope="col"><span class="visually-hidden">Actions</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var note in notes)
+                {
+                    <tr>
+                        <th scope="row">
+                            <a href="@($"/workspace/notes/{note.Id}")">@note.Title</a>
+                        </th>
+                        <td>@note.UpdatedAtUtc.ToLocalTime().ToString("g")</td>
+                        <td>
+                            <a class="btn btn-sm btn-outline-primary"
+                               href="@($"/workspace/notes/{note.Id}")"
+                               aria-label="@($"View note: {note.Title}")">View</a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private IReadOnlyList<WorkspaceNoteListItem> notes = [];
+    private bool isLoading = true;
+    private bool companyContextUnavailable;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+            notes = await WorkspaceNoteService.GetAllAsync(user);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            companyContextUnavailable = true;
+            errorMessage = "Your active company is no longer available. Select an active company and try again.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}

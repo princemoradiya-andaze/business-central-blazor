@@ -1,0 +1,62 @@
+@using BusinessCentralBlazor.Web.Services
+
+<EditForm Model="@Model" OnValidSubmit="SubmitAsync" FormName="workspace-note">
+    <DataAnnotationsValidator />
+    <ValidationSummary class="alert alert-danger" />
+
+    @if (!string.IsNullOrWhiteSpace(ErrorMessage))
+    {
+        <div class="alert alert-danger" role="alert">@ErrorMessage</div>
+    }
+
+    <fieldset disabled="@IsSaving">
+        <div class="mb-3">
+            <label class="form-label" for="workspace-note-title">Title</label>
+            <InputText id="workspace-note-title"
+                       class="form-control"
+                       maxlength="120"
+                       autocomplete="off"
+                       @bind-Value="Model.Title" />
+            <ValidationMessage For="@(() => Model.Title)" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label" for="workspace-note-body">Note</label>
+            <InputTextArea id="workspace-note-body"
+                           class="form-control"
+                           rows="8"
+                           maxlength="4000"
+                           @bind-Value="Model.Body" />
+            <ValidationMessage For="@(() => Model.Body)" />
+        </div>
+    </fieldset>
+
+    <div class="d-flex gap-2">
+        <button class="btn btn-primary" type="submit" disabled="@IsSaving">
+            @(IsSaving ? "Saving..." : SubmitText)
+        </button>
+        <a class="btn btn-outline-secondary" href="@CancelUrl">Cancel</a>
+    </div>
+</EditForm>
+
+@code {
+    [Parameter, EditorRequired]
+    public WorkspaceNoteInput Model { get; set; } = new();
+
+    [Parameter, EditorRequired]
+    public EventCallback OnValidSubmit { get; set; }
+
+    [Parameter]
+    public string SubmitText { get; set; } = "Save";
+
+    [Parameter]
+    public string CancelUrl { get; set; } = "/workspace/notes";
+
+    [Parameter]
+    public bool IsSaving { get; set; }
+
+    [Parameter]
+    public string? ErrorMessage { get; set; }
+
+    private Task SubmitAsync(EditContext _) => OnValidSubmit.InvokeAsync();
+}

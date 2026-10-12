@@ -97,6 +97,10 @@ public sealed class CompanyAuthorizationTests(AuthenticationWebApplicationFactor
         using var homeWithoutMembership = await client.GetAsync("/");
         Assert.Equal(HttpStatusCode.Redirect, homeWithoutMembership.StatusCode);
         Assert.Equal("/account/access-denied", homeWithoutMembership.Headers.Location?.AbsolutePath);
+        var accessDeniedLocation = Assert.IsType<Uri>(homeWithoutMembership.Headers.Location);
+        using var accessDenied = await client.GetAsync(accessDeniedLocation);
+        Assert.Equal(HttpStatusCode.OK, accessDenied.StatusCode);
+        Assert.Contains("/account/company", await accessDenied.Content.ReadAsStringAsync(), StringComparison.Ordinal);
         using var companySelection = await client.GetAsync("/account/company");
         Assert.Equal(HttpStatusCode.OK, companySelection.StatusCode);
 

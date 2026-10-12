@@ -25,10 +25,10 @@ Only mark tasks complete when their acceptance criteria have been verified.
 ## Phase 1 — Foundation framework
 
 - [ ] Phase tracker: [#10](https://github.com/princemoradiya-andaze/business-central-blazor/issues/10) — complete all four scoped issues below, then verify on `dev` and release to `main`.
-- [ ] [#11](https://github.com/princemoradiya-andaze/business-central-blazor/issues/11) — ASP.NET Core Identity sign-in/out and administrator-managed accounts; no public self-registration.
+- [x] [#11](https://github.com/princemoradiya-andaze/business-central-blazor/issues/11) — ASP.NET Core Identity sign-in/out and administrator-managed accounts; no public self-registration (merged in PRs #16 and #17; local sign-in verified).
 - [x] [#13](https://github.com/princemoradiya-andaze/business-central-blazor/issues/13) — tenant/company memberships and validated active-company context (merged in PR #18; local verification passed).
-- [ ] [#14](https://github.com/princemoradiya-andaze/business-central-blazor/issues/14) — authorization policies and cross-tenant/company data isolation (in progress).
-- [ ] [#12](https://github.com/princemoradiya-andaze/business-central-blazor/issues/12) — authenticated application shell, navigation, and reusable CRUD foundation.
+- [x] [#14](https://github.com/princemoradiya-andaze/business-central-blazor/issues/14) — authorization policies and cross-tenant/company data isolation (merged in PR #19; CI and local Release build/22 tests passed).
+- [ ] [#12](https://github.com/princemoradiya-andaze/business-central-blazor/issues/12) — authenticated application shell, navigation, and reusable CRUD foundation (in progress).
 
 **Merge gate:** Ask the user for explicit approval before merging every PR, even when all CI checks pass.
 
@@ -40,4 +40,4 @@ Only mark tasks complete when their acceptance criteria have been verified.
 
 ## Current next step
 
-Phase 0 is complete on `main`. Phase 1 is tracked by issue #10 and four implementation issues (#11–#14). Administrator-managed authentication and CLI provisioning are merged into `dev` through PRs #16 and #17; the user verified local administrator sign-in. Issue #13 (company membership/context) is merged in PR #18 and locally verified. Issue #14 (authorization/isolation) is in progress; issue #12 (app shell/CRUD) follows it. Ask the user before merging every PR. Hosted deployment is not part of the agreed workflow.
+Phase 0 is complete on `main`. Phase 1 is tracked by issue #10 and four implementation issues (#11–#14). Authentication is merged through PRs #16 and #17; company context is merged through PR #18; authorization/isolation is merged through PR #19. The user verified local administrator sign-in; PR #19 CI and the synchronized local `dev` Release build/all 22 tests passed. Issue #12 (the authenticated shell and SQL-backed Workspace notes example) is in progress. The `AddWorkspaceNotes` migration is scaffolded and still needs authorized application to the local development database. Ask the user before merging every PR. Hosted deployment is not part of the agreed workflow.

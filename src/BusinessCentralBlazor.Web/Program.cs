@@ -39,6 +39,7 @@ builder.Services.AddScoped<IAuthorizationHandler, ActiveCompanyAuthorizationHand
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddScoped<IActiveCompanyContext, ActiveCompanyContext>();
 builder.Services.AddScoped<ICompanyScopeAuthorizer, CompanyScopeAuthorizer>();
+builder.Services.AddScoped<IWorkspaceNoteService, WorkspaceNoteService>();
 builder.Services.AddRazorPages();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
