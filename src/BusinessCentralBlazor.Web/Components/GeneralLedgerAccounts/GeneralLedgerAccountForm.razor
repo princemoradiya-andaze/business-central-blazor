@@ -1,0 +1,100 @@
+@using BusinessCentralBlazor.Domain.Enums
+@using BusinessCentralBlazor.Web.Services
+
+<EditForm Model="@Model" OnValidSubmit="SubmitAsync" FormName="general-ledger-account">
+    <DataAnnotationsValidator />
+    <ValidationSummary class="alert alert-danger" />
+
+    @if (!string.IsNullOrWhiteSpace(ErrorMessage))
+    {
+        <div class="alert alert-danger" role="alert">@ErrorMessage</div>
+    }
+
+    <fieldset disabled="@IsSaving">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label" for="account-number">Account number</label>
+                <InputText id="account-number" class="form-control" maxlength="32"
+                           autocomplete="off" @bind-Value="Model.Number" />
+                <ValidationMessage For="@(() => Model.Number)" />
+            </div>
+            <div class="col-md-8">
+                <label class="form-label" for="account-name">Name</label>
+                <InputText id="account-name" class="form-control" maxlength="160"
+                           @bind-Value="Model.Name" />
+                <ValidationMessage For="@(() => Model.Name)" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label" for="account-category">Category</label>
+                <InputSelect id="account-category" class="form-select" @bind-Value="Model.Category">
+                    @foreach (var category in Enum.GetValues<AccountCategory>())
+                    {
+                        <option value="@category">@category</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label" for="account-type">Account type</label>
+                <InputSelect id="account-type" class="form-select" @bind-Value="Model.Type">
+                    @foreach (var type in Enum.GetValues<AccountType>())
+                    {
+                        <option value="@type">@type</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label" for="account-parent">Parent account (optional)</label>
+                <InputSelect id="account-parent" class="form-select" @bind-Value="Model.ParentAccountId">
+                    <option value="">No parent</option>
+                    @foreach (var account in ParentAccounts)
+                    {
+                        <option value="@account.Id">@account.Number — @account.Name</option>
+                    }
+                </InputSelect>
+                <ValidationMessage For="@(() => Model.ParentAccountId)" />
+            </div>
+        </div>
+
+        <div class="d-flex flex-wrap gap-4 mt-3">
+            <div class="form-check">
+                <InputCheckbox id="account-direct-posting" class="form-check-input"
+                               @bind-Value="Model.AllowsDirectPosting" />
+                <label class="form-check-label" for="account-direct-posting">Allow direct posting</label>
+            </div>
+            <div class="form-check">
+                <InputCheckbox id="account-blocked" class="form-check-input"
+                               @bind-Value="Model.IsBlocked" />
+                <label class="form-check-label" for="account-blocked">Blocked</label>
+            </div>
+        </div>
+    </fieldset>
+
+    <div class="d-flex gap-2 mt-4">
+        <button class="btn btn-primary" type="submit" disabled="@IsSaving">
+            @(IsSaving ? "Saving..." : SubmitText)
+        </button>
+        <a class="btn btn-outline-secondary" href="/financial/general-ledger/accounts">Cancel</a>
+    </div>
+</EditForm>
+
+@code {
+    [Parameter, EditorRequired]
+    public GeneralLedgerAccountInput Model { get; set; } = new();
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<GeneralLedgerAccountListItem> ParentAccounts { get; set; } = [];
+
+    [Parameter, EditorRequired]
+    public EventCallback OnValidSubmit { get; set; }
+
+    [Parameter]
+    public string SubmitText { get; set; } = "Save";
+
+    [Parameter]
+    public bool IsSaving { get; set; }
+
+    [Parameter]
+    public string? ErrorMessage { get; set; }
+
+    private Task SubmitAsync(EditContext _) => OnValidSubmit.InvokeAsync();
+}
