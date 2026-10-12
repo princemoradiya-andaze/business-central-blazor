@@ -97,6 +97,7 @@ else
                         <th scope="col">G/L account</th>
                         <th scope="col">Document</th>
                         <th scope="col">Description</th>
+                        <th scope="col">Tax details</th>
                         <th scope="col">Dimensions</th>
                         <th scope="col" class="text-end">Debit</th>
                         <th scope="col" class="text-end">Credit</th>
@@ -116,6 +117,17 @@ else
                             <td>@line.AccountNumber — @line.AccountName</td>
                             <td>@line.DocumentNumber</td>
                             <td>@line.Description</td>
+                            <td>
+                                @if (line.TaxCode is { } taxCode)
+                                {
+                                    <span>@taxCode · @line.TaxRatePercent?.ToString("0.####")% · base @line.TaxBaseAmount?.ToString("N4")</span>
+                                    <span class="d-block text-body-secondary">@line.TaxPostingType</span>
+                                }
+                                else
+                                {
+                                    <span>—</span>
+                                }
+                            </td>
                             <td>
                                 @if (line.Dimensions.Count == 0)
                                 {
@@ -144,7 +156,7 @@ else
                 </tbody>
                 <tfoot>
                     <tr>
-                        <th scope="row" colspan="7" class="text-end">Totals</th>
+                        <th scope="row" colspan="8" class="text-end">Totals</th>
                         <th class="text-end">@batch.Lines.Sum(line => line.DebitAmount).ToString("N2")</th>
                         <th class="text-end">@batch.Lines.Sum(line => line.CreditAmount).ToString("N2")</th>
                         @if (batch.Status == JournalBatchStatus.Open)

@@ -38,8 +38,42 @@ public sealed class GeneralJournalPageTests(AuthenticationWebApplicationFactory 
             Type = AccountType.Posting,
             AllowsDirectPosting = true
         };
-        dbContext.GeneralLedgerAccounts.Add(account);
+        var liabilityAccount = new GeneralLedgerAccount
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.CompanyId,
+            Number = "2100",
+            Name = "Tax liability",
+            Category = AccountCategory.Liability,
+            Type = AccountType.Posting,
+            AllowsDirectPosting = true
+        };
+        var recoverableAccount = new GeneralLedgerAccount
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.CompanyId,
+            Number = "1200",
+            Name = "Tax recoverable",
+            Category = AccountCategory.Asset,
+            Type = AccountType.Posting,
+            AllowsDirectPosting = true
+        };
+        dbContext.GeneralLedgerAccounts.AddRange(account, liabilityAccount, recoverableAccount);
         await dbContext.SaveChangesAsync();
+        var taxSetupService = scope.ServiceProvider.GetRequiredService<ITaxSetupService>();
+        var taxCodeId = await taxSetupService.CreateTaxCodeAsync(principal, new TaxCodeInput
+        {
+            Code = "VAT",
+            Description = "Value added tax",
+            LiabilityAccountId = liabilityAccount.Id,
+            RecoverableAccountId = recoverableAccount.Id
+        });
+        await taxSetupService.CreateRateAsync(principal, new TaxRateInput
+        {
+            TaxCodeId = taxCodeId,
+            RatePercent = 8.25m,
+            StartsOn = new DateOnly(2026, 1, 1)
+        });
         var journalService = scope.ServiceProvider.GetRequiredService<IGeneralJournalService>();
         var periodId = await journalService.CreatePeriodAsync(principal, new AccountingPeriodInput
         {
@@ -96,6 +130,19 @@ public sealed class GeneralJournalPageTests(AuthenticationWebApplicationFactory 
         Assert.Contains("Page test debit", editLineHtml, StringComparison.Ordinal);
         Assert.Contains("Save line", editLineHtml, StringComparison.Ordinal);
 
+        using var newLineResponse = await client.GetAsync($"/financial/journals/{batchId}/lines/new");
+        var newLineHtml = await newLineResponse.Content.ReadAsStringAsync();
+        Assert.Equal(HttpStatusCode.OK, newLineResponse.StatusCode);
+        Assert.Contains("Tax code (manual tax line)", newLineHtml, StringComparison.Ordinal);
+        Assert.Contains("VAT — Value added tax", newLineHtml, StringComparison.Ordinal);
+
+        using var taxSetupResponse = await client.GetAsync("/financial/tax-setup");
+        var taxSetupHtml = await taxSetupResponse.Content.ReadAsStringAsync();
+        Assert.Equal(HttpStatusCode.OK, taxSetupResponse.StatusCode);
+        Assert.Contains("Tax setup", taxSetupHtml, StringComparison.Ordinal);
+        Assert.Contains("VAT — Value added tax", taxSetupHtml, StringComparison.Ordinal);
+        Assert.Contains("8.25", taxSetupHtml, StringComparison.Ordinal);
+
         using var anonymousClient = factory.CreateClient(new WebApplicationFactoryClientOptions
         {
             AllowAutoRedirect = false
@@ -103,6 +150,9 @@ public sealed class GeneralJournalPageTests(AuthenticationWebApplicationFactory 
         using var anonymousResponse = await anonymousClient.GetAsync("/financial/journals");
         Assert.Equal(HttpStatusCode.Redirect, anonymousResponse.StatusCode);
         Assert.StartsWith("/account/login", anonymousResponse.Headers.Location?.AbsolutePath);
+        using var anonymousTaxResponse = await anonymousClient.GetAsync("/financial/tax-setup");
+        Assert.Equal(HttpStatusCode.Redirect, anonymousTaxResponse.StatusCode);
+        Assert.StartsWith("/account/login", anonymousTaxResponse.Headers.Location?.AbsolutePath);
     }
 
     private async Task<ClaimsPrincipal> CreatePrincipalAsync(string email, Guid companyId)

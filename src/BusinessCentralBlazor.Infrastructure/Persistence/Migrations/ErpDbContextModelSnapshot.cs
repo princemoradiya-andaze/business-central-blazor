@@ -470,6 +470,24 @@ namespace BusinessCentralBlazor.Infrastructure.Persistence.Migrations
                     b.Property<DateOnly>("PostingDate")
                         .HasColumnType("date");
 
+                    b.Property<decimal?>("TaxBaseAmount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("decimal(19,4)");
+
+                    b.Property<Guid?>("TaxCodeId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("TaxPostingType")
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<Guid?>("TaxRateId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal?>("TaxRatePercent")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("decimal(9,4)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("CurrencyCode");
@@ -481,6 +499,8 @@ namespace BusinessCentralBlazor.Infrastructure.Persistence.Migrations
                     b.HasIndex("CompanyId", "JournalBatchId", "LineNumber")
                         .IsUnique();
 
+                    b.HasIndex("CompanyId", "TaxCodeId", "TaxRateId");
+
                     b.ToTable("GeneralJournalLines", t =>
                         {
                             t.HasCheckConstraint("CK_GeneralJournalLines_DebitOrCredit", "([DebitAmount] > 0 AND [CreditAmount] = 0) OR ([CreditAmount] > 0 AND [DebitAmount] = 0)");
@@ -490,6 +510,8 @@ namespace BusinessCentralBlazor.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("CK_GeneralJournalLines_LineNumber", "[LineNumber] > 0");
 
                             t.HasCheckConstraint("CK_GeneralJournalLines_NonNegativeAmounts", "[DebitAmount] >= 0 AND [CreditAmount] >= 0");
+
+                            t.HasCheckConstraint("CK_GeneralJournalLines_TaxDetails", "([TaxCodeId] IS NULL AND [TaxRateId] IS NULL AND [TaxRatePercent] IS NULL AND [TaxBaseAmount] IS NULL AND [TaxPostingType] IS NULL) OR ([TaxCodeId] IS NOT NULL AND [TaxRateId] IS NOT NULL AND [TaxRatePercent] > 0 AND [TaxBaseAmount] > 0 AND [TaxPostingType] IN ('Liability', 'Recoverable'))");
                         });
                 });
 
@@ -629,6 +651,24 @@ namespace BusinessCentralBlazor.Infrastructure.Persistence.Migrations
                     b.Property<DateOnly>("PostingDate")
                         .HasColumnType("date");
 
+                    b.Property<decimal?>("TaxBaseAmount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("decimal(19,4)");
+
+                    b.Property<Guid?>("TaxCodeId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("TaxPostingType")
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<Guid?>("TaxRateId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal?>("TaxRatePercent")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("decimal(9,4)");
+
                     b.HasKey("Id");
 
                     b.HasAlternateKey("CompanyId", "Id");
@@ -645,6 +685,8 @@ namespace BusinessCentralBlazor.Infrastructure.Persistence.Migrations
                     b.HasIndex("CompanyId", "JournalLineId")
                         .IsUnique();
 
+                    b.HasIndex("CompanyId", "TaxCodeId", "TaxRateId");
+
                     b.ToTable("GeneralLedgerEntries", t =>
                         {
                             t.HasCheckConstraint("CK_GeneralLedgerEntries_DebitOrCredit", "([DebitAmount] > 0 AND [CreditAmount] = 0) OR ([CreditAmount] > 0 AND [DebitAmount] = 0)");
@@ -652,6 +694,8 @@ namespace BusinessCentralBlazor.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("CK_GeneralLedgerEntries_ForeignAmounts", "([CurrencyCode] IS NULL AND [CurrencyDebitAmount] IS NULL AND [CurrencyCreditAmount] IS NULL) OR ([CurrencyCode] IS NOT NULL AND (([CurrencyDebitAmount] > 0 AND ([CurrencyCreditAmount] = 0 OR [CurrencyCreditAmount] IS NULL)) OR ([CurrencyCreditAmount] > 0 AND ([CurrencyDebitAmount] = 0 OR [CurrencyDebitAmount] IS NULL))))");
 
                             t.HasCheckConstraint("CK_GeneralLedgerEntries_NonNegativeAmounts", "[DebitAmount] >= 0 AND [CreditAmount] >= 0");
+
+                            t.HasCheckConstraint("CK_GeneralLedgerEntries_TaxDetails", "([TaxCodeId] IS NULL AND [TaxRateId] IS NULL AND [TaxRatePercent] IS NULL AND [TaxBaseAmount] IS NULL AND [TaxPostingType] IS NULL) OR ([TaxCodeId] IS NOT NULL AND [TaxRateId] IS NOT NULL AND [TaxRatePercent] > 0 AND [TaxBaseAmount] > 0 AND [TaxPostingType] IN ('Liability', 'Recoverable'))");
                         });
                 });
 
@@ -768,6 +812,83 @@ namespace BusinessCentralBlazor.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("CK_NumberSeries_MinimumDigits", "[MinimumDigits] BETWEEN 1 AND 18");
 
                             t.HasCheckConstraint("CK_NumberSeries_NextNumber", "[NextNumber] > 0");
+                        });
+                });
+
+            modelBuilder.Entity("BusinessCentralBlazor.Domain.Entities.TaxCode", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<bool>("IsBlocked")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid>("LiabilityAccountId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("RecoverableAccountId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId", "Code")
+                        .IsUnique();
+
+                    b.HasIndex("CompanyId", "LiabilityAccountId");
+
+                    b.HasIndex("CompanyId", "RecoverableAccountId");
+
+                    b.ToTable("TaxCodes");
+                });
+
+            modelBuilder.Entity("BusinessCentralBlazor.Domain.Entities.TaxRate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly?>("EndsOn")
+                        .HasColumnType("date");
+
+                    b.Property<decimal>("RatePercent")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("decimal(9,4)");
+
+                    b.Property<DateOnly>("StartsOn")
+                        .HasColumnType("date");
+
+                    b.Property<Guid>("TaxCodeId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("CompanyId", "Id");
+
+                    b.HasIndex("CompanyId", "TaxCodeId", "StartsOn")
+                        .IsUnique();
+
+                    b.ToTable("TaxRates", t =>
+                        {
+                            t.HasCheckConstraint("CK_TaxRates_DateRange", "[EndsOn] IS NULL OR [StartsOn] <= [EndsOn]");
+
+                            t.HasCheckConstraint("CK_TaxRates_PositiveRate", "[RatePercent] > 0");
                         });
                 });
 
@@ -1277,6 +1398,12 @@ namespace BusinessCentralBlazor.Infrastructure.Persistence.Migrations
                         .HasPrincipalKey("CompanyId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.HasOne("BusinessCentralBlazor.Domain.Entities.TaxRate", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId", "TaxCodeId", "TaxRateId")
+                        .HasPrincipalKey("CompanyId", "TaxCodeId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("BusinessCentralBlazor.Domain.Entities.GeneralJournalTemplate", b =>
@@ -1336,6 +1463,12 @@ namespace BusinessCentralBlazor.Infrastructure.Persistence.Migrations
                         .HasPrincipalKey("CompanyId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.HasOne("BusinessCentralBlazor.Domain.Entities.TaxRate", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId", "TaxCodeId", "TaxRateId")
+                        .HasPrincipalKey("CompanyId", "TaxCodeId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("BusinessCentralBlazor.Domain.Entities.Item", b =>
@@ -1376,6 +1509,45 @@ namespace BusinessCentralBlazor.Infrastructure.Persistence.Migrations
                     b.HasOne("BusinessCentralBlazor.Domain.Entities.Company", null)
                         .WithMany()
                         .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BusinessCentralBlazor.Domain.Entities.TaxCode", b =>
+                {
+                    b.HasOne("BusinessCentralBlazor.Domain.Entities.Company", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("BusinessCentralBlazor.Domain.Entities.GeneralLedgerAccount", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId", "LiabilityAccountId")
+                        .HasPrincipalKey("CompanyId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("BusinessCentralBlazor.Domain.Entities.GeneralLedgerAccount", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId", "RecoverableAccountId")
+                        .HasPrincipalKey("CompanyId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BusinessCentralBlazor.Domain.Entities.TaxRate", b =>
+                {
+                    b.HasOne("BusinessCentralBlazor.Domain.Entities.Company", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("BusinessCentralBlazor.Domain.Entities.TaxCode", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId", "TaxCodeId")
+                        .HasPrincipalKey("CompanyId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

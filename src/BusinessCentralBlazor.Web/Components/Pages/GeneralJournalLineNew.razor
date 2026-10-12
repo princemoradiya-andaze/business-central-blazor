@@ -39,6 +39,7 @@ else
 {
     <p class="text-body-secondary">Batch: @batch.Name</p>
     <GeneralJournalLineForm Model="@input" BatchId="@BatchId" OpenPeriods="@openPeriods" Accounts="@accounts"
+                            TaxCodes="@taxCodes"
                             Dimensions="@dimensions" SubmitText="Create line" IsSaving="@isSaving"
                             ErrorMessage="@errorMessage" OnValidSubmit="CreateAsync" />
 }
@@ -51,6 +52,7 @@ else
     private GeneralJournalBatchDetail? batch;
     private IReadOnlyList<AccountingPeriodListItem> openPeriods = [];
     private IReadOnlyList<GeneralJournalAccountOption> accounts = [];
+    private IReadOnlyList<GeneralJournalTaxCodeOption> taxCodes = [];
     private IReadOnlyList<JournalDimensionOption> dimensions = [];
     private bool isLoading = true;
     private bool isSaving;
@@ -66,6 +68,7 @@ else
             var periods = await GeneralJournalService.GetPeriodsAsync(user);
             openPeriods = periods.Where(period => !period.IsClosed && !period.DateLocked).ToArray();
             accounts = await GeneralJournalService.GetPostingAccountsAsync(user);
+            taxCodes = await GeneralJournalService.GetTaxCodesAsync(user);
             dimensions = await GeneralJournalService.GetDimensionsAsync(user);
             if (batch is not null)
             {
