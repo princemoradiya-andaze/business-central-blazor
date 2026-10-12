@@ -1,8 +1,35 @@
 using BusinessCentralBlazor.Web.Components;
+using BusinessCentralBlazor.Infrastructure.Identity;
+using BusinessCentralBlazor.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+builder.Services.AddDbContext<ErpDbContext>((services, options) =>
+{
+    var connectionString = services.GetRequiredService<IConfiguration>().GetConnectionString("ErpDatabase");
+    if (string.IsNullOrWhiteSpace(connectionString))
+    {
+        throw new InvalidOperationException(
+            "Set ConnectionStrings__ErpDatabase before accessing identity-backed application features.");
+    }
+
+    options.UseSqlServer(connectionString);
+});
+builder.Services.AddIdentity<ErpUser, ErpRole>(ErpIdentityDefaults.Configure)
+    .AddEntityFrameworkStores<ErpDbContext>()
+    .AddDefaultTokenProviders();
+builder.Services.ConfigureApplicationCookie(options =>
+{
+    options.LoginPath = "/account/login";
+    options.AccessDeniedPath = "/account/access-denied";
+    options.SlidingExpiration = true;
+    options.ExpireTimeSpan = TimeSpan.FromHours(8);
+});
+builder.Services.AddAuthorization();
+builder.Services.AddCascadingAuthenticationState();
+builder.Services.AddRazorPages();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
@@ -18,10 +45,16 @@ if (!app.Environment.IsDevelopment())
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
 
+app.UseAuthentication();
+app.UseAuthorization();
 app.UseAntiforgery();
 
 app.MapStaticAssets();
+app.MapRazorPages();
 app.MapRazorComponents<App>()
+    .RequireAuthorization()
     .AddInteractiveServerRenderMode();
 
 app.Run();
+
+public partial class Program;

@@ -17,12 +17,12 @@ Build an independently implemented, modular-monolith ERP using Blazor Server, .N
 ## Issue, branch, and pull-request lifecycle
 
 1. Create one GitHub issue per feature, fix, or bounded project task. Document scope, dependencies, risks, and testable acceptance criteria. Keep an issue open while any required verification remains incomplete.
-2. Create an issue branch from the latest `dev` branch. Use `feature/#<issue-number>-<short-description>` for features and `fix/#<issue-number>-<short-description>` for fixes. For example: `feature/#42-company-settings`.
+2. Create an issue branch from the latest `dev` branch. Use `feature/<issue-number>-<short-description>` for features and `fix/<issue-number>-<short-description>` for fixes. For example: `feature/42-company-settings`. Keep the issue number in the branch name without a literal `#`, which is awkward in shell commands.
 3. Implement only the issue's agreed scope. Keep changes reviewable, update related docs/roadmap, and do not commit secrets, local databases, proprietary artifacts, or unapproved source.
 4. On the feature branch, run the relevant local checks before committing. At minimum for code changes, restore/build/test the solution. Run additional module, migration, security, or UI checks that the issue requires, and record actual results in the PR and issue.
-5. Push the feature branch and open a PR into `dev`, linking the issue. Merge only after review and required CI checks pass. Do not push feature work directly to `main`.
+5. Push the feature branch and open a PR into `dev`, linking the issue. After review and required CI checks pass, ask the user for explicit approval before merging. Never merge a PR without that approval. Do not push feature work directly to `main`.
 6. Verify the merged `dev` branch locally against the agreed SQL Server development database using the issue's acceptance criteria. Keep the issue open if local verification or fixes are still outstanding.
-7. When all issues and acceptance criteria for a phase are complete and the merged `dev` branch passes local verification, open a release PR from `dev` to `main`. Require successful CI and applicable human/release approval. Do not promote an incomplete phase.
+7. When all issues and acceptance criteria for a phase are complete and the merged `dev` branch passes local verification, open a release PR from `dev` to `main`. Require successful CI and ask the user for explicit approval before merging. Do not promote an incomplete phase.
 8. After the release PR is merged, verify the `main` branch locally against the agreed SQL Server database before marking phase issues complete and proceeding to the next phase. Record the PR and test evidence. Hosted deployment and production testing are not part of the current workflow.
 
 Branch names must avoid spaces. Preserve issue numbers in branch names and PR titles/bodies so related work is traceable. Never force-push or rewrite shared history as a routine workflow.
@@ -53,8 +53,8 @@ Update this table when phase status materially changes. Link issues, PRs, commit
 
 | Phase | Status | Exit gate |
 |---|---|---|
-| Phase 0 — Repository setup and schema discovery | In progress | User-authorized selected metadata review, reviewed application-owned schema, applied migration, successful local checks and CI on `dev`, then release PR/CI and local verification on `main`. |
-| Phase 1 — Foundation framework | Not started | Identity, company boundaries, application shell, and reusable page/CRUD foundation meet their issue acceptance criteria. |
+| Phase 0 — Repository setup and schema discovery | Complete | Completed on `main`; local SQL Server migration, SQL smoke, build/tests, and app startup verified. |
+| Phase 1 — Foundation framework | In progress | Complete issues #11–#14, verify on `dev`, then pass release PR/CI and local verification on `main`. Ask the user before merging every PR. |
 | Phase 2 — Core financials | Not started | Financial workflows and transaction invariants pass unit, integration, and environment tests. |
 | Phase 3 — Sales, purchasing, and inventory | Not started | Document lifecycles and stock/financial consistency are verified. |
 | Phase 4 — Advanced capabilities and operations | Not started | Production, deployment, monitoring, recovery, and advanced capabilities meet release criteria. |
@@ -67,6 +67,7 @@ Record each material update newest-first. Use the local project timezone (Asia/K
 
 ### 2026-10-12
 
+- **11:16 IST — Phase 1 implementation started:** issue #10 tracks four implementation issues (#11–#14). The user chose administrator-managed accounts without public self-registration and selected a one-time CLI bootstrap using credentials from environment variables. Authentication is being implemented on `feature/11-admin-auth`; the user explicitly requires approval before every PR merge.
 - **10:56–10:57 IST — Schema alignment merged and locally verified on `dev`:** PR #6 merged to `dev` at `0a0ca99`. Applied `20261012051809_AlignJournalAndAccountingFoundation` to the existing Phase 0 database `BusinessCentralBlazor_Phase0` on `.\BCDEMO`; both migrations now show as applied. The updated rollback-only SQL smoke test passed all five checks. Release build passed (0 warnings/errors), tests passed (6/6), EF reported no pending model changes, and the local app returned HTTP 200 at `http://localhost:5211`. This updates only the named Phase 0 database; it is not a hosted deployment. The release PR and local verification on `main` remain.
 - **10:31–10:35 IST — User local verification of the existing `dev` schema:** the user confirmed the initial migration is applied to `BusinessCentralBlazor_Phase0`, all five rollback-only SQL smoke-test checks passed, Release build and tests succeeded, and the web app home page loaded at `http://localhost:5211`. At that point, these results verified only the pre-alignment schema; the aligned schema was verified locally at 10:56–10:57 IST as recorded above.
 - **10:39 IST — Selected Business Central metadata review:** the user confirmed permission to inspect the local source artifacts and selected a concept-alignment approach rather than a field-for-field copy. Read selected foundational table definitions from the Base Application source archive in memory; neither the archive nor repository source files were modified. Updated the application model with journal templates, account structure/category distinction, and period/line relationships. The alignment migration and its local verification are pending.
