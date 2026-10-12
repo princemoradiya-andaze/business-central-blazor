@@ -1,0 +1,227 @@
+:root {
+    --account-ink: #15233f;
+    --account-muted: #64748b;
+    --account-accent: #2563eb;
+    --account-border: #e2e8f0;
+}
+
+body.account-body {
+    min-height: 100vh;
+    background:
+        radial-gradient(ellipse at 12% 10%, rgba(59, 130, 246, 0.14), transparent 35%),
+        radial-gradient(ellipse at 88% 90%, rgba(124, 58, 237, 0.12), transparent 32%),
+        #f3f6fb;
+    color: var(--account-ink);
+}
+
+.account-page {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 2rem 1rem 1rem;
+}
+
+.account-card {
+    width: min(100%, 29rem);
+    overflow: hidden;
+    background: #fff;
+    border: 1px solid rgba(226, 232, 240, 0.9);
+    border-radius: 1.25rem;
+    box-shadow: 0 24px 70px rgba(15, 23, 42, 0.12);
+}
+
+.account-card-wide {
+    width: min(100%, 37rem);
+}
+
+.account-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1.25rem 1.75rem;
+    color: #fff;
+    background: linear-gradient(115deg, #10254b, #173b73 62%, #2457a3);
+    min-width: 0;
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    text-decoration: none;
+}
+
+.account-brand > span:last-child {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.account-brand:hover {
+    color: #fff;
+}
+
+.account-brand-mark {
+    width: 2.4rem;
+    height: 2.4rem;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(255, 255, 255, 0.42);
+    border-radius: 0.7rem;
+    background: rgba(255, 255, 255, 0.12);
+    font-size: 0.83rem;
+    letter-spacing: 0.04em;
+}
+
+.account-brand-light {
+    color: #c7d8ff;
+    font-weight: 400;
+}
+
+.account-card-content {
+    padding: 2rem 2rem 1.75rem;
+}
+
+.account-eyebrow {
+    margin-bottom: 0.45rem;
+    color: var(--account-accent);
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+}
+
+.account-card h1 {
+    margin-bottom: 0.5rem;
+    color: var(--account-ink);
+    font-size: clamp(1.65rem, 5vw, 2rem);
+    font-weight: 700;
+    letter-spacing: -0.035em;
+}
+
+.account-description {
+    margin-bottom: 1.5rem;
+    color: var(--account-muted);
+    line-height: 1.6;
+}
+
+.account-card .form-label {
+    color: #263650;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.account-card .form-control,
+.account-card .form-select {
+    border-color: var(--account-border);
+    border-radius: 0.65rem;
+}
+
+.account-card .form-control:focus,
+.account-card .form-select:focus {
+    border-color: #7ca7f8;
+    box-shadow: 0 0 0 0.22rem rgba(37, 99, 235, 0.14);
+}
+
+.account-card .btn-primary {
+    border: 0;
+    border-radius: 0.65rem;
+    background: linear-gradient(105deg, #2563eb, #315bd5);
+    font-weight: 600;
+}
+
+.account-card .btn-primary:hover {
+    background: linear-gradient(105deg, #1d4ed8, #2548b8);
+}
+
+.account-help,
+.account-current-company {
+    margin: 1.25rem 0 0;
+    color: var(--account-muted);
+    font-size: 0.875rem;
+    line-height: 1.6;
+}
+
+.account-current-company {
+    padding: 0.85rem 1rem;
+    border: 1px solid #dbeafe;
+    border-radius: 0.65rem;
+    background: #eff6ff;
+}
+
+.account-current-company strong {
+    color: #1e3a8a;
+}
+
+.account-empty-state {
+    padding: 1.5rem;
+    border: 1px solid #dbeafe;
+    border-radius: 0.85rem;
+    background: #f8fbff;
+    text-align: center;
+}
+
+.account-empty-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    display: inline-grid;
+    place-items: center;
+    margin-bottom: 0.75rem;
+    border-radius: 50%;
+    background: #e0ecff;
+    color: #1d4ed8;
+    font-size: 1.2rem;
+    font-weight: 700;
+}
+
+.account-empty-state h2 {
+    color: var(--account-ink);
+    font-size: 1.1rem;
+    font-weight: 700;
+}
+
+.account-empty-state p {
+    margin-bottom: 0;
+    color: var(--account-muted);
+    line-height: 1.6;
+}
+
+.account-secondary-action {
+    display: flex;
+    justify-content: center;
+    margin-top: 1rem;
+}
+
+.account-secondary-action form {
+    margin: 0;
+}
+
+.account-secondary-action .btn-link {
+    color: var(--account-muted);
+    text-decoration: none;
+}
+
+.account-secondary-action .btn-link:hover {
+    color: var(--account-ink);
+    text-decoration: underline;
+}
+
+.account-footer {
+    margin: 1.25rem 0 0;
+    color: #718096;
+    font-size: 0.8rem;
+    text-align: center;
+}
+
+@media (max-width: 480px) {
+    .account-page {
+        justify-content: flex-start;
+        padding-top: 1.25rem;
+    }
+
+    .account-brand {
+        padding-inline: 1.25rem;
+    }
+
+    .account-card-content {
+        padding: 1.5rem 1.25rem;
+    }
+}

@@ -42,6 +42,8 @@ For isolated local UI testing only, `setup-local-demo` creates one `Local Demo T
 
 Authenticated users can choose only active companies for which both a tenant membership and a company membership exist. The selected company ID is stored as a claim in the protected authentication cookie, but that claim is only a selection hint: `IActiveCompanyContext.ResolveAsync` rechecks the current membership rows and company-active status against SQL Server whenever called. Missing, removed, or inactive memberships therefore resolve to no active company. Users without an eligible company see a safe no-access state; they must be assigned a membership before accessing company-owned features. Any future business operation must resolve and enforce this context server-side rather than trusting a company ID supplied by the browser. The company-context change does not alter the EF model or require a migration.
 
+After successful sign-in, the app reloads eligible memberships from the database. It selects the company automatically only when exactly one active company is available; users with multiple eligible companies are sent to the company selector, while users with none receive the no-access flow. A requested local return URL is preserved through company selection.
+
 ## Company authorization and data isolation
 
 The Blazor component endpoint and company-owned pages use the `ActiveCompany` authorization policy. It requires a signed-in user whose selected company still has an active company membership and tenant membership. The Razor Page at `/account/company` remains available to signed-in users without an active selection so they can choose an eligible company.
