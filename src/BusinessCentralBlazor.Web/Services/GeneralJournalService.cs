@@ -755,6 +755,7 @@ public sealed class GeneralJournalService(
             .OrderBy(line => line.LineNumber)
             .ToListAsync();
         ValidateBatchIsBalanced(lines);
+        await BankService.ValidateJournalForPostingAsync(dbContext, company.CompanyId, batchId, lines);
         foreach (var line in lines)
         {
             await ValidatePersistedLineAsync(dbContext, company.CompanyId, line);

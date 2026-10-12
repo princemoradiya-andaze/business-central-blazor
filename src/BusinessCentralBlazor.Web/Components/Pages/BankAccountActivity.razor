@@ -1,0 +1,138 @@
+@page "/financial/banks/{BankId:guid}"
+@attribute [Authorize(Policy = CompanyAuthorizationPolicies.ActiveCompany)]
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IBankService BankService
+@inject IGeneralJournalService JournalService
+@inject NavigationManager Navigation
+
+<PageTitle>Bank receipts, payments and statements</PageTitle>
+<h1>Bank receipts, payments and statements</h1>
+<a href="/financial/banks">Bank accounts</a>
+@if (error is not null)
+{
+    <div class="alert alert-danger" role="alert">@error</div>
+}
+@if (bank is not null)
+{
+    <h2>@bank.Code - @bank.Name (@bank.CurrencyCode)</h2>
+    <p>Receipts and payments create balanced draft journals. Review and post them in General journals;
+        only posted G/L bank activity can be reconciled. Posting and reversal use the existing ledger workflow.</p>
+    <EditForm Model="@journal" OnValidSubmit="CreateJournalAsync" FormName="bank-journal">
+        <DataAnnotationsValidator /><ValidationSummary />
+        <fieldset disabled="@(saving || bank.IsBlocked)">
+            <legend>New receipt or payment</legend>
+            <label for="bank-receipt">Receipt (clear for payment)</label>
+            <InputCheckbox id="bank-receipt" @bind-Value="journal.IsReceipt" />
+            <label for="bank-document">Unique document number</label>
+            <InputText id="bank-document" class="form-control" @bind-Value="journal.DocumentNumber" />
+            <label for="bank-description">Description</label>
+            <InputText id="bank-description" class="form-control" @bind-Value="journal.Description" />
+            <label for="bank-date">Posting date</label>
+            <InputDate id="bank-date" class="form-control" @bind-Value="journal.PostingDate" />
+            <label for="bank-amount">Positive amount</label>
+            <InputNumber id="bank-amount" class="form-control" step="0.0001" @bind-Value="journal.Amount" />
+            <label for="bank-period">Accounting period</label>
+            <InputSelect id="bank-period" class="form-select" @bind-Value="journal.AccountingPeriodId">
+                <option value="@Guid.Empty">Select open period</option>
+                @foreach (var period in periods.Where(period => !period.IsClosed && !period.DateLocked))
+                {
+                    <option value="@period.Id">@period.Name</option>
+                }
+            </InputSelect>
+            <label for="bank-offset">Offset G/L account</label>
+            <InputSelect id="bank-offset" class="form-select" @bind-Value="journal.OffsetAccountId">
+                <option value="@Guid.Empty">Select offset account</option>
+                @foreach (var account in accounts.Where(account => account.Id != bank.GeneralLedgerAccountId))
+                {
+                    <option value="@account.Id">@account.Number - @account.Name</option>
+                }
+            </InputSelect>
+            <button type="submit" class="btn btn-primary my-3">Create draft journal</button>
+        </fieldset>
+    </EditForm>
+    <table class="table">
+        <caption>Journal-linked receipts and payments</caption>
+        <thead><tr><th>Document</th><th>Type</th><th>Status</th><th>Journal trace</th></tr></thead>
+        <tbody>
+            @foreach (var item in journals)
+            {
+                <tr><td>@item.DocumentNumber</td><td>@(item.IsReceipt ? "Receipt" : "Payment")</td><td>@item.Status</td>
+                    <td><a href="@($"/financial/journals/{item.BatchId}")">Review journal</a></td></tr>
+            }
+        </tbody>
+    </table>
+    <EditForm Model="@statement" OnValidSubmit="CreateStatementAsync" FormName="bank-statement">
+        <DataAnnotationsValidator /><ValidationSummary />
+        <fieldset disabled="@(saving || bank.IsBlocked)">
+            <legend>New manual statement</legend>
+            <label for="statement-reference">Unique reference</label>
+            <InputText id="statement-reference" class="form-control" @bind-Value="statement.Reference" />
+            <label for="statement-start">From</label>
+            <InputDate id="statement-start" class="form-control" @bind-Value="statement.StartsOn" />
+            <label for="statement-end">Through</label>
+            <InputDate id="statement-end" class="form-control" @bind-Value="statement.EndsOn" />
+            <label for="statement-opening">Opening balance</label>
+            <InputNumber id="statement-opening" class="form-control" step="0.0001" @bind-Value="statement.OpeningBalance" />
+            <label for="statement-closing">Closing balance</label>
+            <InputNumber id="statement-closing" class="form-control" step="0.0001" @bind-Value="statement.ClosingBalance" />
+            <button type="submit" class="btn btn-primary my-3">Create statement</button>
+        </fieldset>
+    </EditForm>
+    <table class="table">
+        <caption>Manual statements</caption>
+        <thead><tr><th>Reference</th><th>Through</th><th>Status</th></tr></thead>
+        <tbody>
+            @foreach (var item in statements)
+            {
+                <tr><td><a href="@($"/financial/bank-statements/{item.Id}")">@item.Reference</a></td>
+                    <td>@item.EndsOn</td><td>@(item.IsCompleted ? "Completed" : "Open")</td></tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    [Parameter] public Guid BankId { get; set; }
+    private BankAccountDetail? bank;
+    private BankJournalInput journal = new();
+    private BankStatementInput statement = new();
+    private IReadOnlyList<GeneralJournalAccountOption> accounts = [];
+    private IReadOnlyList<AccountingPeriodListItem> periods = [];
+    private IReadOnlyList<BankJournalDetail> journals = [];
+    private IReadOnlyList<BankStatementSummary> statements = [];
+    private bool saving;
+    private string? error;
+    protected override async Task OnParametersSetAsync()
+    {
+        bank = null;
+        await ExecuteAsync(async user =>
+        {
+            bank = (await BankService.GetAccountsAsync(user)).SingleOrDefault(item => item.Id == BankId);
+            if (bank is null) throw new ValidationException("Bank account not found in the active company.");
+            accounts = await JournalService.GetPostingAccountsAsync(user);
+            periods = await JournalService.GetPeriodsAsync(user);
+            journals = await BankService.GetJournalsAsync(user, BankId);
+            statements = await BankService.GetStatementsAsync(user, BankId);
+        });
+    }
+    private Task CreateJournalAsync() => ExecuteAsync(async user =>
+    {
+        var id = await BankService.CreateJournalAsync(user, BankId, journal);
+        Navigation.NavigateTo($"/financial/journals/{id}");
+    });
+    private Task CreateStatementAsync() => ExecuteAsync(async user =>
+    {
+        var id = await BankService.CreateStatementAsync(user, BankId, statement);
+        Navigation.NavigateTo($"/financial/bank-statements/{id}");
+    });
+    private async Task ExecuteAsync(Func<System.Security.Claims.ClaimsPrincipal, Task> action)
+    {
+        if (saving) return;
+        saving = true;
+        error = null;
+        try { await action((await AuthenticationStateProvider.GetAuthenticationStateAsync()).User); }
+        catch (ValidationException exception) { error = exception.Message; }
+        catch (UnauthorizedAccessException exception) { error = exception.Message; }
+        finally { saving = false; }
+    }
+}

@@ -33,6 +33,10 @@ public sealed class ErpDbContext(DbContextOptions<ErpDbContext> options)
     public DbSet<Item> Items => Set<Item>();
     public DbSet<NumberSeries> NumberSeries => Set<NumberSeries>();
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
+    public DbSet<BankAccount> BankAccounts => Set<BankAccount>();
+    public DbSet<BankJournal> BankJournals => Set<BankJournal>();
+    public DbSet<BankStatement> BankStatements => Set<BankStatement>();
+    public DbSet<BankStatementLine> BankStatementLines => Set<BankStatementLine>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -42,6 +46,71 @@ public sealed class ErpDbContext(DbContextOptions<ErpDbContext> options)
         ConfigureTenancy(modelBuilder);
         ConfigureAccounting(modelBuilder);
         ConfigureOperations(modelBuilder);
+        ConfigureBanking(modelBuilder);
+    }
+
+    private static void ConfigureBanking(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<BankAccount>(entity =>
+        {
+            ConfigureCompanyEntity(entity);
+            entity.HasIndex(bank => new { bank.CompanyId, bank.Code }).IsUnique();
+            entity.HasIndex(bank => new { bank.CompanyId, bank.GeneralLedgerAccountId }).IsUnique();
+            entity.Property(bank => bank.Code).HasMaxLength(32).IsRequired();
+            entity.Property(bank => bank.Name).HasMaxLength(160).IsRequired();
+            entity.Property(bank => bank.AccountIdentifier).HasMaxLength(100).IsRequired();
+            entity.Property(bank => bank.CurrencyCode).HasColumnType("char(3)").IsRequired();
+            entity.Property(bank => bank.Revision).IsConcurrencyToken();
+            entity.HasOne<Currency>().WithMany().HasForeignKey(bank => bank.CurrencyCode)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<GeneralLedgerAccount>().WithMany()
+                .HasForeignKey(bank => new { bank.CompanyId, bank.GeneralLedgerAccountId })
+                .HasPrincipalKey(account => new { account.CompanyId, account.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<BankJournal>(entity =>
+        {
+            ConfigureCompanyEntity(entity);
+            entity.HasIndex(journal => new { journal.CompanyId, journal.BankAccountId, journal.DocumentNumber }).IsUnique();
+            entity.HasIndex(journal => new { journal.CompanyId, journal.JournalBatchId }).IsUnique();
+            entity.Property(journal => journal.DocumentNumber).HasMaxLength(64).IsRequired();
+            entity.HasOne<BankAccount>().WithMany()
+                .HasForeignKey(journal => new { journal.CompanyId, journal.BankAccountId })
+                .HasPrincipalKey(bank => new { bank.CompanyId, bank.Id }).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<GeneralJournalBatch>().WithMany()
+                .HasForeignKey(journal => new { journal.CompanyId, journal.JournalBatchId })
+                .HasPrincipalKey(batch => new { batch.CompanyId, batch.Id }).OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<BankStatement>(entity =>
+        {
+            ConfigureCompanyEntity(entity);
+            entity.HasIndex(statement => new { statement.CompanyId, statement.BankAccountId, statement.Reference }).IsUnique();
+            entity.Property(statement => statement.Reference).HasMaxLength(64).IsRequired();
+            entity.Property(statement => statement.OpeningBalance).HasPrecision(19, 4);
+            entity.Property(statement => statement.ClosingBalance).HasPrecision(19, 4);
+            entity.Property(statement => statement.Revision).IsConcurrencyToken();
+            entity.ToTable(table => table.HasCheckConstraint("CK_BankStatements_DateRange", "[StartsOn] <= [EndsOn]"));
+            entity.HasOne<BankAccount>().WithMany()
+                .HasForeignKey(statement => new { statement.CompanyId, statement.BankAccountId })
+                .HasPrincipalKey(bank => new { bank.CompanyId, bank.Id }).OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<BankStatementLine>(entity =>
+        {
+            ConfigureCompanyEntity(entity);
+            entity.HasIndex(line => new { line.CompanyId, line.BankStatementId, line.Reference }).IsUnique();
+            entity.HasIndex(line => new { line.CompanyId, line.GeneralLedgerEntryId }).IsUnique()
+                .HasFilter("[GeneralLedgerEntryId] IS NOT NULL");
+            entity.Property(line => line.Reference).HasMaxLength(64).IsRequired();
+            entity.Property(line => line.Description).HasMaxLength(250).IsRequired();
+            entity.Property(line => line.Amount).HasPrecision(19, 4);
+            entity.ToTable(table => table.HasCheckConstraint("CK_BankStatementLines_NonzeroAmount", "[Amount] <> 0"));
+            entity.HasOne<BankStatement>().WithMany()
+                .HasForeignKey(line => new { line.CompanyId, line.BankStatementId })
+                .HasPrincipalKey(statement => new { statement.CompanyId, statement.Id }).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<GeneralLedgerEntry>().WithMany()
+                .HasForeignKey(line => new { line.CompanyId, line.GeneralLedgerEntryId })
+                .HasPrincipalKey(entry => new { entry.CompanyId, entry.Id }).OnDelete(DeleteBehavior.Restrict);
+        });
     }
 
     private static void ConfigureIdentity(ModelBuilder modelBuilder)

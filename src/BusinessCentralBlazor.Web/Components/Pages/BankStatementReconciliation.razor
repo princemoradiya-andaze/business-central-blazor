@@ -1,0 +1,178 @@
+@page "/financial/bank-statements/{StatementId:guid}"
+@attribute [Authorize(Policy = CompanyAuthorizationPolicies.ActiveCompany)]
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IBankService BankService
+
+<PageTitle>Manual bank reconciliation</PageTitle>
+<h1>Manual bank reconciliation</h1>
+@if (error is not null)
+{
+    <div class="alert alert-danger" role="alert">@error</div>
+}
+<button class="btn btn-outline-secondary" disabled="@saving" @onclick="ReloadAsync">Reload</button>
+@if (statement is not null)
+{
+    <a href="@($"/financial/banks/{statement.BankAccountId}")">Bank activity</a>
+    <h2>@statement.Reference - @(statement.IsCompleted ? "Completed" : "Open")</h2>
+    <p>Statement period: @statement.StartsOn through @statement.EndsOn.
+        Opening: @statement.OpeningBalance.ToString("N4"); closing: @statement.ClosingBalance.ToString("N4").</p>
+    <p><strong>Statement balance difference:</strong> @statement.StatementDifference.ToString("N4")
+        (closing minus opening and statement lines).</p>
+    <p><strong>Statement minus G/L closing balance:</strong> @statement.BookDifference.ToString("N4").
+        Outstanding posted items are shown below, including earlier uncleared entries.
+        Timing differences do not create adjusting entries automatically.</p>
+    @if (!statement.IsCompleted)
+    {
+        <EditForm Model="@headerInput" OnValidSubmit="UpdateHeaderAsync" FormName="statement-header">
+            <DataAnnotationsValidator /><ValidationSummary />
+            <fieldset disabled="@saving">
+                <legend>Correct statement header</legend>
+                <label for="header-reference">Reference</label>
+                <InputText id="header-reference" class="form-control" @bind-Value="headerInput.Reference" />
+                <label for="header-start">From</label>
+                <InputDate id="header-start" class="form-control" @bind-Value="headerInput.StartsOn" />
+                <label for="header-end">Through</label>
+                <InputDate id="header-end" class="form-control" @bind-Value="headerInput.EndsOn" />
+                <label for="header-opening">Opening balance</label>
+                <InputNumber id="header-opening" class="form-control" step="0.0001" @bind-Value="headerInput.OpeningBalance" />
+                <label for="header-closing">Closing balance</label>
+                <InputNumber id="header-closing" class="form-control" step="0.0001" @bind-Value="headerInput.ClosingBalance" />
+                <button type="submit" class="btn btn-outline-primary my-3">Save header</button>
+            </fieldset>
+        </EditForm>
+        <EditForm Model="@lineInput" OnValidSubmit="AddLineAsync" FormName="statement-line">
+            <DataAnnotationsValidator /><ValidationSummary />
+            <fieldset disabled="@saving">
+                <legend>Manual statement line</legend>
+                <label for="line-reference">Unique line reference</label>
+                <InputText id="line-reference" class="form-control" @bind-Value="lineInput.Reference" />
+                <label for="line-date">Transaction date</label>
+                <InputDate id="line-date" class="form-control" @bind-Value="lineInput.TransactionDate" />
+                <label for="line-description">Description</label>
+                <InputText id="line-description" class="form-control" @bind-Value="lineInput.Description" />
+                <label for="line-amount">Signed amount (receipt positive, payment negative)</label>
+                <InputNumber id="line-amount" class="form-control" step="0.0001" @bind-Value="lineInput.Amount" />
+                <button type="submit" class="btn btn-primary my-3">Add line</button>
+            </fieldset>
+        </EditForm>
+        <label for="statement-import">Paste tab-separated lines, without a header:
+            yyyy-MM-dd, reference, description, signed amount (invariant decimal point).</label>
+        <textarea id="statement-import" class="form-control" rows="5" maxlength="400000" disabled="@saving" @bind="importText"></textarea>
+        <button class="btn btn-outline-primary my-3" disabled="@saving" @onclick="ImportAsync">Import all lines</button>
+        <p>Import is all-or-nothing, maximum 1000 lines. Duplicate references are rejected; no automatic matching.</p>
+    }
+    <table class="table">
+        <caption>Statement lines - @statement.Lines.Count(line => line.EntryId is null) unmatched</caption>
+        <thead><tr><th>Reference / date</th><th>Description</th><th>Amount</th><th>Match</th></tr></thead>
+        <tbody>
+            @foreach (var line in statement.Lines)
+            {
+                <tr @key="line.Id">
+                    <td>@line.Reference / @line.TransactionDate</td><td>@line.Description</td><td>@line.Amount.ToString("N4")</td>
+                    <td>
+                        @if (line.EntryId is not null)
+                        {
+                            var entry = statement.Activity.SingleOrDefault(item => item.Id == line.EntryId);
+                            @if (entry is not null)
+                            {
+                                <a href="@($"/financial/journals/{entry.BatchId}")">Entry @entry.EntryNumber / @entry.DocumentNumber</a>
+                            }
+                            @if (!statement.IsCompleted)
+                            {
+                                <button class="btn btn-link" disabled="@saving" @onclick="() => MatchAsync(line.Id, null)">Unmatch</button>
+                            }
+                        }
+                        else if (!statement.IsCompleted)
+                        {
+                            <label class="visually-hidden" for="@($"match-{line.Id}")">Posted entry for @line.Reference</label>
+                            <select id="@($"match-{line.Id}")" class="form-select" disabled="@saving" @bind="selections[line.Id]">
+                                <option value="@Guid.Empty">Select exact-amount posted entry</option>
+                                @foreach (var entry in statement.Activity.Where(item => item.MatchedLineId is null && item.Amount == line.Amount))
+                                {
+                                    <option value="@entry.Id">@entry.EntryNumber / @entry.PostingDate / @entry.DocumentNumber</option>
+                                }
+                            </select>
+                            <button class="btn btn-link" disabled="@(saving || selections[line.Id] == Guid.Empty)"
+                                    @onclick="() => MatchAsync(line.Id, selections[line.Id])">Match</button>
+                            <button class="btn btn-link" disabled="@saving" @onclick="() => RemoveAsync(line.Id)">Remove line</button>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <table class="table">
+        <caption>Unreconciled posted bank activity through @statement.EndsOn</caption>
+        <thead><tr><th>Entry</th><th>Date</th><th>Document</th><th>Description</th><th>Signed amount</th></tr></thead>
+        <tbody>
+            @foreach (var entry in statement.Activity.Where(item => item.MatchedLineId is null))
+            {
+                <tr><td><a href="@($"/financial/journals/{entry.BatchId}")">@entry.EntryNumber</a></td>
+                    <td>@entry.PostingDate</td><td>@entry.DocumentNumber</td><td>@entry.Description</td><td>@entry.Amount.ToString("N4")</td></tr>
+            }
+        </tbody>
+    </table>
+    @if (!statement.IsCompleted)
+    {
+        <p>Completion locks the statement and its matches. All statement lines must be matched and the
+            statement balance difference must be zero. Outstanding G/L items may remain as timing differences.</p>
+        <button class="btn btn-primary" disabled="@(saving || statement.Lines.Count == 0 ||
+            statement.Lines.Any(line => line.EntryId is null) || statement.StatementDifference != 0)"
+                @onclick="CompleteAsync">Complete reconciliation</button>
+    }
+}
+
+@code {
+    [Parameter] public Guid StatementId { get; set; }
+    private BankStatementDetail? statement;
+    private BankStatementLineInput lineInput = new();
+    private BankStatementInput headerInput = new();
+    private string importText = string.Empty;
+    private readonly Dictionary<Guid, Guid> selections = [];
+    private string? error;
+    private bool saving;
+    protected override Task OnParametersSetAsync() => ReloadAsync();
+    private async Task LoadAsync(System.Security.Claims.ClaimsPrincipal user)
+    {
+        statement = null;
+        statement = await BankService.GetStatementAsync(user, StatementId);
+        headerInput = new() { Reference = statement.Reference, StartsOn = statement.StartsOn, EndsOn = statement.EndsOn,
+            OpeningBalance = statement.OpeningBalance, ClosingBalance = statement.ClosingBalance };
+        selections.Clear();
+        foreach (var line in statement.Lines) selections[line.Id] = Guid.Empty;
+    }
+    private Task ReloadAsync() => ExecuteAsync(LoadAsync, false);
+    private Task UpdateHeaderAsync() => ExecuteAsync(user =>
+        BankService.UpdateStatementAsync(user, StatementId, statement!.Revision, headerInput));
+    private Task AddLineAsync() => ExecuteAsync(async user =>
+    {
+        await BankService.AddLinesAsync(user, StatementId, statement!.Revision, [lineInput]);
+        lineInput = new() { TransactionDate = statement.StartsOn };
+    });
+    private Task ImportAsync() => ExecuteAsync(async user =>
+    {
+        await BankService.ImportLinesAsync(user, StatementId, statement!.Revision, importText);
+        importText = string.Empty;
+    });
+    private Task MatchAsync(Guid lineId, Guid? entryId) => ExecuteAsync(user =>
+        BankService.MatchAsync(user, StatementId, statement!.Revision, lineId, entryId));
+    private Task RemoveAsync(Guid lineId) => ExecuteAsync(user =>
+        BankService.RemoveLineAsync(user, StatementId, statement!.Revision, lineId));
+    private Task CompleteAsync() => ExecuteAsync(user =>
+        BankService.CompleteAsync(user, StatementId, statement!.Revision));
+    private async Task ExecuteAsync(Func<System.Security.Claims.ClaimsPrincipal, Task> action, bool reload = true)
+    {
+        if (saving) return;
+        saving = true;
+        error = null;
+        try
+        {
+            var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+            await action(user);
+            if (reload) await LoadAsync(user);
+        }
+        catch (ValidationException exception) { error = exception.Message; }
+        catch (UnauthorizedAccessException exception) { statement = null; error = exception.Message; }
+        finally { saving = false; }
+    }
+}
