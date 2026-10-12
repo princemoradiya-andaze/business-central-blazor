@@ -1,0 +1,27 @@
+@using BusinessCentralBlazor.Web.Services
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IActiveCompanyContext ActiveCompanyContext
+
+<div class="nav-item px-3 small text-light" aria-live="polite">
+    @if (activeCompany is null)
+    {
+        <span>No active company</span>
+    }
+    else
+    {
+        <span>Company: @activeCompany.Name (@activeCompany.Code)</span>
+    }
+    <div>
+        <a class="link-light" href="/account/company" data-enhance-nav="false">Select company</a>
+    </div>
+</div>
+
+@code {
+    private CompanyMembershipOption? activeCompany;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        activeCompany = await ActiveCompanyContext.ResolveAsync(authenticationState.User);
+    }
+}

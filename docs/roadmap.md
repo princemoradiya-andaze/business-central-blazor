@@ -24,11 +24,11 @@ Only mark tasks complete when their acceptance criteria have been verified.
 
 ## Phase 1 — Foundation framework
 
-- [ ] Phase tracker: [#10](https://github.com/princemoradiya-andaze/business-central-blazor/issues/10) — complete all four scoped issues below, then verify on `dev` and release to `main`.
-- [ ] [#11](https://github.com/princemoradiya-andaze/business-central-blazor/issues/11) — ASP.NET Core Identity sign-in/out and administrator-managed accounts; no public self-registration.
-- [ ] [#13](https://github.com/princemoradiya-andaze/business-central-blazor/issues/13) — tenant/company memberships and validated active-company context.
-- [ ] [#14](https://github.com/princemoradiya-andaze/business-central-blazor/issues/14) — authorization policies and cross-tenant/company data isolation.
-- [ ] [#12](https://github.com/princemoradiya-andaze/business-central-blazor/issues/12) — authenticated application shell, navigation, and reusable CRUD foundation.
+- [ ] Phase tracker: [#10](https://github.com/princemoradiya-andaze/business-central-blazor/issues/10) — all four implementation issues are complete and verified on `dev`; pass the release PR/CI and verify locally on `main` before closing.
+- [x] [#11](https://github.com/princemoradiya-andaze/business-central-blazor/issues/11) — ASP.NET Core Identity sign-in/out and administrator-managed accounts; no public self-registration (merged in PRs #16 and #17; local sign-in verified).
+- [x] [#13](https://github.com/princemoradiya-andaze/business-central-blazor/issues/13) — tenant/company memberships and validated active-company context (merged in PR #18; local verification passed).
+- [x] [#14](https://github.com/princemoradiya-andaze/business-central-blazor/issues/14) — authorization policies and cross-tenant/company data isolation (merged in PR #19; CI and local Release build/22 tests passed).
+- [x] [#12](https://github.com/princemoradiya-andaze/business-central-blazor/issues/12) — authenticated application shell, navigation, and reusable CRUD foundation (merged in PR #20; local verification passed).
 
 **Merge gate:** Ask the user for explicit approval before merging every PR, even when all CI checks pass.
 
@@ -40,4 +40,4 @@ Only mark tasks complete when their acceptance criteria have been verified.
 
 ## Current next step
 
-Phase 0 is complete on `main`. Phase 1 is planned and tracked by issue #10 with four implementation issues (#11–#14); no Phase 1 implementation has started. Account creation is administrator-managed with no public self-registration. Create each feature branch from the latest `dev`, link its issue in the PR, verify locally and in CI, and ask the user before merging. Hosted deployment is not part of the agreed workflow.
+Phase 0 is complete on `main`. All four Phase 1 implementation issues (#11–#14) are merged into `dev`; local account, company selection, authorization, shell, and Workspace notes flows have been verified by the user. On the latest `dev`, the Release build passed with 0 warnings/errors, all 32 tests passed, EF reported no pending model changes, and the approved local database `BusinessCentralBlazor_Phase0` has all three expected migrations applied. The release PR to `main` is pending; after its CI and explicit merge approval, repeat local verification on `main` before closing issue #10. Ask the user before merging every PR. Hosted deployment is not part of the agreed workflow.

@@ -1,0 +1,110 @@
+@page "/workspace/notes/{NoteId:guid}/edit"
+@attribute [Authorize(Policy = CompanyAuthorizationPolicies.ActiveCompany)]
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IWorkspaceNoteService WorkspaceNoteService
+@inject NavigationManager Navigation
+
+<PageTitle>Edit workspace note</PageTitle>
+
+<nav aria-label="Breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/workspace/notes">Workspace notes</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Edit</li>
+    </ol>
+</nav>
+
+@if (isLoading)
+{
+    <p role="status" aria-live="polite">Loading note...</p>
+}
+else if (companyContextUnavailable)
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+    <a href="/account/company" data-enhance-nav="false">Select an active company</a>
+}
+else if (note is null)
+{
+    <h1>Note not found</h1>
+    <p>This note is not available in the active company.</p>
+    <a class="btn btn-outline-secondary" href="/workspace/notes">Back to notes</a>
+}
+else
+{
+    <h1>Edit workspace note</h1>
+    <WorkspaceNoteForm Model="@note"
+                       SubmitText="Save changes"
+                       CancelUrl="@($"/workspace/notes/{NoteId}")"
+                       IsSaving="@isSaving"
+                       ErrorMessage="@errorMessage"
+                       OnValidSubmit="SaveAsync" />
+}
+
+@code {
+    [Parameter]
+    public Guid NoteId { get; set; }
+
+    private WorkspaceNoteInput? note;
+    private bool isLoading = true;
+    private bool isSaving;
+    private bool companyContextUnavailable;
+    private string? errorMessage;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        companyContextUnavailable = false;
+        errorMessage = null;
+        try
+        {
+            var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+            var details = await WorkspaceNoteService.GetAsync(user, NoteId);
+            note = details is null
+                ? null
+                : new WorkspaceNoteInput
+                {
+                    Title = details.Title,
+                    Body = details.Body
+                };
+        }
+        catch (UnauthorizedAccessException)
+        {
+            companyContextUnavailable = true;
+            errorMessage = "Your active company is no longer available. Select an active company and try again.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (note is null)
+        {
+            return;
+        }
+
+        isSaving = true;
+        errorMessage = null;
+        try
+        {
+            var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+            if (await WorkspaceNoteService.UpdateAsync(user, NoteId, note))
+            {
+                Navigation.NavigateTo($"/workspace/notes/{NoteId}");
+                return;
+            }
+
+            errorMessage = "This note is no longer available in the active company.";
+        }
+        catch (UnauthorizedAccessException)
+        {
+            companyContextUnavailable = true;
+            errorMessage = "Your active company is no longer available. Select an active company and try again.";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}

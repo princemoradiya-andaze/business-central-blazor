@@ -843,6 +843,41 @@ namespace BusinessCentralBlazor.Infrastructure.Persistence.Migrations
                     b.ToTable("Vendors", (string)null);
                 });
 
+            modelBuilder.Entity("BusinessCentralBlazor.Domain.Entities.WorkspaceNote", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "CompanyId", "UpdatedAtUtc");
+
+                    b.ToTable("WorkspaceNotes");
+                });
+
             modelBuilder.Entity("BusinessCentralBlazor.Infrastructure.Identity.ErpRole", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1359,6 +1394,16 @@ namespace BusinessCentralBlazor.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("CurrencyCode")
                         .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("BusinessCentralBlazor.Domain.Entities.WorkspaceNote", b =>
+                {
+                    b.HasOne("BusinessCentralBlazor.Domain.Entities.Company", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "CompanyId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>

@@ -1,0 +1,54 @@
+@page "/account/login"
+@model BusinessCentralBlazor.Web.Pages.Account.LoginModel
+@{
+    Layout = null;
+    ViewData["Title"] = "Sign in";
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Business Central Blazor</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/app.css" />
+    <link rel="stylesheet" href="~/account.css" asp-append-version="true" />
+</head>
+<body class="account-body">
+    <main class="account-page">
+        <section class="account-card" aria-labelledby="page-title">
+            <a class="account-brand" href="/" aria-label="Business Central Blazor home">
+                <span class="account-brand-mark" aria-hidden="true">BC</span>
+                <span>Business Central <span class="account-brand-light">Blazor</span></span>
+            </a>
+            <div class="account-card-content">
+                <p class="account-eyebrow">Your business workspace</p>
+                <h1 id="page-title">Welcome back</h1>
+                <p class="account-description">Sign in with an account provided by your administrator.</p>
+                <form method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" asp-for="ReturnUrl" />
+                    <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
+                    <div class="mb-3">
+                        <label asp-for="Input.Email" class="form-label"></label>
+                        <input asp-for="Input.Email" class="form-control form-control-lg" autocomplete="username" />
+                        <span asp-validation-for="Input.Email" class="text-danger"></span>
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="Input.Password" class="form-label"></label>
+                        <input asp-for="Input.Password" class="form-control form-control-lg" autocomplete="current-password" />
+                        <span asp-validation-for="Input.Password" class="text-danger"></span>
+                    </div>
+                    <div class="form-check mb-4">
+                        <input asp-for="Input.RememberMe" class="form-check-input" />
+                        <label asp-for="Input.RememberMe" class="form-check-label"></label>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-lg w-100">Sign in</button>
+                </form>
+                <p class="account-help">Need access? Contact your system administrator.</p>
+            </div>
+        </section>
+        <p class="account-footer">Secure access to your company workspace</p>
+    </main>
+</body>
+</html>

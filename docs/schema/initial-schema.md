@@ -5,7 +5,7 @@
 ## Scope and provenance
 
 - Application schema source: this repository's C# domain entities and `ErpDbContext` configuration. All application code and schema decisions remain independently implemented.
-- Migrations: `InitialCompanyAndFinancialSchema` followed by `AlignJournalAndAccountingFoundation`.
+- Migrations: `InitialCompanyAndFinancialSchema`, `AlignJournalAndAccountingFoundation`, and `AddWorkspaceNotes`.
 - Target/provider: SQL Server via EF Core 10.
 - Local smoke-test database: `BusinessCentralBlazor_Phase0` on the user's existing `.\BCDEMO` SQL Server Express instance. The migration was applied to this newly named database only; other databases were not modified.
 - Reference artifact: W1 `28.4.53241.0`, paired by its manifest with platform `28.0.53152.0`; selected table metadata was read from the platform archive's Base Application source ZIP. The user confirmed permission to inspect the local artifact. The archive was read in memory and not modified; no source files, packages, license files, or demo data were copied into this repository.
@@ -15,15 +15,16 @@
 
 | Area | Tables | Ownership and primary constraints |
 |---|---|---|
-| Authentication | `AspNetUsers`, `AspNetRoles`, `AspNetUserClaims`, `AspNetUserLogins`, `AspNetUserRoles`, `AspNetUserTokens`, `AspNetRoleClaims` | ASP.NET Core Identity uses `Guid` IDs. Login/authorization services are not wired into the web host yet. |
+| Authentication | `AspNetUsers`, `AspNetRoles`, `AspNetUserClaims`, `AspNetUserLogins`, `AspNetUserRoles`, `AspNetUserTokens`, `AspNetRoleClaims` | ASP.NET Core Identity uses `Guid` IDs. Login/logout, active-company selection, and application-level authorization are wired into the web host; database row-level security is not implemented. |
 | Tenant/company | `Tenants`, `Companies`, `CompanySettings`, `TenantMemberships`, `CompanyMemberships` | Company code is unique within a tenant. Memberships reference Identity users. Company membership has composite references to the company and tenant membership so a user cannot be linked to a company outside their tenant through these constraints. |
 | Currency and periods | `Currencies`, `CurrencyRates`, `AccountingPeriods` | ISO-style 3-character currency key; minor units 0–4; company-scoped unique rate per base/quote/date, positive rate, date-bounded periods uniquely identified by company and start date, with separate closed and date-locked flags. |
 | General ledger foundation | `GeneralLedgerAccounts`, `GeneralJournalTemplates`, `GeneralJournalBatches`, `GeneralJournalLines`, `GeneralLedgerEntries` | Accounts distinguish posting structure from financial category. Journals follow template → batch → line; each line has its own company-scoped period while a batch carries a default period. Composite FKs prevent cross-company account, template, batch, and period references. Journal/ledger amounts are `decimal(19,4)`; batches use row-version concurrency; a unique `(CompanyId, JournalLineId)` ledger index prevents duplicate posting. |
 | Dimensions | `Dimensions`, `DimensionValues`, `JournalLineDimensions` | Dimension/value codes are unique in their company and dimension. Each line assignment has one value per dimension and composite same-company foreign keys. Dimension-set deduplication and reuse remain future work. |
 | Operational master data | `Customers`, `Vendors`, `Items` | Company-scoped unique numbers; optional currency reference; item cost uses `decimal(19,4)` and cannot be negative. |
+| Foundation UI example | `WorkspaceNotes` | Safe generic example records are explicitly tenant/company scoped, with a composite FK to prevent cross-tenant company references. Service operations revalidate the active company and filter reads and writes by the validated tenant/company pair. |
 | Controls and audit | `NumberSeries`, `AuditEntries` | Number-series code unique per company, positive next number, bounded digit width, row-version concurrency; audit rows are company-scoped and indexed by occurrence time. |
 
-The original SQL schema contained 20 application-owned domain tables, 7 ASP.NET Core Identity tables, and the EF migration-history table (28 tables total). The alignment migration adds the journal-template table and changes period, account, and journal relationships; re-run local SQL inspection after applying it to record updated counts. User authentication, role administration, and tenant/company authorization policies remain Phase 1 work.
+The schema now defines 22 application-owned domain tables, 7 ASP.NET Core Identity tables, and the EF migration-history table (30 tables total after all migrations are applied). With the user's approval, `AddWorkspaceNotes` was applied to `BusinessCentralBlazor_Phase0` on `.\BCDEMO`. The migration-history row, `WorkspaceNotes` table, composite company FK, and index were verified; the table contains no seeded notes. Other databases require their own reviewed migration application.
 
 ## Relationships
 
@@ -61,6 +62,7 @@ erDiagram
     COMPANY ||--o{ ITEM : owns
     COMPANY ||--o{ NUMBER_SERIES : defines
     COMPANY ||--o{ AUDIT_ENTRY : records
+    COMPANY ||--o{ WORKSPACE_NOTE : contains
 ```
 
 The diagram omits Identity's internal claims/login/token relations for readability. Company-owned rows carry `CompanyId`; database composite keys protect cross-company references where a company-owned principal is referenced. Tenant/company data access still requires server-side authorization and company scoping in application services; it is not implemented by this migration alone.
@@ -81,7 +83,8 @@ The diagram omits Identity's internal claims/login/token relations for readabili
 
 - A tenant owns multiple companies; Identity users receive explicit tenant/company memberships. Roles are stored as membership role names, while global Identity roles are available as a separate foundation. Effective-permission semantics remain to be finalized with Phase 1 authorization.
 - Currencies form a shared reference catalogue; company-specific conversion rates and accounting settings remain company-scoped.
-- No automatic currency, account, customer, vendor, item, or demo-data seeding is included.
+- No automatic currency, account, customer, vendor, item, or workspace-note seeding is included.
+- `WorkspaceNotes` is a small generic CRUD example, not an ERP business module; rows are company-owned and the UI creates them only after the user selects a valid active company.
 - The selected metadata review informed the journal template/batch/line hierarchy, the distinction between account structure and financial category, and period start-date plus closed/date-locked concepts. Internal GUID keys, company-scoped tables, and the batch's default period are application choices.
 - This is not a complete Business Central model: journal lines currently post only to G/L accounts; default/global dimensions are not modeled; dimension combinations are assigned directly rather than deduplicated into dimension sets; currency exchange-rate semantics, posting setup, posting groups, document types, and posting workflows are simplified or deferred.
 - No sales/purchase documents, inventory movements/valuation, tax, bank reconciliation, document numbering policies, attachments, localization, or posting engine are implemented.

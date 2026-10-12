@@ -12,6 +12,7 @@ public sealed class ErpDbContext(DbContextOptions<ErpDbContext> options)
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<Company> Companies => Set<Company>();
     public DbSet<CompanySettings> CompanySettings => Set<CompanySettings>();
+    public DbSet<WorkspaceNote> WorkspaceNotes => Set<WorkspaceNote>();
     public DbSet<TenantMembership> TenantMemberships => Set<TenantMembership>();
     public DbSet<CompanyMembership> CompanyMemberships => Set<CompanyMembership>();
     public DbSet<Currency> Currencies => Set<Currency>();
@@ -328,6 +329,20 @@ public sealed class ErpDbContext(DbContextOptions<ErpDbContext> options)
 
     private static void ConfigureOperations(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<WorkspaceNote>(entity =>
+        {
+            entity.HasKey(note => note.Id);
+            entity.HasIndex(note => new { note.TenantId, note.CompanyId, note.UpdatedAtUtc });
+            entity.Property(note => note.Title).HasMaxLength(120).IsRequired();
+            entity.Property(note => note.Body).HasMaxLength(4000).IsRequired();
+            entity.Property(note => note.CreatedAtUtc).HasColumnType("datetimeoffset");
+            entity.Property(note => note.UpdatedAtUtc).HasColumnType("datetimeoffset");
+            entity.HasOne<Company>().WithMany()
+                .HasForeignKey(note => new { note.TenantId, note.CompanyId })
+                .HasPrincipalKey(company => new { company.TenantId, company.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
         ConfigureParty<Customer>(modelBuilder, "Customers");
         ConfigureParty<Vendor>(modelBuilder, "Vendors");
 
