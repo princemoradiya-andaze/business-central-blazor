@@ -127,6 +127,7 @@ public sealed class GeneralJournalBatch
     public DateTimeOffset CreatedAtUtc { get; set; }
     public DateTimeOffset? PostedAtUtc { get; set; }
     public Guid? PostedByUserId { get; set; }
+    public Guid? ReversedByBatchId { get; set; }
     public byte[] RowVersion { get; set; } = [];
 }
 

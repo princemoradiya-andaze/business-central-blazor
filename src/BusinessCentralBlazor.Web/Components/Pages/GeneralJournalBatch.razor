@@ -1,0 +1,376 @@
+@page "/financial/journals/{BatchId:guid}"
+@attribute [Authorize(Policy = CompanyAuthorizationPolicies.ActiveCompany)]
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IGeneralJournalService GeneralJournalService
+@inject NavigationManager Navigation
+
+<PageTitle>Journal batch</PageTitle>
+
+@if (isLoading)
+{
+    <p role="status" aria-live="polite">Loading journal batch...</p>
+}
+else if (companyContextUnavailable)
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+    <a href="/account/company" data-enhance-nav="false">Select an active company</a>
+}
+else if (batch is null)
+{
+    <h1>Journal batch not found</h1>
+    <p>This batch does not exist in the active company.</p>
+    <a href="/financial/journals">Back to journals</a>
+}
+else
+{
+    <nav aria-label="Breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/financial/journals">General journals</a></li>
+            <li class="breadcrumb-item active" aria-current="page">@batch.Name</li>
+        </ol>
+    </nav>
+
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+        <div>
+            <h1>@batch.Name</h1>
+            <p class="text-body-secondary mb-1">@batch.Description</p>
+            <p class="mb-0">Template: @batch.TemplateCode · Default period: @batch.DefaultPeriodName · Status: <strong>@batch.Status</strong></p>
+        </div>
+        @if (batch.Status == JournalBatchStatus.Open)
+        {
+            <div class="d-flex flex-wrap gap-2">
+                <a class="btn btn-outline-secondary" href="@($"/financial/journals/{BatchId}/edit")">Edit batch</a>
+                <a class="btn btn-outline-secondary" href="@($"/financial/journals/{BatchId}/lines/new")">Add line</a>
+                <button class="btn btn-primary" type="button" disabled="@isSaving" @onclick="PostAsync">
+                    @(isSaving ? "Posting..." : "Post batch")
+                </button>
+            </div>
+        }
+        else if (batch.ReversedByBatchId is null && batch.ReversalOfBatchId is null)
+        {
+            <button class="btn btn-outline-danger" type="button" @onclick="ShowReversalForm">
+                Reverse entire batch
+            </button>
+        }
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert alert-danger" role="alert">@errorMessage</div>
+    }
+    @if (batch.ReversalOfBatchId is { } originalBatchId)
+    {
+        <div class="alert alert-info" role="status">
+            This is the reversing batch for <a href="@($"/financial/journals/{originalBatchId}")">the original batch</a>.
+        </div>
+    }
+    @if (batch.ReversedByBatchId is { } reversalBatchId)
+    {
+        <div class="alert alert-info" role="status">
+            This batch has been reversed by <a href="@($"/financial/journals/{reversalBatchId}")">the reversing batch</a>.
+        </div>
+    }
+
+    @if (batch.Status == JournalBatchStatus.Open)
+    {
+        <p class="text-body-secondary">Open batches can be edited. Posting permanently locks the lines.</p>
+    }
+    else
+    {
+        <p class="text-body-secondary">Posted lines and ledger entries are immutable.</p>
+    }
+
+    @if (batch.Lines.Count == 0)
+    {
+        <div class="alert alert-info" role="status">No journal lines have been added to this batch yet.</div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-striped align-middle">
+                <caption class="visually-hidden">Journal lines in @batch.Name</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">Line</th>
+                        <th scope="col">Posting date</th>
+                        <th scope="col">Period</th>
+                        <th scope="col">G/L account</th>
+                        <th scope="col">Document</th>
+                        <th scope="col">Description</th>
+                        <th scope="col">Dimensions</th>
+                        <th scope="col" class="text-end">Debit</th>
+                        <th scope="col" class="text-end">Credit</th>
+                        @if (batch.Status == JournalBatchStatus.Open)
+                        {
+                            <th scope="col"><span class="visually-hidden">Actions</span></th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var line in batch.Lines)
+                    {
+                        <tr>
+                            <th scope="row">@line.LineNumber</th>
+                            <td>@line.PostingDate.ToString("yyyy-MM-dd")</td>
+                            <td>@line.AccountingPeriodName</td>
+                            <td>@line.AccountNumber — @line.AccountName</td>
+                            <td>@line.DocumentNumber</td>
+                            <td>@line.Description</td>
+                            <td>
+                                @if (line.Dimensions.Count == 0)
+                                {
+                                    <span>—</span>
+                                }
+                                else
+                                {
+                                    @string.Join(", ", line.Dimensions.Select(item => $"{item.DimensionCode}: {item.DimensionValueCode}"))
+                                }
+                            </td>
+                            <td class="text-end">@line.DebitAmount.ToString("N2")</td>
+                            <td class="text-end">@line.CreditAmount.ToString("N2")</td>
+                            @if (batch.Status == JournalBatchStatus.Open)
+                            {
+                                <td class="text-nowrap">
+                                    <a class="btn btn-sm btn-outline-secondary"
+                                       href="@($"/financial/journals/{BatchId}/lines/{line.Id}/edit")">Edit</a>
+                                    <button class="btn btn-sm btn-outline-danger ms-1" type="button"
+                                            disabled="@isSaving" @onclick="() => DeleteLineAsync(line.Id)">
+                                        Delete
+                                    </button>
+                                </td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <th scope="row" colspan="7" class="text-end">Totals</th>
+                        <th class="text-end">@batch.Lines.Sum(line => line.DebitAmount).ToString("N2")</th>
+                        <th class="text-end">@batch.Lines.Sum(line => line.CreditAmount).ToString("N2")</th>
+                        @if (batch.Status == JournalBatchStatus.Open)
+                        {
+                            <td></td>
+                        }
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    }
+
+    @if (showReversalForm)
+    {
+        <section class="card mt-4" aria-labelledby="reversal-heading">
+            <div class="card-body">
+                <h2 id="reversal-heading" class="h4">Reverse entire batch</h2>
+                <p>The original remains unchanged. A linked reversing batch will be posted with debit and credit sides swapped.</p>
+                @if (openPeriods.Count == 0)
+                {
+                    <div class="alert alert-warning" role="status">
+                        An open, unlocked period is required for the reversal.
+                        <a href="/financial/accounting-periods">Manage accounting periods</a>
+                    </div>
+                }
+                else
+                {
+                    <EditForm Model="@reversalInput" OnValidSubmit="ReverseAsync" FormName="reverse-journal-batch">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary class="alert alert-danger" />
+                        <fieldset disabled="@isSaving">
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label class="form-label" for="reversal-name">Reversing batch name</label>
+                                    <InputText id="reversal-name" class="form-control" maxlength="32"
+                                               @bind-Value="reversalInput.Name" />
+                                    <ValidationMessage For="@(() => reversalInput.Name)" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label" for="reversal-period">Accounting period</label>
+                                    <InputSelect id="reversal-period" class="form-select"
+                                                 @bind-Value="reversalInput.AccountingPeriodId"
+                                                 @bind-Value:after="AdjustReversalDate">
+                                        @foreach (var period in openPeriods)
+                                        {
+                                            <option value="@period.Id">@period.Name</option>
+                                        }
+                                    </InputSelect>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label" for="reversal-date">Posting date</label>
+                                    <InputDate id="reversal-date" class="form-control" TValue="DateOnly"
+                                               @bind-Value="reversalInput.PostingDate" />
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label" for="reversal-description">Description</label>
+                                    <InputText id="reversal-description" class="form-control" maxlength="100"
+                                               @bind-Value="reversalInput.Description" />
+                                </div>
+                            </div>
+                        </fieldset>
+                        <div class="d-flex gap-2 mt-3">
+                            <button class="btn btn-danger" type="submit" disabled="@isSaving">
+                                @(isSaving ? "Reversing..." : "Post reversal")
+                            </button>
+                            <button class="btn btn-outline-secondary" type="button" disabled="@isSaving"
+                                    @onclick="() => showReversalForm = false">Cancel</button>
+                        </div>
+                    </EditForm>
+                }
+            </div>
+        </section>
+    }
+}
+
+@code {
+    [Parameter]
+    public Guid BatchId { get; set; }
+
+    private GeneralJournalBatchDetail? batch;
+    private IReadOnlyList<AccountingPeriodListItem> openPeriods = [];
+    private readonly GeneralJournalReversalInput reversalInput = new();
+    private bool isLoading = true;
+    private bool isSaving;
+    private bool showReversalForm;
+    private bool companyContextUnavailable;
+    private string? errorMessage;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+            batch = await GeneralJournalService.GetBatchAsync(user, BatchId);
+            openPeriods = (await GeneralJournalService.GetPeriodsAsync(user))
+                .Where(period => !period.IsClosed && !period.DateLocked)
+                .ToArray();
+            if (openPeriods.Count > 0 &&
+                !openPeriods.Any(period => period.Id == reversalInput.AccountingPeriodId))
+            {
+                reversalInput.AccountingPeriodId = openPeriods[0].Id;
+                AdjustReversalDate();
+            }
+        }
+        catch (UnauthorizedAccessException)
+        {
+            companyContextUnavailable = true;
+            errorMessage = "Your active company is no longer available. Select an active company and try again.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ShowReversalForm()
+    {
+        if (batch is null)
+        {
+            return;
+        }
+
+        reversalInput.Name = $"REV-{batch.Name}"[..Math.Min(32, batch.Name.Length + 4)];
+        var description = $"Reversal of {batch.Name}";
+        reversalInput.Description = description[..Math.Min(100, description.Length)];
+        showReversalForm = true;
+        AdjustReversalDate();
+    }
+
+    private void AdjustReversalDate()
+    {
+        var period = openPeriods.FirstOrDefault(item => item.Id == reversalInput.AccountingPeriodId);
+        if (period is null)
+        {
+            return;
+        }
+
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        reversalInput.PostingDate = today < period.StartsOn
+            ? period.StartsOn
+            : today > period.EndsOn
+                ? period.EndsOn
+                : today;
+    }
+
+    private async Task DeleteLineAsync(Guid lineId)
+    {
+        isSaving = true;
+        errorMessage = null;
+        try
+        {
+            var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+            if (!await GeneralJournalService.DeleteLineAsync(user, BatchId, lineId))
+            {
+                errorMessage = "The journal line was not found in this batch.";
+            }
+
+            await LoadAsync();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            companyContextUnavailable = true;
+            errorMessage = "Your active company is no longer available. Select an active company and try again.";
+        }
+        catch (ValidationException exception)
+        {
+            errorMessage = exception.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task PostAsync()
+    {
+        isSaving = true;
+        errorMessage = null;
+        try
+        {
+            var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+            await GeneralJournalService.PostBatchAsync(user, BatchId);
+            await LoadAsync();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            companyContextUnavailable = true;
+            errorMessage = "Your active company is no longer available. Select an active company and try again.";
+        }
+        catch (ValidationException exception)
+        {
+            errorMessage = exception.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task ReverseAsync()
+    {
+        isSaving = true;
+        errorMessage = null;
+        try
+        {
+            var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+            var reversalId = await GeneralJournalService.ReverseBatchAsync(user, BatchId, reversalInput);
+            Navigation.NavigateTo($"/financial/journals/{reversalId}");
+        }
+        catch (UnauthorizedAccessException)
+        {
+            companyContextUnavailable = true;
+            errorMessage = "Your active company is no longer available. Select an active company and try again.";
+        }
+        catch (ValidationException exception)
+        {
+            errorMessage = exception.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}

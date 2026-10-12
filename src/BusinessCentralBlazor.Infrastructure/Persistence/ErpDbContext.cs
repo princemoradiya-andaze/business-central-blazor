@@ -208,9 +208,16 @@ public sealed class ErpDbContext(DbContextOptions<ErpDbContext> options)
             entity.Property(batch => batch.CreatedAtUtc).HasColumnType("datetimeoffset");
             entity.Property(batch => batch.PostedAtUtc).HasColumnType("datetimeoffset");
             entity.Property(batch => batch.RowVersion).IsRowVersion();
+            entity.HasIndex(batch => new { batch.CompanyId, batch.ReversedByBatchId })
+                .IsUnique()
+                .HasFilter("[ReversedByBatchId] IS NOT NULL");
             entity.HasOne<AccountingPeriod>().WithMany()
                 .HasForeignKey(batch => new { batch.CompanyId, batch.DefaultAccountingPeriodId })
                 .HasPrincipalKey(period => new { period.CompanyId, period.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<GeneralJournalBatch>().WithMany()
+                .HasForeignKey(batch => new { batch.CompanyId, batch.ReversedByBatchId })
+                .HasPrincipalKey(batch => new { batch.CompanyId, batch.Id })
                 .OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<GeneralJournalTemplate>().WithMany()
                 .HasForeignKey(batch => new { batch.CompanyId, batch.JournalTemplateId })

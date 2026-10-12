@@ -1,4 +1,5 @@
 SET NOCOUNT ON;
+SET QUOTED_IDENTIFIER ON;
 SET XACT_ABORT OFF;
 
 IF OBJECT_ID(N'dbo.__EFMigrationsHistory', N'U') IS NULL
@@ -7,9 +8,9 @@ IF OBJECT_ID(N'dbo.__EFMigrationsHistory', N'U') IS NULL
 IF NOT EXISTS (
     SELECT 1
     FROM dbo.__EFMigrationsHistory
-    WHERE MigrationId = N'20261012051809_AlignJournalAndAccountingFoundation'
+    WHERE MigrationId = N'20261012103444_AddJournalBatchReversal'
 )
-    THROW 51104, 'Apply the schema-alignment migration before running this smoke test.', 1;
+    THROW 51104, 'Apply the journal-reversal migration before running this smoke test.', 1;
 
 DECLARE @tenantId uniqueidentifier = NEWID();
 DECLARE @companyId uniqueidentifier = NEWID();
@@ -19,6 +20,8 @@ DECLARE @accountId uniqueidentifier = NEWID();
 DECLARE @otherAccountId uniqueidentifier = NEWID();
 DECLARE @templateId uniqueidentifier = NEWID();
 DECLARE @batchId uniqueidentifier = NEWID();
+DECLARE @otherBatchId uniqueidentifier = NEWID();
+DECLARE @reversalBatchId uniqueidentifier = NEWID();
 DECLARE @lineId uniqueidentifier = NEWID();
 DECLARE @ledgerEntryId uniqueidentifier = NEWID();
 DECLARE @now datetimeoffset = TODATETIMEOFFSET(SYSUTCDATETIME(), '+00:00');
@@ -60,6 +63,29 @@ VALUES (@templateId, @companyId, N'GENERAL', N'General journal', N'General');
 INSERT dbo.GeneralJournalBatches
     (Id, CompanyId, JournalTemplateId, DefaultAccountingPeriodId, Name, Description, Status, CreatedAtUtc)
 VALUES (@batchId, @companyId, @templateId, @periodId, N'DEFAULT', N'Default journal batch', N'Open', @now);
+
+INSERT dbo.GeneralJournalBatches
+    (Id, CompanyId, JournalTemplateId, DefaultAccountingPeriodId, Name, Description, Status, CreatedAtUtc)
+VALUES
+    (@otherBatchId, @companyId, @templateId, @periodId, N'OTHER', N'Other journal batch', N'Open', @now),
+    (@reversalBatchId, @companyId, @templateId, @periodId, N'REVERSAL', N'Reversing journal batch', N'Posted', @now);
+
+UPDATE dbo.GeneralJournalBatches
+SET ReversedByBatchId = @reversalBatchId
+WHERE CompanyId = @companyId AND Id = @batchId;
+
+BEGIN TRY
+    UPDATE dbo.GeneralJournalBatches
+    SET ReversedByBatchId = @reversalBatchId
+    WHERE CompanyId = @companyId AND Id = @otherBatchId;
+    THROW 51105, 'Unique reversal constraint did not reject a duplicate reversal.', 1;
+END TRY
+BEGIN CATCH
+    IF ERROR_NUMBER() NOT IN (2601, 2627)
+        THROW;
+
+    PRINT 'PASS: unique reversal index rejected a second reversal for the same batch.';
+END CATCH;
 
 INSERT dbo.GeneralJournalLines
     (Id, CompanyId, JournalBatchId, AccountingPeriodId, AccountId, LineNumber, PostingDate, DocumentNumber,

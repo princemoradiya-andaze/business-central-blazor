@@ -94,6 +94,26 @@ public sealed class ErpDbContextModelTests
     }
 
     [Fact]
+    public void JournalBatchReversalsUseACompanyScopedLinkAndPreventDuplicateReversal()
+    {
+        using var context = CreateContext();
+        var model = context.GetService<IDesignTimeModel>().Model;
+        var batch = model.FindEntityType(typeof(GeneralJournalBatch))!;
+        var reversalForeignKey = Assert.Single(batch.GetForeignKeys(), foreignKey =>
+            foreignKey.Properties.Select(property => property.Name)
+                .SequenceEqual(["CompanyId", "ReversedByBatchId"]));
+        var reversalIndex = Assert.Single(batch.GetIndexes(), index =>
+            index.Properties.Select(property => property.Name)
+                .SequenceEqual(["CompanyId", "ReversedByBatchId"]));
+
+        Assert.Equal(
+            ["CompanyId", "Id"],
+            reversalForeignKey.PrincipalKey.Properties.Select(property => property.Name));
+        Assert.True(reversalIndex.IsUnique);
+        Assert.Equal("[ReversedByBatchId] IS NOT NULL", reversalIndex.GetFilter());
+    }
+
+    [Fact]
     public void AccountingAndGeneralLedgerModelsSeparateBusinessCentralConcepts()
     {
         using var context = CreateContext();
