@@ -1,0 +1,111 @@
+@page "/financial/journals"
+@attribute [Authorize(Policy = CompanyAuthorizationPolicies.ActiveCompany)]
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IGeneralJournalService GeneralJournalService
+
+<PageTitle>General journals</PageTitle>
+
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+    <div>
+        <h1>General journals</h1>
+        <p class="text-body-secondary mb-0">Prepare, validate, post, and reverse general journal batches.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-secondary" href="/financial/accounting-periods">Accounting periods</a>
+        <a class="btn btn-primary" href="/financial/journals/new">New journal batch</a>
+    </div>
+</div>
+
+@if (isLoading)
+{
+    <p role="status" aria-live="polite">Loading journal batches...</p>
+}
+else if (companyContextUnavailable)
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+    <a href="/account/company" data-enhance-nav="false">Select an active company</a>
+}
+else if (periods.Count == 0)
+{
+    <div class="alert alert-info" role="status">
+        Create an accounting period before preparing a journal batch.
+        <a href="/financial/accounting-periods">Set up accounting periods</a>
+    </div>
+}
+else if (batches.Count == 0)
+{
+    <div class="alert alert-info" role="status">No general journal batches have been created for this company.</div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped align-middle">
+            <caption class="visually-hidden">General journal batches for the active company</caption>
+            <thead>
+                <tr>
+                    <th scope="col">Batch</th>
+                    <th scope="col">Description</th>
+                    <th scope="col">Default period</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Lines</th>
+                    <th scope="col">Reversal</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var batch in batches)
+                {
+                    <tr>
+                        <th scope="row">
+                            <a href="@($"/financial/journals/{batch.Id}")">@batch.Name</a>
+                        </th>
+                        <td>@batch.Description</td>
+                        <td>@batch.DefaultPeriodName</td>
+                        <td>@batch.Status</td>
+                        <td>@batch.LineCount</td>
+                        <td>
+                            @if (batch.ReversalOfBatchId is { } sourceBatchId)
+                            {
+                                <a href="@($"/financial/journals/{sourceBatchId}")">Reverses original batch</a>
+                            }
+                            else if (batch.ReversedByBatchId is { } reversalBatchId)
+                            {
+                                <a href="@($"/financial/journals/{reversalBatchId}")">View reversal</a>
+                            }
+                            else
+                            {
+                                <span>—</span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private IReadOnlyList<GeneralJournalBatchListItem> batches = [];
+    private IReadOnlyList<AccountingPeriodListItem> periods = [];
+    private bool isLoading = true;
+    private bool companyContextUnavailable;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+            periods = await GeneralJournalService.GetPeriodsAsync(user);
+            batches = await GeneralJournalService.GetBatchesAsync(user);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            companyContextUnavailable = true;
+            errorMessage = "Your active company is no longer available. Select an active company and try again.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}

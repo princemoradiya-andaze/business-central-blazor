@@ -1,0 +1,109 @@
+@page "/financial/general-ledger/accounts"
+@attribute [Authorize(Policy = CompanyAuthorizationPolicies.ActiveCompany)]
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IGeneralLedgerAccountService AccountService
+
+<PageTitle>Chart of Accounts</PageTitle>
+
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+    <div>
+        <h1>Chart of Accounts</h1>
+        <p class="text-body-secondary mb-0">Financial accounts for the active company.</p>
+    </div>
+    <a class="btn btn-primary" href="/financial/general-ledger/accounts/new">New account</a>
+</div>
+
+@if (isLoading)
+{
+    <p role="status" aria-live="polite">Loading accounts...</p>
+}
+else if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+    @if (companyContextUnavailable)
+    {
+        <a href="/account/company" data-enhance-nav="false">Select an active company</a>
+    }
+}
+else if (accounts.Count == 0)
+{
+    <div class="alert alert-info" role="status">
+        No accounts have been set up for this company yet. Create an account to get started.
+    </div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped align-middle">
+            <caption class="visually-hidden">Chart of Accounts for the active company</caption>
+            <thead>
+                <tr>
+                    <th scope="col">Number</th>
+                    <th scope="col">Name</th>
+                    <th scope="col">Category</th>
+                    <th scope="col">Type</th>
+                    <th scope="col">Parent</th>
+                    <th scope="col">Posting</th>
+                    <th scope="col">Status</th>
+                    <th scope="col"><span class="visually-hidden">Actions</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var account in accounts)
+                {
+                    <tr>
+                        <th scope="row">@account.Number</th>
+                        <td>@account.Name</td>
+                        <td>@account.Category</td>
+                        <td>@account.Type</td>
+                        <td>@(account.ParentAccountNumber ?? "—")</td>
+                        <td>@(account.AllowsDirectPosting ? "Allowed" : "Not allowed")</td>
+                        <td>
+                            @if (account.IsBlocked)
+                            {
+                                <span class="badge text-bg-secondary">Blocked</span>
+                            }
+                            else
+                            {
+                                <span class="badge text-bg-success">Active</span>
+                            }
+                        </td>
+                        <td>
+                            <a class="btn btn-sm btn-outline-secondary me-1"
+                               href="@($"/financial/general-ledger/accounts/{account.Id}/activity")"
+                               aria-label="@($"View activity: {account.Number} {account.Name}")">Activity</a>
+                            <a class="btn btn-sm btn-outline-primary"
+                               href="@($"/financial/general-ledger/accounts/{account.Id}/edit")"
+                               aria-label="@($"Edit account: {account.Number} {account.Name}")">Edit</a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private IReadOnlyList<GeneralLedgerAccountListItem> accounts = [];
+    private bool isLoading = true;
+    private bool companyContextUnavailable;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+            accounts = await AccountService.GetAllAsync(user);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            companyContextUnavailable = true;
+            errorMessage = "Your active company is no longer available. Select an active company and try again.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}

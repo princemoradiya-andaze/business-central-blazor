@@ -1,0 +1,296 @@
+@using BusinessCentralBlazor.Web.Services
+
+<EditForm Model="@Model" OnValidSubmit="SubmitAsync" FormName="general-journal-line">
+    <DataAnnotationsValidator />
+    <ValidationSummary class="alert alert-danger" />
+    @if (!string.IsNullOrWhiteSpace(ErrorMessage))
+    {
+        <div class="alert alert-danger" role="alert">@ErrorMessage</div>
+    }
+
+    <fieldset disabled="@IsSaving">
+        <div class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label" for="journal-line-number">Line number</label>
+                <InputNumber id="journal-line-number" class="form-control" @bind-Value="Model.LineNumber" />
+                <ValidationMessage For="@(() => Model.LineNumber)" />
+            </div>
+            <div class="col-md-5">
+                <label class="form-label" for="journal-line-account">G/L account</label>
+                <InputSelect id="journal-line-account" class="form-select" @bind-Value="Model.AccountId">
+                    <option value="@Guid.Empty">Select an account</option>
+                    @foreach (var account in Accounts)
+                    {
+                        <option value="@account.Id">@account.Number — @account.Name</option>
+                    }
+                    @if (SelectedTaxCode is { } taxCode &&
+                         !Accounts.Any(account => account.Id == GetMappedTaxAccountId(taxCode)))
+                    {
+                        <option value="@GetMappedTaxAccountId(taxCode)" disabled>
+                            Configured tax account is not available for posting
+                        </option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label" for="journal-line-period">Accounting period</label>
+                <InputSelect id="journal-line-period" class="form-select" @bind-Value="Model.AccountingPeriodId">
+                    @foreach (var period in OpenPeriods)
+                    {
+                        <option value="@period.Id">@period.Name</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label" for="journal-line-date">Posting date</label>
+                <InputDate id="journal-line-date" class="form-control" TValue="DateOnly" @bind-Value="Model.PostingDate" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label" for="journal-line-document">Document number</label>
+                <InputText id="journal-line-document" class="form-control" maxlength="64"
+                           @bind-Value="Model.DocumentNumber" />
+                <ValidationMessage For="@(() => Model.DocumentNumber)" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label" for="journal-line-description">Description</label>
+                <InputText id="journal-line-description" class="form-control" maxlength="250"
+                           @bind-Value="Model.Description" />
+                <ValidationMessage For="@(() => Model.Description)" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" for="journal-line-debit">Debit</label>
+                <InputNumber id="journal-line-debit" class="form-control" min="0" step="0.0001"
+                             @bind-Value="Model.DebitAmount" @bind-Value:after="TaxSideChanged" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" for="journal-line-credit">Credit</label>
+                <InputNumber id="journal-line-credit" class="form-control" min="0" step="0.0001"
+                             @bind-Value="Model.CreditAmount" @bind-Value:after="TaxSideChanged" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" for="journal-line-tax-code">Tax code (manual tax line)</label>
+                <InputSelect id="journal-line-tax-code" class="form-select" @bind-Value="Model.TaxCodeId"
+                             @bind-Value:after="TaxCodeChanged">
+                    <option value="">No tax code</option>
+                    @foreach (var taxCode in TaxCodes)
+                    {
+                        <option value="@taxCode.Id">@taxCode.Code — @taxCode.Description</option>
+                    }
+                </InputSelect>
+            </div>
+            @if (SelectedTaxCode is not null)
+            {
+                <div class="col-md-6">
+                    <label class="form-label" for="journal-line-tax-base">Taxable base</label>
+                    <InputNumber id="journal-line-tax-base" class="form-control" min="0.0001" step="0.0001"
+                                 @bind-Value="Model.TaxBaseAmount" />
+                    <div class="form-text">
+                        Enter the taxable base. This line must post the calculated tax amount to the configured
+                        @(Model.DebitAmount > 0 ? "recoverable" : "liability") account.
+                    </div>
+                </div>
+                @if (GetEffectiveTaxRate(SelectedTaxCode) is { } effectiveRate)
+                {
+                    <div class="col-12">
+                        <p class="form-text">
+                            Effective rate: @effectiveRate.RatePercent.ToString("0.####")%.
+                            @if (GetExpectedTaxAmount(effectiveRate) is { } expectedTaxAmount)
+                            {
+                                <span>Calculated tax amount: @expectedTaxAmount.ToString("0.0000").</span>
+                            }
+                            else
+                            {
+                                <span>Enter a valid taxable base to calculate the tax amount.</span>
+                            }
+                        </p>
+                    </div>
+                }
+                else if (GetEffectiveTaxRate(SelectedTaxCode) is null)
+                {
+                    <div class="col-12">
+                        <p class="text-danger mb-0">No rate for this tax code is effective on the posting date.</p>
+                    </div>
+                }
+            }
+        </div>
+
+        <div class="mt-4">
+            <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+                <h2 class="h5 mb-0">Dimensions</h2>
+                <button class="btn btn-sm btn-outline-secondary" type="button"
+                        disabled="@(Model.Dimensions.Count >= AvailableDimensions.Count)"
+                        @onclick="AddDimension">
+                    Add dimension
+                </button>
+            </div>
+            @if (Model.Dimensions.Count == 0)
+            {
+                <p class="text-body-secondary">No dimensions assigned.</p>
+            }
+            else
+            {
+                @foreach (var assignment in Model.Dimensions)
+                {
+                    <div class="row g-2 align-items-end mb-2" @key="assignment">
+                        <div class="col-md-5">
+                            <label class="form-label" for="@($"journal-dimension-{assignment.DimensionId}")">Dimension</label>
+                            <InputSelect id="@($"journal-dimension-{assignment.DimensionId}")"
+                                         class="form-select" @bind-Value="assignment.DimensionId"
+                                         @bind-Value:after="() => ResetDimensionValue(assignment)">
+                                <option value="@Guid.Empty">Select a dimension</option>
+                                @foreach (var dimension in GetAvailableDimensions(assignment))
+                                {
+                                    <option value="@dimension.Id">@dimension.Code — @dimension.Name</option>
+                                }
+                            </InputSelect>
+                        </div>
+                        <div class="col-md-5">
+                            <label class="form-label" for="@($"journal-dimension-value-{assignment.DimensionId}")">Value</label>
+                            <InputSelect id="@($"journal-dimension-value-{assignment.DimensionId}")"
+                                         class="form-select" @bind-Value="assignment.DimensionValueId">
+                                <option value="@Guid.Empty">Select a value</option>
+                                @foreach (var value in GetValues(assignment.DimensionId))
+                                {
+                                    <option value="@value.Id">@value.Code — @value.Name</option>
+                                }
+                            </InputSelect>
+                        </div>
+                        <div class="col-md-2">
+                            <button class="btn btn-outline-danger" type="button"
+                                    @onclick="() => RemoveDimension(assignment)">Remove</button>
+                        </div>
+                    </div>
+                }
+            }
+            @if (AvailableDimensions.Count == 0 && Model.Dimensions.Count == 0)
+            {
+                <p class="text-body-secondary">No dimensions are configured for this company.</p>
+            }
+        </div>
+    </fieldset>
+
+    <div class="d-flex gap-2 mt-4">
+        <button class="btn btn-primary" type="submit" disabled="@IsSaving">
+            @(IsSaving ? "Saving..." : SubmitText)
+        </button>
+        <a class="btn btn-outline-secondary" href="@($"/financial/journals/{BatchId}")">Cancel</a>
+    </div>
+</EditForm>
+
+@code {
+    [Parameter, EditorRequired]
+    public GeneralJournalLineInput Model { get; set; } = new();
+
+    [Parameter, EditorRequired]
+    public Guid BatchId { get; set; }
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<AccountingPeriodListItem> OpenPeriods { get; set; } = [];
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<GeneralJournalAccountOption> Accounts { get; set; } = [];
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<GeneralJournalTaxCodeOption> TaxCodes { get; set; } = [];
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<JournalDimensionOption> Dimensions { get; set; } = [];
+
+    [Parameter, EditorRequired]
+    public EventCallback OnValidSubmit { get; set; }
+
+    [Parameter]
+    public string SubmitText { get; set; } = "Save line";
+
+    [Parameter]
+    public bool IsSaving { get; set; }
+
+    [Parameter]
+    public string? ErrorMessage { get; set; }
+
+    private IReadOnlyList<JournalDimensionOption> AvailableDimensions => Dimensions;
+    private GeneralJournalTaxCodeOption? SelectedTaxCode =>
+        TaxCodes.FirstOrDefault(item => item.Id == Model.TaxCodeId);
+
+    private Guid GetMappedTaxAccountId(GeneralJournalTaxCodeOption taxCode) =>
+        Model.DebitAmount > 0 ? taxCode.RecoverableAccountId : taxCode.LiabilityAccountId;
+
+    private GeneralJournalTaxRateOption? GetEffectiveTaxRate(GeneralJournalTaxCodeOption? taxCode) =>
+        taxCode?.Rates.FirstOrDefault(rate =>
+            rate.StartsOn <= Model.PostingDate &&
+            (rate.EndsOn is null || rate.EndsOn >= Model.PostingDate));
+
+    private decimal? GetExpectedTaxAmount(GeneralJournalTaxRateOption rate)
+    {
+        if (Model.TaxBaseAmount is not { } taxableBase || taxableBase <= 0)
+        {
+            return null;
+        }
+
+        try
+        {
+            return decimal.Round(
+                checked(taxableBase * rate.RatePercent / 100m),
+                4,
+                MidpointRounding.AwayFromZero);
+        }
+        catch (OverflowException)
+        {
+            return null;
+        }
+    }
+
+    private void TaxCodeChanged()
+    {
+        var taxCode = SelectedTaxCode;
+        if (taxCode is not null)
+        {
+            Model.AccountId = GetMappedTaxAccountId(taxCode);
+        }
+        else if (Model.TaxCodeId is null)
+        {
+            Model.TaxBaseAmount = null;
+        }
+    }
+
+    private void TaxSideChanged()
+    {
+        if (Model.TaxCodeId is { } taxCodeId)
+        {
+            var taxCode = TaxCodes.FirstOrDefault(item => item.Id == taxCodeId);
+            if (taxCode is not null)
+            {
+                Model.AccountId = GetMappedTaxAccountId(taxCode);
+            }
+        }
+    }
+
+    private IEnumerable<JournalDimensionOption> GetAvailableDimensions(
+        JournalDimensionAssignmentInput current) =>
+        AvailableDimensions.Where(dimension =>
+            dimension.Id == current.DimensionId ||
+            Model.Dimensions.All(assignment =>
+                ReferenceEquals(assignment, current) || assignment.DimensionId != dimension.Id));
+
+    private IEnumerable<JournalDimensionValueOption> GetValues(Guid dimensionId) =>
+        AvailableDimensions.FirstOrDefault(dimension => dimension.Id == dimensionId)?.Values
+            .Where(value => !value.IsBlocked) ?? [];
+
+    private void AddDimension()
+    {
+        var dimension = AvailableDimensions.FirstOrDefault(option =>
+            Model.Dimensions.All(assignment => assignment.DimensionId != option.Id));
+        if (dimension is not null)
+        {
+            Model.Dimensions.Add(new JournalDimensionAssignmentInput { DimensionId = dimension.Id });
+        }
+    }
+
+    private void RemoveDimension(JournalDimensionAssignmentInput assignment) =>
+        Model.Dimensions.Remove(assignment);
+
+    private static void ResetDimensionValue(JournalDimensionAssignmentInput assignment) =>
+        assignment.DimensionValueId = Guid.Empty;
+
+    private Task SubmitAsync(EditContext _) => OnValidSubmit.InvokeAsync();
+}

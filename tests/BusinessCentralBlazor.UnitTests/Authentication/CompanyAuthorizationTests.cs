@@ -111,6 +111,11 @@ public sealed class CompanyAuthorizationTests(AuthenticationWebApplicationFactor
         await SelectCompanyAsync(client, company.CompanyId);
         using var authorizedHome = await client.GetAsync("/");
         Assert.Equal(HttpStatusCode.OK, authorizedHome.StatusCode);
+        var authorizedHomeHtml = await authorizedHome.Content.ReadAsStringAsync();
+        Assert.Contains("Manage your company's accounts, dimensions, journals, ledger activity, tax setup, and banking",
+            authorizedHomeHtml,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("Business modules are not available yet", authorizedHomeHtml, StringComparison.Ordinal);
 
         await factory.RemoveCompanyMembershipAsync(await GetUserIdAsync(email), company.CompanyId);
 

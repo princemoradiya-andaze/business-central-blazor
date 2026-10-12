@@ -5,7 +5,7 @@
 ## Scope and provenance
 
 - Application schema source: this repository's C# domain entities and `ErpDbContext` configuration. All application code and schema decisions remain independently implemented.
-- Migrations: `InitialCompanyAndFinancialSchema`, `AlignJournalAndAccountingFoundation`, and `AddWorkspaceNotes`.
+- Migrations: `InitialCompanyAndFinancialSchema`, `AlignJournalAndAccountingFoundation`, `AddWorkspaceNotes`, `AddJournalBatchReversal`, `AddCompanyTaxSetupAndJournalTaxDetails`, and `AddCompanyBankingAndReconciliation`.
 - Target/provider: SQL Server via EF Core 10.
 - Local smoke-test database: `BusinessCentralBlazor_Phase0` on the user's existing `.\BCDEMO` SQL Server Express instance. The migration was applied to this newly named database only; other databases were not modified.
 - Reference artifact: W1 `28.4.53241.0`, paired by its manifest with platform `28.0.53152.0`; selected table metadata was read from the platform archive's Base Application source ZIP. The user confirmed permission to inspect the local artifact. The archive was read in memory and not modified; no source files, packages, license files, or demo data were copied into this repository.
@@ -18,13 +18,15 @@
 | Authentication | `AspNetUsers`, `AspNetRoles`, `AspNetUserClaims`, `AspNetUserLogins`, `AspNetUserRoles`, `AspNetUserTokens`, `AspNetRoleClaims` | ASP.NET Core Identity uses `Guid` IDs. Login/logout, active-company selection, and application-level authorization are wired into the web host; database row-level security is not implemented. |
 | Tenant/company | `Tenants`, `Companies`, `CompanySettings`, `TenantMemberships`, `CompanyMemberships` | Company code is unique within a tenant. Memberships reference Identity users. Company membership has composite references to the company and tenant membership so a user cannot be linked to a company outside their tenant through these constraints. |
 | Currency and periods | `Currencies`, `CurrencyRates`, `AccountingPeriods` | ISO-style 3-character currency key; minor units 0–4; company-scoped unique rate per base/quote/date, positive rate, date-bounded periods uniquely identified by company and start date, with separate closed and date-locked flags. |
-| General ledger foundation | `GeneralLedgerAccounts`, `GeneralJournalTemplates`, `GeneralJournalBatches`, `GeneralJournalLines`, `GeneralLedgerEntries` | Accounts distinguish posting structure from financial category. Journals follow template → batch → line; each line has its own company-scoped period while a batch carries a default period. Composite FKs prevent cross-company account, template, batch, and period references. Journal/ledger amounts are `decimal(19,4)`; batches use row-version concurrency; a unique `(CompanyId, JournalLineId)` ledger index prevents duplicate posting. |
+| General ledger foundation | `GeneralLedgerAccounts`, `GeneralJournalTemplates`, `GeneralJournalBatches`, `GeneralJournalLines`, `GeneralLedgerEntries` | Accounts distinguish posting structure from financial category. Journals follow template → batch → line; each line has its own company-scoped period while a batch carries a default period. Composite FKs prevent cross-company account, template, batch, period, and reversal references. Journal/ledger amounts are `decimal(19,4)`; batches use row-version concurrency; a unique `(CompanyId, JournalLineId)` ledger index prevents duplicate posting. |
+| Tax setup and manual journal tax | `TaxCodes`, `TaxRates` plus optional tax snapshots on `GeneralJournalLines` and `GeneralLedgerEntries` | Tax codes and effective-dated rates are company-scoped. Tax codes map distinct Liability and Asset (recoverable) posting accounts. Journal tax lines select a code, taxable base, and debit/credit treatment; the service resolves the posting-date rate, rounds the calculated tax to four decimals, requires the entered line amount/account to match, and snapshots code/rate/base/treatment to the posted entry. |
+| Banking and manual reconciliation | `BankAccounts`, `BankJournals`, `BankStatements`, `BankStatementLines` | Dedicated bank G/L mappings and codes are company-unique. Bank journals reference ordinary receipt/payment batches; statements/lines have same-company bank, statement and ledger FKs. Signed amounts use `decimal(19,4)`; bank/statement revisions are concurrency tokens. Unique bank/document and statement/line references prevent duplicates, and a filtered unique company/ledger-entry index prevents multiple matches. |
 | Dimensions | `Dimensions`, `DimensionValues`, `JournalLineDimensions` | Dimension/value codes are unique in their company and dimension. Each line assignment has one value per dimension and composite same-company foreign keys. Dimension-set deduplication and reuse remain future work. |
 | Operational master data | `Customers`, `Vendors`, `Items` | Company-scoped unique numbers; optional currency reference; item cost uses `decimal(19,4)` and cannot be negative. |
 | Foundation UI example | `WorkspaceNotes` | Safe generic example records are explicitly tenant/company scoped, with a composite FK to prevent cross-tenant company references. Service operations revalidate the active company and filter reads and writes by the validated tenant/company pair. |
 | Controls and audit | `NumberSeries`, `AuditEntries` | Number-series code unique per company, positive next number, bounded digit width, row-version concurrency; audit rows are company-scoped and indexed by occurrence time. |
 
-The schema now defines 22 application-owned domain tables, 7 ASP.NET Core Identity tables, and the EF migration-history table (30 tables total after all migrations are applied). With the user's approval, `AddWorkspaceNotes` was applied to `BusinessCentralBlazor_Phase0` on `.\BCDEMO`. The migration-history row, `WorkspaceNotes` table, composite company FK, and index were verified; the table contains no seeded notes. Other databases require their own reviewed migration application.
+The schema defines 28 application-owned domain tables, 7 ASP.NET Core Identity tables, and the EF migration-history table (36 tables total when the current migrations are applied). Earlier migrations, including `AddWorkspaceNotes`, were verified against `BusinessCentralBlazor_Phase0` on `.\BCDEMO`; the tax and bank migrations have not been applied to any local database. Other databases require their own reviewed migration application.
 
 ## Relationships
 
@@ -43,11 +45,17 @@ erDiagram
     CURRENCY ||--o{ CURRENCY_RATE : base_or_quote
     COMPANY ||--o{ GL_ACCOUNT : defines
     GL_ACCOUNT ||--o{ GL_ACCOUNT : parent_account
+    COMPANY ||--o{ TAX_CODE : configures
+    TAX_CODE ||--o{ TAX_RATE : defines
+    GL_ACCOUNT ||--o{ TAX_CODE : liability_mapping
+    GL_ACCOUNT ||--o{ TAX_CODE : recoverable_mapping
+    TAX_RATE ||--o{ JOURNAL_LINE : selected_rate
     COMPANY ||--o{ JOURNAL_TEMPLATE : defines
     JOURNAL_TEMPLATE ||--o{ JOURNAL_BATCH : groups
     COMPANY ||--o{ JOURNAL_BATCH : owns
     ACCOUNTING_PERIOD ||--o{ JOURNAL_BATCH : default_period
     JOURNAL_BATCH ||--|{ JOURNAL_LINE : contains
+    JOURNAL_BATCH ||--o| JOURNAL_BATCH : reverses
     ACCOUNTING_PERIOD ||--o{ JOURNAL_LINE : posting_period
     GL_ACCOUNT ||--o{ JOURNAL_LINE : posts_to
     COMPANY ||--o{ DIMENSION : defines
@@ -57,6 +65,13 @@ erDiagram
     JOURNAL_BATCH ||--o{ LEDGER_ENTRY : posts
     JOURNAL_LINE ||--o| LEDGER_ENTRY : source_line
     GL_ACCOUNT ||--o{ LEDGER_ENTRY : records
+    COMPANY ||--o{ BANK_ACCOUNT : owns
+    GL_ACCOUNT ||--o| BANK_ACCOUNT : dedicated_mapping
+    BANK_ACCOUNT ||--o{ BANK_JOURNAL : records
+    JOURNAL_BATCH ||--o| BANK_JOURNAL : source
+    BANK_ACCOUNT ||--o{ BANK_STATEMENT : receives
+    BANK_STATEMENT ||--o{ BANK_STATEMENT_LINE : contains
+    LEDGER_ENTRY |o--o| BANK_STATEMENT_LINE : matched
     COMPANY ||--o{ CUSTOMER : owns
     COMPANY ||--o{ VENDOR : owns
     COMPANY ||--o{ ITEM : owns
@@ -71,13 +86,16 @@ The diagram omits Identity's internal claims/login/token relations for readabili
 
 - Monetary columns use fixed precision, never floating point. Local-currency journal/ledger debit and credit amounts are represented as nonnegative `decimal(19,4)` values; a database check requires exactly one side to be positive per line/entry.
 - When a foreign currency is supplied, its currency debit or credit amount must also have exactly one positive side. Currency and exchange rates reference the currency catalogue; rate is positive and stored as `decimal(19,8)`.
-- Each journal batch belongs to a company-scoped template and has a company-scoped default accounting period; each journal line references its own company-scoped period so one batch can contain lines in different periods. Every line also references the same company's batch and account. **Checking the posting date lies within the referenced period is a future application rule**, not a database check.
+- Each journal batch belongs to a company-scoped template and has a company-scoped default accounting period; each journal line references its own company-scoped period so one batch can contain lines in different periods. Every line also references the same company's batch and account. Accounting-period date ranges are checked for overlap when created; journal services validate that posting dates are within the referenced period and reject closed or date-locked periods.
 - Every ledger entry references the source journal batch, source line, and account in the same company. Unique source-line indexing provides database-level duplicate-posting protection.
-- A posting service must, in a single database transaction, validate period/account/dimension/company rules, calculate and round amounts under the company's currency precision, verify batch debit equals credit in local currency, create ledger entries, and transition the batch to posted. Those posting services and rollback/concurrency behavior are not implemented in Phase 0.
-- Posted ledger rows must be append-only from application services; reversal/correction creates new entries. Database permissions/immutability enforcement and reversal workflows are future work.
+- Posting revalidates active-company scope, eligible G/L accounts, periods, dimensions, and local-currency balance. Journal batch status, ledger entries, and the row-versioned G/L entry-number series are saved together; SQL Server `SaveChanges` transactionality, batch/sequence concurrency tokens, and the unique source-line index prevent partial, concurrent, or duplicate posts.
+- Full-batch reversals create a distinct posted batch, link it from the original, and append entries with debit/credit sides swapped, preserving original entries. Only one reversal can link to an original batch; reversals use a selected open period/date and do not mutate original ledger rows. Posted journal lines and ledger rows are immutable through application services. Database permissions/immutability enforcement remains future work.
+- Tax-rate effective intervals are inclusive, may be open-ended, and cannot overlap within a company and tax code. Rates already referenced by journal lines cannot be edited. A manual tax journal line must use the configured active Liability account for a credit or recoverable Asset account for a debit, and its entered side must equal `round(taxable base × effective rate / 100, 4, AwayFromZero)`. The selected rate percentage, code/rate references, taxable base, and treatment are retained on the line and ledger entry; a reversal mirrors the original ledger entry without recalculating the tax.
 - `DateOnly` maps to SQL `date`; timestamps are `DateTimeOffset` and named `...Utc`. Services must normalize timestamps to UTC.
 - `NumberSeries` and journal batches have SQL Server `rowversion` optimistic-concurrency tokens. Allocating numbers still requires a transaction/retry strategy.
 - Audit metadata is optional JSON text; validation, redaction, retention, and tamper protection remain application/operations responsibilities.
+- Bank setup requires an active company base currency and a dedicated, unblocked, directly-postable Asset G/L account. Bank journals are created atomically as balanced receipt/payment drafts, and posting revalidates the linked bank and document/signed-line trace. Existing G/L mappings cannot change after journals/statements/posted activity exist.
+- Statements cannot overlap per bank. Lines are signed, nonzero, four-decimal amounts dated within the statement period. Manual one-to-one matches require a same-company posted entry on the bank G/L account, the same signed amount, and a posting date no later than the statement end (earlier outstanding entries are allowed). SQL serializable transactions plus revision concurrency and the unique entry-match index prevent competing matches. Completion requires matched statement lines and zero statement arithmetic; G/L timing differences remain visible and do not create adjustments. Completed statements/matches cannot be changed through services.
 
 ## Intentional differences and omissions
 
@@ -87,7 +105,7 @@ The diagram omits Identity's internal claims/login/token relations for readabili
 - `WorkspaceNotes` is a small generic CRUD example, not an ERP business module; rows are company-owned and the UI creates them only after the user selects a valid active company.
 - The selected metadata review informed the journal template/batch/line hierarchy, the distinction between account structure and financial category, and period start-date plus closed/date-locked concepts. Internal GUID keys, company-scoped tables, and the batch's default period are application choices.
 - This is not a complete Business Central model: journal lines currently post only to G/L accounts; default/global dimensions are not modeled; dimension combinations are assigned directly rather than deduplicated into dimension sets; currency exchange-rate semantics, posting setup, posting groups, document types, and posting workflows are simplified or deferred.
-- No sales/purchase documents, inventory movements/valuation, tax, bank reconciliation, document numbering policies, attachments, localization, or posting engine are implemented.
+- Automatic sales/purchase document tax calculation/posting, statutory filing, tax returns, inventory movements/valuation, bank feeds, payment initiation, automatic reconciliation, check printing, FX conversion, attachments, and localization are not implemented. Tax is only available as an explicitly entered manual journal tax line; sales/purchase document tax remains Phase 3 scope. General journal posting/reversal, ledger inquiry/reporting, and manual bank reconciliation are implemented; integrated local end-to-end verification of tax/bank migrations remains pending.
 
 ## Local migration workflow
 
@@ -108,5 +126,5 @@ The alignment migration preserves existing account categories and batch/period d
 - SQL Server inspection confirmed the database, migration-history row, expected Identity and application tables, foreign keys, check constraints, and unique indexes.
 - `database/scripts/verify-initial-schema.sql` passed against the new database; valid records persisted within the transaction, the database rejected invalid zero-sided journal lines, cross-company journal references, and duplicate ledger posting, and the test rows were rolled back.
 - Unit tests verify required table mappings, same-company account references, debit/credit checks, monetary precision, and row-version concurrency metadata.
-- The user initially verified the pre-alignment `dev` schema. After the alignment PR merged, the user-local `BusinessCentralBlazor_Phase0` database was updated through `20261012051809_AlignJournalAndAccountingFoundation`; both migrations are listed as applied. The updated SQL smoke test passed all five checks, Release build succeeded with 0 warnings/errors, tests passed (6/6), EF reported no pending model changes, and the app returned HTTP 200 at `http://localhost:5211`. After release to `main`, restore, Release build, all 6 tests, migration history, EF drift, all five SQL smoke checks, and app startup were repeated successfully against the merged `main` code. This verifies the aligned local Phase 0 schema, not field-for-field or runtime compatibility with Business Central.
-- Further transactional/integration tests and authorization tests remain before financial posting is implemented.
+- The user initially verified the pre-alignment `dev` schema. After the alignment PR merged, the user-local `BusinessCentralBlazor_Phase0` database was updated through `20261012051809_AlignJournalAndAccountingFoundation`; both migrations are now listed as applied. The updated SQL smoke test passed all five checks, Release build succeeded with 0 warnings/errors, tests passed (6/6), EF reported no pending model changes, and the app returned HTTP 200 at `http://localhost:5211`. These checks verify the aligned `dev` code locally; repeat applicable checks after release to `main`.
+- The company tax setup/manual journal tax migration `20261012113439_AddCompanyTaxSetupAndJournalTaxDetails` passed generated idempotent SQL inspection, EF reported no pending model changes, and all 61 Release tests pass, including effective-date overlap, company/account isolation, invalid mapping, calculated tax, ledger snapshot, reversal, model metadata, and authenticated page checks. The migration has not been applied to a local SQL Server database; local end-to-end verification is deferred until all Phase 2 work is integrated into `dev`, as agreed.

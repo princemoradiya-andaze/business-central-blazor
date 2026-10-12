@@ -1,0 +1,198 @@
+@page "/financial/company-settings"
+@using System.ComponentModel.DataAnnotations
+@attribute [Authorize(Policy = CompanyAuthorizationPolicies.ActiveCompany)]
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ICompanySettingsService CompanySettingsService
+
+<PageTitle>Company settings</PageTitle>
+<h1>Company settings</h1>
+<p class="text-body-secondary">Configure the active company's base currency.</p>
+
+@if (isLoading)
+{
+    <p role="status">Loading company settings...</p>
+}
+else
+{
+    @if (!string.IsNullOrWhiteSpace(statusMessage))
+    {
+        <div class="alert alert-success" role="status">@statusMessage</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert alert-danger" role="alert">@errorMessage</div>
+    }
+
+    <section class="card mb-4" aria-labelledby="base-currency-heading">
+        <div class="card-body">
+            <h2 id="base-currency-heading" class="h4">Base currency</h2>
+            @if (currencies.Count == 0)
+            {
+                <div class="alert alert-info" role="status">
+                    No active currencies are available. Add a currency to the shared catalog below, then assign it here.
+                </div>
+            }
+            else
+            {
+                <EditForm Model="@input" OnValidSubmit="SaveAsync" FormName="company-base-currency">
+                    <DataAnnotationsValidator />
+                    <div class="mb-3">
+                        <label class="form-label" for="base-currency">Base currency</label>
+                        <InputSelect id="base-currency" class="form-select" @bind-Value="input.BaseCurrencyCode">
+                            <option value="">Select a currency</option>
+                            @foreach (var currency in currencies)
+                            {
+                                <option value="@currency.Code">@currency.Code — @currency.Name</option>
+                            }
+                        </InputSelect>
+                    </div>
+                    <button class="btn btn-primary" type="submit" disabled="@isSaving">
+                        @(isSaving ? "Saving..." : "Save base currency")
+                    </button>
+                </EditForm>
+            }
+        </div>
+    </section>
+
+    <section class="card" aria-labelledby="currency-catalog-heading">
+        <div class="card-body">
+            <h2 id="currency-catalog-heading" class="h4">Add currency to shared catalog</h2>
+            <p class="text-body-secondary">
+                Currency entries are shared reference data and become available to all companies.
+            </p>
+            <EditForm Model="@currencyInput" OnValidSubmit="CreateCurrencyAsync" FormName="create-currency">
+                <DataAnnotationsValidator />
+                <ValidationSummary class="alert alert-danger" />
+                <fieldset disabled="@isSaving">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label" for="currency-code">Currency code</label>
+                            <InputText id="currency-code" class="form-control" maxlength="3"
+                                       @bind-Value="currencyInput.Code" />
+                            <ValidationMessage For="@(() => currencyInput.Code)" />
+                        </div>
+                        <div class="col-md-5">
+                            <label class="form-label" for="currency-name">Name</label>
+                            <InputText id="currency-name" class="form-control" maxlength="80"
+                                       @bind-Value="currencyInput.Name" />
+                            <ValidationMessage For="@(() => currencyInput.Name)" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label" for="currency-minor-unit">Minor units</label>
+                            <InputNumber id="currency-minor-unit" class="form-control" min="0" max="4"
+                                         @bind-Value="currencyInput.MinorUnit" />
+                            <ValidationMessage For="@(() => currencyInput.MinorUnit)" />
+                        </div>
+                    </div>
+                    <button class="btn btn-outline-primary mt-3" type="submit">Add currency</button>
+                </fieldset>
+            </EditForm>
+        </div>
+    </section>
+}
+
+@code {
+    private readonly BaseCurrencyInput input = new();
+    private readonly CurrencyInput currencyInput = new();
+    private IReadOnlyList<CompanyCurrencyOption> currencies = [];
+    private bool isLoading = true;
+    private bool isSaving;
+    private string? statusMessage;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+            var settings = await CompanySettingsService.GetAsync(user);
+            currencies = settings.Currencies;
+            input.BaseCurrencyCode = settings.BaseCurrencyCode ?? string.Empty;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            errorMessage = "Your active company is no longer available. Select an active company and try again.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        isSaving = true;
+        errorMessage = null;
+        statusMessage = null;
+        try
+        {
+            var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+            await CompanySettingsService.SaveBaseCurrencyAsync(user, input.BaseCurrencyCode);
+            var settings = await CompanySettingsService.GetAsync(user);
+            currencies = settings.Currencies;
+            input.BaseCurrencyCode = settings.BaseCurrencyCode ?? string.Empty;
+            statusMessage = $"Base currency saved as {input.BaseCurrencyCode}.";
+        }
+        catch (UnauthorizedAccessException)
+        {
+            errorMessage = "Your active company is no longer available. Select an active company and try again.";
+        }
+        catch (ValidationException exception)
+        {
+            errorMessage = exception.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task CreateCurrencyAsync()
+    {
+        isSaving = true;
+        errorMessage = null;
+        statusMessage = null;
+        try
+        {
+            var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+            var code = await CompanySettingsService.CreateCurrencyAsync(
+                user, currencyInput.Code, currencyInput.Name, currencyInput.MinorUnit);
+            var settings = await CompanySettingsService.GetAsync(user);
+            currencies = settings.Currencies;
+            input.BaseCurrencyCode = code;
+            currencyInput.Code = string.Empty;
+            currencyInput.Name = string.Empty;
+            currencyInput.MinorUnit = 2;
+            statusMessage = $"Currency {code} was added to the shared catalog. Save it above to set it as the base currency.";
+        }
+        catch (UnauthorizedAccessException)
+        {
+            errorMessage = "Your active company is no longer available. Select an active company and try again.";
+        }
+        catch (ValidationException exception)
+        {
+            errorMessage = exception.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private sealed class BaseCurrencyInput
+    {
+        public string BaseCurrencyCode { get; set; } = string.Empty;
+    }
+
+    private sealed class CurrencyInput
+    {
+        [Required, StringLength(3, MinimumLength = 3)]
+        public string Code { get; set; } = string.Empty;
+
+        [Required, StringLength(80)]
+        public string Name { get; set; } = string.Empty;
+
+        [Range(0, 4)]
+        public int MinorUnit { get; set; } = 2;
+    }
+}

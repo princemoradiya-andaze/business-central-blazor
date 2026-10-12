@@ -1,0 +1,119 @@
+@page "/financial/dimensions/{DimensionId:guid}"
+@attribute [Authorize(Policy = CompanyAuthorizationPolicies.ActiveCompany)]
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IDimensionService DimensionService
+
+<PageTitle>Dimension values</PageTitle>
+
+<nav aria-label="Breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/financial/dimensions">Dimensions</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Values</li>
+    </ol>
+</nav>
+
+@if (isLoading)
+{
+    <p role="status" aria-live="polite">Loading dimension values...</p>
+}
+else if (companyContextUnavailable)
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+    <a href="/account/company" data-enhance-nav="false">Select an active company</a>
+}
+else if (dimension is null)
+{
+    <h1>Dimension not found</h1>
+    <p>This dimension does not exist in the active company.</p>
+    <a href="/financial/dimensions">Back to dimensions</a>
+}
+else
+{
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+        <div>
+            <h1>@dimension.Name <small class="text-body-secondary">(@dimension.Code)</small></h1>
+            <p class="text-body-secondary mb-0">Dimension values define the available analysis codes.</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a class="btn btn-outline-secondary" href="@($"/financial/dimensions/{DimensionId}/edit")">Edit dimension</a>
+            <a class="btn btn-primary" href="@($"/financial/dimensions/{DimensionId}/values/new")">New value</a>
+        </div>
+    </div>
+
+    @if (values.Count == 0)
+    {
+        <div class="alert alert-info" role="status">No values have been added to this dimension yet.</div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-striped align-middle">
+                <caption class="visually-hidden">Values for dimension @dimension.Code</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">Code</th>
+                        <th scope="col">Name</th>
+                        <th scope="col">Status</th>
+                        <th scope="col"><span class="visually-hidden">Actions</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var value in values)
+                    {
+                        <tr>
+                            <th scope="row">@value.Code</th>
+                            <td>@value.Name</td>
+                            <td>
+                                @if (value.IsBlocked)
+                                {
+                                    <span class="badge text-bg-secondary">Blocked</span>
+                                }
+                                else
+                                {
+                                    <span class="badge text-bg-success">Active</span>
+                                }
+                            </td>
+                            <td>
+                                <a class="btn btn-sm btn-outline-primary"
+                                   href="@($"/financial/dimensions/{DimensionId}/values/{value.Id}/edit")">Edit</a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+}
+
+@code {
+    [Parameter]
+    public Guid DimensionId { get; set; }
+
+    private DimensionDetail? dimension;
+    private IReadOnlyList<DimensionValueListItem> values = [];
+    private bool isLoading = true;
+    private bool companyContextUnavailable;
+    private string? errorMessage;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        try
+        {
+            var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+            dimension = await DimensionService.GetAsync(user, DimensionId);
+            if (dimension is not null)
+            {
+                values = await DimensionService.GetValuesAsync(user, DimensionId);
+            }
+        }
+        catch (UnauthorizedAccessException)
+        {
+            companyContextUnavailable = true;
+            errorMessage = "Your active company is no longer available. Select an active company and try again.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}

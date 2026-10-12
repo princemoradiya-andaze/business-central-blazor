@@ -1,0 +1,108 @@
+@page "/financial/dimensions/{DimensionId:guid}/values/{ValueId:guid}/edit"
+@attribute [Authorize(Policy = CompanyAuthorizationPolicies.ActiveCompany)]
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IDimensionService DimensionService
+@inject NavigationManager Navigation
+
+<PageTitle>Edit dimension value</PageTitle>
+<nav aria-label="Breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/financial/dimensions">Dimensions</a></li>
+        <li class="breadcrumb-item"><a href="@($"/financial/dimensions/{DimensionId}")">Values</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Edit value</li>
+    </ol>
+</nav>
+
+@if (isLoading)
+{
+    <p role="status" aria-live="polite">Loading dimension value...</p>
+}
+else if (companyContextUnavailable)
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+    <a href="/account/company" data-enhance-nav="false">Select an active company</a>
+}
+else if (dimension is null || value is null)
+{
+    <h1>Dimension value not found</h1>
+    <p>This value does not exist in the selected dimension in the active company.</p>
+    <a href="/financial/dimensions">Back to dimensions</a>
+}
+else
+{
+    <h1>Edit value for @dimension.Name (@dimension.Code)</h1>
+    <p class="text-body-secondary">Blocked values remain visible and can be unblocked later.</p>
+    <DimensionValueForm Model="@input" DimensionId="@DimensionId" SubmitText="Save changes"
+                        IsSaving="@isSaving" ErrorMessage="@errorMessage" OnValidSubmit="SaveAsync" />
+}
+
+@code {
+    [Parameter]
+    public Guid DimensionId { get; set; }
+
+    [Parameter]
+    public Guid ValueId { get; set; }
+
+    private readonly DimensionValueInput input = new();
+    private DimensionDetail? dimension;
+    private DimensionValueDetail? value;
+    private bool isLoading = true;
+    private bool isSaving;
+    private bool companyContextUnavailable;
+    private string? errorMessage;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        try
+        {
+            var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+            dimension = await DimensionService.GetAsync(user, DimensionId);
+            value = dimension is null ? null : await DimensionService.GetValueAsync(user, DimensionId, ValueId);
+            if (value is not null)
+            {
+                input.Code = value.Code;
+                input.Name = value.Name;
+                input.IsBlocked = value.IsBlocked;
+            }
+        }
+        catch (UnauthorizedAccessException)
+        {
+            companyContextUnavailable = true;
+            errorMessage = "Your active company is no longer available. Select an active company and try again.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        isSaving = true;
+        errorMessage = null;
+        try
+        {
+            var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+            if (!await DimensionService.UpdateValueAsync(user, DimensionId, ValueId, input))
+            {
+                value = null;
+                return;
+            }
+
+            Navigation.NavigateTo($"/financial/dimensions/{DimensionId}");
+        }
+        catch (UnauthorizedAccessException)
+        {
+            companyContextUnavailable = true;
+            errorMessage = "Your active company is no longer available. Select an active company and try again.";
+        }
+        catch (ValidationException exception)
+        {
+            errorMessage = exception.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}

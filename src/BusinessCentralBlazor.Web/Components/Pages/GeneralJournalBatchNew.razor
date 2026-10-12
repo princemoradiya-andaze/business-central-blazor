@@ -1,0 +1,130 @@
+@page "/financial/journals/new"
+@attribute [Authorize(Policy = CompanyAuthorizationPolicies.ActiveCompany)]
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IGeneralJournalService GeneralJournalService
+@inject NavigationManager Navigation
+
+<PageTitle>New journal batch</PageTitle>
+<nav aria-label="Breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/financial/journals">General journals</a></li>
+        <li class="breadcrumb-item active" aria-current="page">New batch</li>
+    </ol>
+</nav>
+
+<h1>New general journal batch</h1>
+@if (isLoading)
+{
+    <p role="status" aria-live="polite">Loading accounting periods...</p>
+}
+else if (companyContextUnavailable)
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+    <a href="/account/company" data-enhance-nav="false">Select an active company</a>
+}
+else if (openPeriods.Count == 0)
+{
+    <div class="alert alert-info" role="status">
+        An open, unlocked accounting period is required.
+        <a href="/financial/accounting-periods">Set up accounting periods</a>
+    </div>
+}
+else
+{
+    <EditForm Model="@input" OnValidSubmit="CreateAsync" FormName="new-general-journal-batch">
+        <DataAnnotationsValidator />
+        <ValidationSummary class="alert alert-danger" />
+        @if (!string.IsNullOrWhiteSpace(errorMessage))
+        {
+            <div class="alert alert-danger" role="alert">@errorMessage</div>
+        }
+        <fieldset disabled="@isSaving">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label" for="batch-name">Batch name</label>
+                    <InputText id="batch-name" class="form-control" maxlength="32" @bind-Value="input.Name" />
+                    <ValidationMessage For="@(() => input.Name)" />
+                </div>
+                <div class="col-md-8">
+                    <label class="form-label" for="batch-description">Description</label>
+                    <InputText id="batch-description" class="form-control" maxlength="100"
+                               @bind-Value="input.Description" />
+                    <ValidationMessage For="@(() => input.Description)" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="batch-period">Default accounting period</label>
+                    <InputSelect id="batch-period" class="form-select" @bind-Value="input.DefaultAccountingPeriodId">
+                        @foreach (var period in openPeriods)
+                        {
+                            <option value="@period.Id">@period.Name (@period.StartsOn:yyyy-MM-dd — @period.EndsOn:yyyy-MM-dd)</option>
+                        }
+                    </InputSelect>
+                </div>
+            </div>
+        </fieldset>
+        <div class="d-flex gap-2 mt-4">
+            <button class="btn btn-primary" type="submit" disabled="@isSaving">
+                @(isSaving ? "Creating..." : "Create batch")
+            </button>
+            <a class="btn btn-outline-secondary" href="/financial/journals">Cancel</a>
+        </div>
+    </EditForm>
+}
+
+@code {
+    private readonly GeneralJournalBatchInput input = new();
+    private IReadOnlyList<AccountingPeriodListItem> openPeriods = [];
+    private bool isLoading = true;
+    private bool isSaving;
+    private bool companyContextUnavailable;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+            openPeriods = (await GeneralJournalService.GetPeriodsAsync(user))
+                .Where(period => !period.IsClosed && !period.DateLocked)
+                .ToArray();
+            if (openPeriods.Count > 0)
+            {
+                input.DefaultAccountingPeriodId = openPeriods[0].Id;
+            }
+        }
+        catch (UnauthorizedAccessException)
+        {
+            companyContextUnavailable = true;
+            errorMessage = "Your active company is no longer available. Select an active company and try again.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task CreateAsync()
+    {
+        isSaving = true;
+        errorMessage = null;
+        try
+        {
+            var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+            var batchId = await GeneralJournalService.CreateBatchAsync(user, input);
+            Navigation.NavigateTo($"/financial/journals/{batchId}");
+        }
+        catch (UnauthorizedAccessException)
+        {
+            companyContextUnavailable = true;
+            errorMessage = "Your active company is no longer available. Select an active company and try again.";
+        }
+        catch (ValidationException exception)
+        {
+            errorMessage = exception.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}

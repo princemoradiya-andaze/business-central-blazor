@@ -18,6 +18,12 @@ public enum AccountType
     EndTotal
 }
 
+public enum TaxPostingType
+{
+    Liability,
+    Recoverable
+}
+
 public enum JournalBatchStatus
 {
     Open,
