@@ -2,18 +2,15 @@
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject IActiveCompanyContext ActiveCompanyContext
 
-<div class="company-switcher text-light" aria-live="polite" aria-label="@CompanyAccessibleLabel">
+<div class="company-switcher" aria-live="polite" aria-label="@CompanyAccessibleLabel">
     @if (activeCompany is null)
     {
-        <span class="company-label">Company</span>
         <span class="company-name">No active company</span>
     }
     else
     {
-        <span class="company-label">Company</span>
         <span class="company-name">@activeCompany.Name <span class="company-code">(@activeCompany.Code)</span></span>
     }
-    <a class="company-change link-light" href="/account/company" data-enhance-nav="false">Change company</a>
 </div>
 
 @code {

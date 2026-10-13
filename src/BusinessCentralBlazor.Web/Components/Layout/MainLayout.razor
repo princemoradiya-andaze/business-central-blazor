@@ -1,4 +1,6 @@
 ﻿@inherits LayoutComponentBase
+@implements IDisposable
+@inject NavigationManager Navigation
 
 <div class="app-shell">
     <header class="global-header">
@@ -10,7 +12,26 @@
             <span class="environment-label">Environment <strong>Local</strong></span>
             <AuthorizeView>
                 <Authorized>
-                    <a href="/financial/company-settings">Company workspace settings</a>
+                    <div class="settings-menu-container">
+                        <button type="button"
+                                class="settings-toggle"
+                                aria-label="Settings"
+                                title="Settings"
+                                aria-expanded="@isSettingsOpen"
+                                aria-controls="global-settings-menu"
+                                @onclick="ToggleSettings">
+                            <span aria-hidden="true">⚙</span>
+                        </button>
+                        <div class="settings-menu"
+                             id="global-settings-menu"
+                             role="menu"
+                             aria-label="Settings menu"
+                             hidden="@(!isSettingsOpen)">
+                            <div class="settings-menu-header">Settings</div>
+                            <a href="/account/company" role="menuitem" @onclick="CloseSettings">Change company</a>
+                            <a href="/financial/company-settings" role="menuitem" @onclick="CloseSettings">Company workspace settings</a>
+                        </div>
+                    </div>
                     <form method="post" action="/account/logout">
                         <AntiforgeryToken />
                         <button type="submit">Sign out</button>
@@ -35,3 +56,30 @@
     <a href="." class="reload">Reload</a>
     <span class="dismiss">🗙</span>
 </div>
+
+@code {
+    private bool isSettingsOpen;
+
+    protected override void OnInitialized()
+    {
+        Navigation.LocationChanged += OnLocationChanged;
+    }
+
+    private void ToggleSettings() => isSettingsOpen = !isSettingsOpen;
+
+    private void CloseSettings() => isSettingsOpen = false;
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        if (isSettingsOpen)
+        {
+            isSettingsOpen = false;
+            _ = InvokeAsync(StateHasChanged);
+        }
+    }
+
+    public void Dispose()
+    {
+        Navigation.LocationChanged -= OnLocationChanged;
+    }
+}

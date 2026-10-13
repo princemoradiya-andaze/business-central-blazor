@@ -60,6 +60,76 @@
     font-weight: 600;
 }
 
+.settings-menu-container {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+
+.settings-toggle {
+    display: grid;
+    width: 2rem;
+    height: 2rem;
+    place-items: center;
+    border: 0;
+    border-radius: 2px;
+    color: #e7e7e7;
+    background: transparent;
+    font-size: 1.15rem;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.settings-toggle:hover,
+.settings-toggle:focus-visible,
+.settings-toggle[aria-expanded="true"] {
+    color: #fff;
+    background: #414141;
+}
+
+.settings-menu {
+    position: absolute;
+    top: calc(100% + 0.35rem);
+    right: 0;
+    z-index: 50;
+    min-width: 14rem;
+    padding: 0.4rem 0;
+    border: 1px solid #d9dde1;
+    border-radius: 0.25rem;
+    background: #ffffff;
+    box-shadow: 0 0.45rem 1.2rem rgb(16 24 40 / 16%);
+}
+
+.settings-menu[hidden] {
+    display: none;
+}
+
+.settings-menu-header {
+    padding: 0.35rem 1rem 0.25rem;
+    color: #667085;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.settings-menu a {
+    display: block;
+    padding: 0.45rem 1rem;
+    color: #17212b !important;
+    background: transparent !important;
+    font-size: 0.82rem;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.settings-menu a:hover,
+.settings-menu a:focus-visible {
+    color: #007c91 !important;
+    background: #f2f6f8 !important;
+    text-decoration: none;
+}
+
 .global-actions a,
 .global-actions button {
     padding: 0.3rem 0.45rem;
