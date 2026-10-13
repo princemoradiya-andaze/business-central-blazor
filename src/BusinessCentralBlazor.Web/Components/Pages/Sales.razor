@@ -1,0 +1,528 @@
+@page "/financial/sales"
+@attribute [Authorize(Policy = CompanyAuthorizationPolicies.ActiveCompany)]
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ISalesService SalesService
+@inject NavigationManager Navigation
+
+<PageTitle>Sales and receivables</PageTitle>
+<h1>Sales and receivables</h1>
+<p class="text-body-secondary">
+    Create customer orders, ship the full order through inventory, and invoice it through the general journal.
+    Customer payments and partial shipments are not included in this first sales release.
+</p>
+
+@if (!string.IsNullOrWhiteSpace(statusMessage))
+{
+    <div class="alert alert-success" role="status">@statusMessage</div>
+}
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+}
+@if (isLoading)
+{
+    <p role="status">Loading sales...</p>
+}
+else
+{
+    <section class="card mb-4" aria-labelledby="customers-heading">
+        <div class="card-body">
+            <h2 id="customers-heading" class="h4">Customers</h2>
+            @if (customers.Count == 0)
+            {
+                <p>No sales customers have been created for this company.</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-striped align-middle">
+                        <caption>Sales customers and their receivables accounts</caption>
+                        <thead>
+                            <tr><th scope="col">Number</th><th scope="col">Name</th><th scope="col">Receivables account</th><th scope="col">Status</th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var customer in customers)
+                            {
+                                <tr>
+                                    <th scope="row">@customer.Number</th>
+                                    <td>@customer.Name</td>
+                                    <td>@customer.ReceivablesAccountNumber</td>
+                                    <td>@(customer.IsBlocked ? "Blocked" : "Active")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+
+            <h3 class="h5 mt-4">Create customer</h3>
+            @if (!EligibleReceivablesAccounts.Any())
+            {
+                <div class="alert alert-info" role="status">
+                    Create an unblocked Asset posting account for accounts receivable before adding a customer.
+                </div>
+            }
+            <EditForm Model="@customerInput" OnValidSubmit="CreateCustomerAsync" FormName="sales-customer">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+                <fieldset disabled="@isSaving">
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label" for="sales-customer-number">Customer number</label>
+                            <InputText id="sales-customer-number" class="form-control" @bind-Value="customerInput.Number" />
+                            <ValidationMessage For="@(() => customerInput.Number)" />
+                        </div>
+                        <div class="col-md-5">
+                            <label class="form-label" for="sales-customer-name">Name</label>
+                            <InputText id="sales-customer-name" class="form-control" @bind-Value="customerInput.Name" />
+                            <ValidationMessage For="@(() => customerInput.Name)" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="sales-customer-ar">Receivables account</label>
+                            <InputSelect id="sales-customer-ar" class="form-select" @bind-Value="customerInput.ReceivablesAccountId">
+                                <option value="@Guid.Empty">Select Asset posting account</option>
+                                @foreach (var account in EligibleReceivablesAccounts)
+                                {
+                                    <option value="@account.Id">@account.Number - @account.Name</option>
+                                }
+                            </InputSelect>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary mt-3" type="submit" disabled="@(!EligibleReceivablesAccounts.Any())">
+                        @(isSaving ? "Saving..." : "Create customer")
+                    </button>
+                </fieldset>
+            </EditForm>
+        </div>
+    </section>
+
+    <section class="card mb-4" aria-labelledby="sales-order-heading">
+        <div class="card-body">
+            <h2 id="sales-order-heading" class="h4">Create sales order</h2>
+            @if (!EligibleCustomers.Any() || EligibleItems.Count == 0 || EligibleSalesAccounts.Count == 0)
+            {
+                <div class="alert alert-info" role="status">
+                    To create an order, add an active customer, an active inventory item, and an Income posting account.
+                    @if (EligibleItems.Count == 0)
+                    {
+                        <a href="/financial/inventory">Set up inventory items</a>
+                    }
+                    @if (EligibleSalesAccounts.Count == 0)
+                    {
+                        <a href="/financial/general-ledger/accounts">Set up sales accounts</a>
+                    }
+                </div>
+            }
+            <EditForm Model="@orderInput" OnValidSubmit="CreateOrderAsync" FormName="sales-order">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+                <fieldset disabled="@isSaving">
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label" for="sales-order-number">Order number</label>
+                            <InputText id="sales-order-number" class="form-control" @bind-Value="orderInput.OrderNumber" />
+                            <ValidationMessage For="@(() => orderInput.OrderNumber)" />
+                        </div>
+                        <div class="col-md-5">
+                            <label class="form-label" for="sales-order-description">Description</label>
+                            <InputText id="sales-order-description" class="form-control" @bind-Value="orderInput.Description" />
+                            <ValidationMessage For="@(() => orderInput.Description)" />
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label" for="sales-order-date">Order date</label>
+                            <InputDate id="sales-order-date" class="form-control" TValue="DateOnly" @bind-Value="orderInput.OrderDate" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="sales-order-customer">Customer</label>
+                            <InputSelect id="sales-order-customer" class="form-select" @bind-Value="orderInput.CustomerId">
+                                <option value="@Guid.Empty">Select customer</option>
+                                @foreach (var customer in EligibleCustomers)
+                                {
+                                    <option value="@customer.Id">@customer.Number - @customer.Name</option>
+                                }
+                            </InputSelect>
+                        </div>
+                    </div>
+
+                    <h3 class="h5 mt-4">Order lines</h3>
+                    @for (var index = 0; index < orderInput.Lines.Count; index++)
+                    {
+                        var line = orderInput.Lines[index];
+                        <div class="row g-3 mb-3 border-bottom pb-3" @key="line">
+                            <div class="col-md-4">
+                                <label class="form-label" for="@($"sales-line-item-{index}")">Inventory item</label>
+                                <InputSelect id="@($"sales-line-item-{index}")" class="form-select" @bind-Value="line.ItemId">
+                                    <option value="@Guid.Empty">Select item</option>
+                                    @foreach (var item in EligibleItems)
+                                    {
+                                        <option value="@item.Id">@item.Number - @item.Description (on hand: @item.QuantityOnHand.ToString("N4"))</option>
+                                    }
+                                </InputSelect>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label" for="@($"sales-line-quantity-{index}")">Quantity</label>
+                                <InputNumber id="@($"sales-line-quantity-{index}")" class="form-control" step="0.0001" @bind-Value="line.Quantity" />
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label" for="@($"sales-line-price-{index}")">Unit price</label>
+                                <InputNumber id="@($"sales-line-price-{index}")" class="form-control" step="0.0001" @bind-Value="line.UnitPrice" />
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label" for="@($"sales-line-account-{index}")">Revenue account</label>
+                                <InputSelect id="@($"sales-line-account-{index}")" class="form-select" @bind-Value="line.SalesAccountId">
+                                    <option value="@Guid.Empty">Select Income account</option>
+                                    @foreach (var account in EligibleSalesAccounts)
+                                    {
+                                        <option value="@account.Id">@account.Number - @account.Name</option>
+                                    }
+                                </InputSelect>
+                            </div>
+                            <div class="col-md-1 d-flex align-items-end">
+                                <button class="btn btn-outline-danger" type="button" disabled="@(isSaving || orderInput.Lines.Count == 1)"
+                                        aria-label="Remove line" @onclick="() => RemoveOrderLine(line)">Remove</button>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label" for="@($"sales-line-tax-{index}")">Tax code (optional)</label>
+                                <InputSelect id="@($"sales-line-tax-{index}")" class="form-select" @bind-Value="line.TaxCodeId">
+                                    <option value="">No tax</option>
+                                    @foreach (var taxCode in taxCodes)
+                                    {
+                                        <option value="@taxCode.Id">@taxCode.Code - @taxCode.Description</option>
+                                    }
+                                </InputSelect>
+                            </div>
+                        </div>
+                    }
+                    <button class="btn btn-outline-secondary" type="button" disabled="@isSaving" @onclick="AddOrderLine">Add line</button>
+                    <button class="btn btn-primary ms-2" type="submit"
+                            disabled="@(isSaving || !EligibleCustomers.Any() || EligibleItems.Count == 0 || EligibleSalesAccounts.Count == 0)">
+                        @(isSaving ? "Saving..." : "Create order")
+                    </button>
+                </fieldset>
+            </EditForm>
+        </div>
+    </section>
+
+    <section class="card mb-4" aria-labelledby="fulfillment-heading">
+        <div class="card-body">
+            <h2 id="fulfillment-heading" class="h4">Ship and invoice orders</h2>
+            @if (orders.Count == 0)
+            {
+                <p>Create a sales order to begin the shipment and invoicing workflow.</p>
+            }
+            else if (periods.Count == 0)
+            {
+                <div class="alert alert-info" role="status">Create an open, unlocked accounting period before shipment or invoicing.</div>
+            }
+            else
+            {
+                <div class="row g-3">
+                    <div class="col-md-5">
+                        <label class="form-label" for="sales-process-order">Order</label>
+                        <InputSelect id="sales-process-order" class="form-select" @bind-Value="selectedOrderId">
+                            <option value="@Guid.Empty">Select order</option>
+                            @foreach (var order in orders.Where(order => order.Status is SalesOrderStatus.Open or SalesOrderStatus.Shipped))
+                            {
+                                <option value="@order.Id">@order.OrderNumber - @order.CustomerName (@order.Status)</option>
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" for="sales-posting-period">Accounting period</label>
+                        <InputSelect id="sales-posting-period" class="form-select" @bind-Value="postingInput.AccountingPeriodId">
+                            <option value="@Guid.Empty">Select period</option>
+                            @foreach (var period in periods)
+                            {
+                                <option value="@period.Id">@period.Name (@period.StartsOn - @period.EndsOn)</option>
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label" for="sales-posting-date">Posting date</label>
+                        <InputDate id="sales-posting-date" class="form-control" TValue="DateOnly" @bind-Value="postingInput.PostingDate" />
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label" for="sales-invoice-number">Invoice number</label>
+                        <InputText id="sales-invoice-number" class="form-control" @bind-Value="postingInput.DocumentNumber" />
+                    </div>
+                </div>
+                @if (SelectedOrder is { } selected)
+                {
+                    <p class="mt-3">
+                        <strong>@selected.OrderNumber:</strong> @selected.Description — @selected.CustomerName.
+                        Full shipment and invoice quantity: @selected.Lines.Sum(line => line.Quantity).ToString("N4").
+                    </p>
+                    @if (selected.Status == SalesOrderStatus.Open)
+                    {
+                        <button class="btn btn-primary" type="button" disabled="@isSaving" @onclick="CreateShipmentDraftAsync">
+                            Create shipment journal
+                        </button>
+                    }
+                    else if (selected.Status == SalesOrderStatus.Shipped)
+                    {
+                        <button class="btn btn-primary" type="button" disabled="@isSaving" @onclick="CreateInvoiceDraftAsync">
+                            Create invoice journal
+                        </button>
+                    }
+                }
+                <p class="form-text mt-2">Draft journals must be reviewed and posted from General journals. Posting creates the shipment or invoice.</p>
+            }
+        </div>
+    </section>
+
+    <section class="mb-4" aria-labelledby="orders-heading">
+        <h2 id="orders-heading" class="h4">Sales orders</h2>
+        @if (orders.Count == 0)
+        {
+            <p>No sales orders have been created for this company.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-striped align-middle">
+                    <caption>Sales orders, their lifecycle status, and linked journals</caption>
+                    <thead>
+                        <tr><th scope="col">Order</th><th scope="col">Customer</th><th scope="col">Date</th><th scope="col">Order lines</th><th scope="col">Status</th><th scope="col">Shipment journal</th><th scope="col">Invoice journal</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var order in orders)
+                        {
+                            <tr>
+                                <th scope="row">@order.OrderNumber</th>
+                                <td>@order.CustomerNumber - @order.CustomerName</td>
+                                <td>@order.OrderDate.ToString("yyyy-MM-dd")</td>
+                                <td>@string.Join(", ", order.Lines.Select(line => $"{line.ItemNumber}: {line.Quantity:N4} x {line.UnitPrice:N2}"))</td>
+                                <td>@order.Status</td>
+                                <td>
+                                    @if (order.ShipmentJournalBatchId is { } shipmentBatchId)
+                                    {
+                                        <a href="@($"/financial/journals/{shipmentBatchId}")">Open journal</a>
+                                    }
+                                </td>
+                                <td>
+                                    @if (order.InvoiceJournalBatchId is { } invoiceBatchId)
+                                    {
+                                        <a href="@($"/financial/journals/{invoiceBatchId}")">Open journal</a>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+
+    <section aria-labelledby="receivables-heading">
+        <h2 id="receivables-heading" class="h4">Open receivables</h2>
+        @if (receivables.Count == 0)
+        {
+            <p>No posted sales invoices are currently open.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-striped align-middle">
+                    <caption>Posted sales invoices and their outstanding balances</caption>
+                    <thead>
+                        <tr><th scope="col">Invoice</th><th scope="col">Date</th><th scope="col">Order</th><th scope="col">Customer</th><th scope="col" class="text-end">Net</th><th scope="col" class="text-end">Tax</th><th scope="col" class="text-end">Open amount</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var receivable in receivables)
+                        {
+                            <tr>
+                                <th scope="row">@receivable.InvoiceNumber</th>
+                                <td>@receivable.PostingDate.ToString("yyyy-MM-dd")</td>
+                                <td>@receivable.OrderNumber</td>
+                                <td>@receivable.CustomerNumber - @receivable.CustomerName</td>
+                                <td class="text-end">@receivable.NetAmount.ToString("N2")</td>
+                                <td class="text-end">@receivable.TaxAmount.ToString("N2")</td>
+                                <td class="text-end">@receivable.OpenAmount.ToString("N2")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+}
+
+@code {
+    private IReadOnlyList<SalesCustomerOption> customers = [];
+    private IReadOnlyList<SalesItemOption> items = [];
+    private IReadOnlyList<SalesAccountOption> accounts = [];
+    private IReadOnlyList<AccountingPeriodListItem> periods = [];
+    private IReadOnlyList<GeneralJournalTaxCodeOption> taxCodes = [];
+    private IReadOnlyList<SalesOrderDetail> orders = [];
+    private IReadOnlyList<SalesReceivableDetail> receivables = [];
+    private readonly SalesCustomerInput customerInput = new();
+    private readonly SalesOrderInput orderInput = new() { Lines = [new SalesOrderLineInput()] };
+    private readonly SalesDocumentPostingInput postingInput = new();
+    private Guid selectedOrderId;
+    private bool isLoading = true;
+    private bool isSaving;
+    private string? statusMessage;
+    private string? errorMessage;
+
+    private IEnumerable<SalesCustomerOption> EligibleCustomers => customers.Where(customer => !customer.IsBlocked);
+    private IReadOnlyList<SalesItemOption> EligibleItems => items.Where(item => !item.IsBlocked).ToArray();
+    private IReadOnlyList<SalesAccountOption> EligibleSalesAccounts => accounts
+        .Where(account => account.Category == AccountCategory.Income &&
+                          !account.IsBlocked)
+        .ToArray();
+    private IReadOnlyList<SalesAccountOption> EligibleReceivablesAccounts => accounts
+        .Where(account => account.Category == AccountCategory.Asset &&
+                          !account.IsBlocked)
+        .ToArray();
+    private SalesOrderDetail? SelectedOrder => orders.SingleOrDefault(order => order.Id == selectedOrderId);
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await LoadAsync();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            errorMessage = "Your active company is no longer available. Select an active company and try again.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+        var loadedCustomers = await SalesService.GetCustomersAsync(user);
+        var loadedItems = await SalesService.GetItemsAsync(user);
+        var loadedAccounts = await SalesService.GetSalesAccountsAsync(user);
+        var loadedPeriods = await SalesService.GetOpenPeriodsAsync(user);
+        var loadedTaxCodes = await SalesService.GetTaxCodesAsync(user);
+        var loadedOrders = await SalesService.GetOrdersAsync(user);
+        var loadedReceivables = await SalesService.GetOpenReceivablesAsync(user);
+        customers = loadedCustomers;
+        items = loadedItems;
+        accounts = loadedAccounts;
+        periods = loadedPeriods;
+        taxCodes = loadedTaxCodes;
+        orders = loadedOrders;
+        receivables = loadedReceivables;
+        if (postingInput.AccountingPeriodId == Guid.Empty && periods.Count > 0)
+        {
+            postingInput.AccountingPeriodId = periods[0].Id;
+        }
+        if (selectedOrderId == Guid.Empty || orders.All(order => order.Id != selectedOrderId))
+        {
+            selectedOrderId = orders.FirstOrDefault(order =>
+                order.Status is SalesOrderStatus.Open or SalesOrderStatus.Shipped)?.Id ?? Guid.Empty;
+        }
+    }
+
+    private async Task CreateCustomerAsync()
+    {
+        await ExecuteAsync(async user =>
+        {
+            await SalesService.CreateCustomerAsync(user, customerInput);
+            customerInput.Number = string.Empty;
+            customerInput.Name = string.Empty;
+            customerInput.ReceivablesAccountId = Guid.Empty;
+            statusMessage = "Customer created.";
+        });
+    }
+
+    private void AddOrderLine() => orderInput.Lines.Add(new SalesOrderLineInput());
+
+    private void RemoveOrderLine(SalesOrderLineInput line)
+    {
+        if (orderInput.Lines.Count > 1)
+        {
+            orderInput.Lines.Remove(line);
+        }
+    }
+
+    private async Task CreateOrderAsync()
+    {
+        await ExecuteAsync(async user =>
+        {
+            var orderId = await SalesService.CreateOrderAsync(user, orderInput);
+            orderInput.OrderNumber = string.Empty;
+            orderInput.Description = string.Empty;
+            orderInput.CustomerId = Guid.Empty;
+            orderInput.OrderDate = DateOnly.FromDateTime(DateTime.Today);
+            orderInput.Lines = [new SalesOrderLineInput()];
+            selectedOrderId = orderId;
+            statusMessage = "Sales order created.";
+        });
+    }
+
+    private async Task CreateShipmentDraftAsync()
+    {
+        if (SelectedOrder is not { } order)
+        {
+            return;
+        }
+
+        await CreateDocumentDraftAsync(
+            order,
+            (user, orderId) => SalesService.CreateShipmentDraftAsync(user, orderId, postingInput),
+            "Shipment journal draft created. Review and post the journal to reduce inventory and recognize cost of goods sold.");
+    }
+
+    private async Task CreateInvoiceDraftAsync()
+    {
+        if (SelectedOrder is not { } order)
+        {
+            return;
+        }
+
+        await CreateDocumentDraftAsync(
+            order,
+            (user, orderId) => SalesService.CreateInvoiceDraftAsync(user, orderId, postingInput),
+            "Invoice journal draft created. Review and post the journal to recognize revenue, tax, and receivables.");
+    }
+
+    private async Task CreateDocumentDraftAsync(
+        SalesOrderDetail order,
+        Func<System.Security.Claims.ClaimsPrincipal, Guid, Task<Guid>> createDraft,
+        string successMessage)
+    {
+        await ExecuteAsync(async user =>
+        {
+            var batchId = await createDraft(user, order.Id);
+            statusMessage = successMessage;
+            Navigation.NavigateTo($"/financial/journals/{batchId}");
+        });
+    }
+
+    private async Task ExecuteAsync(Func<System.Security.Claims.ClaimsPrincipal, Task> action)
+    {
+        if (isSaving)
+        {
+            return;
+        }
+
+        isSaving = true;
+        errorMessage = null;
+        statusMessage = null;
+        try
+        {
+            var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+            await action(user);
+            await LoadAsync();
+        }
+        catch (ValidationException exception)
+        {
+            errorMessage = exception.Message;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            errorMessage = "Your active company is no longer available. Select an active company and try again.";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}

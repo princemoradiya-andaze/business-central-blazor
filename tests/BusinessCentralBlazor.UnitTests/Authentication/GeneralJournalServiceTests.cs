@@ -17,6 +17,43 @@ public sealed class GeneralJournalServiceTests(AuthenticationWebApplicationFacto
     private const string TestPassword = "Valid-Test-Password-2026!";
 
     [Fact]
+    public async Task CreatingGeneralBatchUsesGeneralTemplateWhenInventoryTemplateHasGeneralType()
+    {
+        var (principal, companyId) = await CreateUserAndCompanyAsync("journal-template-selection");
+        var period = await CreatePeriodAsync(principal);
+        await using (var setupScope = factory.Services.CreateAsyncScope())
+        {
+            var dbContext = setupScope.ServiceProvider.GetRequiredService<ErpDbContext>();
+            dbContext.GeneralJournalTemplates.Add(new GeneralJournalTemplate
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = companyId,
+                Code = "INVENTORY",
+                Description = "Inventory movements",
+                Type = JournalTemplateType.General
+            });
+            await dbContext.SaveChangesAsync();
+        }
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var service = scope.ServiceProvider.GetRequiredService<IGeneralJournalService>();
+        var batchId = await service.CreateBatchAsync(principal, new GeneralJournalBatchInput
+        {
+            Name = "OPENING-DEMO",
+            Description = "Demo opening balance",
+            DefaultAccountingPeriodId = period.Id
+        });
+
+        await using var verificationScope = factory.Services.CreateAsyncScope();
+        var verificationContext = verificationScope.ServiceProvider.GetRequiredService<ErpDbContext>();
+        var batch = await verificationContext.GeneralJournalBatches
+            .SingleAsync(candidate => candidate.CompanyId == companyId && candidate.Id == batchId);
+        var template = await verificationContext.GeneralJournalTemplates
+            .SingleAsync(candidate => candidate.CompanyId == companyId && candidate.Id == batch.JournalTemplateId);
+        Assert.Equal("GENERAL", template.Code);
+    }
+
+    [Fact]
     public async Task BalancedBatchPostsLedgerEntriesAndLocksItsLines()
     {
         var (principal, companyId) = await CreateUserAndCompanyAsync("journal-post");

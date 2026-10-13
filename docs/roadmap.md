@@ -44,9 +44,12 @@ Only mark tasks complete when their acceptance criteria have been verified.
 
 ## Later phases
 
-- [ ] Sales, purchasing, inventory, and document lifecycles.
+- [ ] Phase 3 tracker: [#53](https://github.com/princemoradiya-andaze/business-central-blazor/issues/53) — sales, receivables, inventory, purchasing, and document lifecycles.
+- [x] [#54](https://github.com/princemoradiya-andaze/business-central-blazor/issues/54) — company-scoped inventory items and weighted-average costing (merged to `dev` in PR #55; migration applied to the approved local database; 86 Release tests and EF model-drift check passed; user completed local workflow verification).
+- [x] [#56](https://github.com/princemoradiya-andaze/business-central-blazor/issues/56) — sales orders, shipment, invoicing, and open receivables (merged to `dev` in PR #57; user completed local Phase 3 sales verification).
+- [ ] [#59](https://github.com/princemoradiya-andaze/business-central-blazor/issues/59) — purchasing orders, full receipts, vendor invoices, tax, GRNI, and open payables. Implementation and migration are on `feature/59-purchasing`; Release build (0 warnings/errors), all 96 Release tests, EF model-drift check, and migration SQL review passed. After explicit approval, migration `20261013063111_AddPurchasingLifecycle` was applied to `BusinessCentralBlazor_Phase0` on `.\BCDEMO` and verified in migration history. Local SQL Server/browser workflow verification remains.
 - [ ] Advanced capabilities, production operations, and Azure deployment.
 
 ## Current next step
 
-Phase 0 and Phase 1 are complete on `main`. Phase 1 was released in PR #27 and documented in PR #28; the merged `main` commit passed a Release build (0 warnings/errors), all 32 tests, EF model-drift validation, and local HTTP smoke checks. Phase 2 is tracked in #29. Chart of Accounts (#30, PR #31) and dimensions/values (#33, PR #34) are verified on `dev`. General journal posting/reversal (#36, PR #37), general-ledger inquiry/reporting (#38, PR #41), and tax setup/manual journal tax (#39, PR #42) are merged into `dev`. Bank reconciliation (#40) is implemented and automatically verified on its feature branch. Review/integrate the remaining Phase 2 feature PRs, then perform full local end-to-end verification on merged `dev`, including approved tax/bank migration application. Ask the user before merging every PR. Hosted deployment is not part of the agreed workflow.
+Phase 0–2 have been completed and released. Phase 3 tracker #53 now has inventory (#54) and sales (#56) slices merged to `dev` and locally verified. Purchasing (#59) is implemented and its migration is applied to the explicitly approved `BusinessCentralBlazor_Phase0` database on `.\BCDEMO`; finish local SQL Server/browser workflow verification, update the issue, and open a PR to `dev`. Ask the user before merging any PR. Hosted deployment is not part of the agreed workflow.

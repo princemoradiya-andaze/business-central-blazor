@@ -118,6 +118,38 @@ generated migration metadata; they do not establish live SQL concurrency or migr
 Bank feeds, credential storage, payment initiation, automatic reconciliation, check printing and FX
 remain out of scope.
 
+## Inventory items and stock movements
+
+`/financial/inventory` configures company-scoped inventory items with an inventory Asset account,
+an opening/increase offset account, and an inventory issue Expense account. Each receipt or issue
+creates a linked general-journal draft; review and post it through General journals to update the
+item balance and G/L in the same transaction. Receipts recalculate weighted-average cost, issues use
+the current average and cannot create negative stock, and generic journal reversal is blocked for
+inventory-linked batches. Correct posted stock movements with a compensating inventory movement.
+The initial slice uses one company-wide balance per item and does not include warehouses or bins.
+
+Migration `20261013035640_AddInventoryFoundation` has been applied to the local
+`BusinessCentralBlazor_Phase0` database on `.\BCDEMO`; migration history, the `InventoryMovements`
+table, rowversion column, checks, and company-scoped foreign keys were verified. Automated tests
+cover inventory costing/posting and the authorized page; full browser-based SQL Server workflow and
+concurrency verification remain outstanding.
+
+## Purchase orders, receipts, invoices, and payables
+
+`/financial/purchasing` configures the company's GRNI liability account and vendor payables accounts,
+creates purchase orders for inventory items, and creates separate full-quantity receipt and vendor
+invoice journal drafts. Review and post each draft through General journals. Receipt posting increases
+inventory at the purchase-order cost and credits GRNI; invoice posting clears GRNI, debits recoverable
+tax where configured, and credits vendor payables. The open-payables inquiry lists posted invoices at
+their full unpaid balance. Partial receipts, purchase-price variances, vendor payments/application,
+returns, and credit memos are not included.
+
+Migration `20261013063111_AddPurchasingLifecycle` was applied, after explicit approval, to the local
+`BusinessCentralBlazor_Phase0` database on `.\BCDEMO`; EF migration history confirms it is current.
+The Release solution build, all 96 Release tests, EF model-drift check, and generated migration SQL
+review passed. The automated service tests use the existing in-memory harness; complete the live
+SQL Server/browser purchasing workflow verification before merging the purchasing slice.
+
 ## Branch and review workflow
 
 - `main` is production-ready; `dev` is the integration branch.

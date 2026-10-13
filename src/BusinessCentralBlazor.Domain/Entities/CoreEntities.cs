@@ -25,6 +25,7 @@ public sealed class CompanySettings
     public string BaseCurrencyCode { get; set; } = string.Empty;
     public string TimeZoneId { get; set; } = "UTC";
     public int FirstDayOfWeek { get; set; }
+    public Guid? GoodsReceivedNotInvoicedAccountId { get; set; }
 }
 
 public sealed class WorkspaceNote

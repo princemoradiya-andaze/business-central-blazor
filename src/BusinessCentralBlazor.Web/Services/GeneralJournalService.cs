@@ -187,7 +187,10 @@ public interface IGeneralJournalService
 
 public sealed class GeneralJournalService(
     IDbContextFactory<ErpDbContext> dbContextFactory,
-    ICompanyScopeAuthorizer companyScopeAuthorizer) : IGeneralJournalService
+    ICompanyScopeAuthorizer companyScopeAuthorizer,
+    IInventoryJournalPostingService inventoryJournalPostingService,
+    ISalesJournalPostingService salesJournalPostingService,
+    IPurchasingJournalPostingService purchasingJournalPostingService) : IGeneralJournalService
 {
     private const string EntryNumberSeriesCode = "GL-ENTRY";
     private const decimal MaximumAmount = 999999999999999.9999m;
@@ -547,7 +550,7 @@ public sealed class GeneralJournalService(
             company.CompanyId,
             input.DefaultAccountingPeriodId);
         var template = await dbContext.GeneralJournalTemplates.SingleOrDefaultAsync(item =>
-            item.CompanyId == company.CompanyId && item.Type == JournalTemplateType.General);
+            item.CompanyId == company.CompanyId && item.Code == "GENERAL");
         if (template is null)
         {
             template = new GeneralJournalTemplate
@@ -761,8 +764,29 @@ public sealed class GeneralJournalService(
             await ValidatePersistedLineAsync(dbContext, company.CompanyId, line);
         }
 
-        var numberSeries = await GetEntryNumberSeriesAsync(dbContext, company.CompanyId);
         var now = DateTimeOffset.UtcNow;
+        await inventoryJournalPostingService.ApplyForPostingAsync(
+            dbContext,
+            user,
+            company.CompanyId,
+            batch,
+            lines,
+            now);
+        await salesJournalPostingService.ApplyForPostingAsync(
+            dbContext,
+            user,
+            company.CompanyId,
+            batch,
+            lines,
+            now);
+        await purchasingJournalPostingService.ApplyForPostingAsync(
+            dbContext,
+            user,
+            company.CompanyId,
+            batch,
+            lines,
+            now);
+        var numberSeries = await GetEntryNumberSeriesAsync(dbContext, company.CompanyId);
         var userId = GetUserId(user);
         foreach (var line in lines)
         {
@@ -817,6 +841,36 @@ public sealed class GeneralJournalService(
         if (original.ReversedByBatchId is not null)
         {
             throw new ValidationException("This journal batch has already been reversed.");
+        }
+
+        if (await dbContext.InventoryMovements.AnyAsync(movement =>
+                movement.CompanyId == company.CompanyId &&
+                movement.JournalBatchId == original.Id))
+        {
+            throw new ValidationException(
+                "Inventory movement journals cannot be reversed as general journals. Create a compensating inventory movement instead.");
+        }
+
+        if (await dbContext.SalesOrders.AnyAsync(order =>
+                order.CompanyId == company.CompanyId &&
+                order.ShipmentJournalBatchId == original.Id) ||
+            await dbContext.SalesInvoices.AnyAsync(invoice =>
+                invoice.CompanyId == company.CompanyId &&
+                invoice.JournalBatchId == original.Id))
+        {
+            throw new ValidationException(
+                "Sales shipment and invoice journals cannot be reversed as general journals. Correct the source sales document instead.");
+        }
+
+        if (await dbContext.PurchaseReceipts.AnyAsync(receipt =>
+                receipt.CompanyId == company.CompanyId &&
+                receipt.JournalBatchId == original.Id) ||
+            await dbContext.PurchaseInvoices.AnyAsync(invoice =>
+                invoice.CompanyId == company.CompanyId &&
+                invoice.JournalBatchId == original.Id))
+        {
+            throw new ValidationException(
+                "Purchase receipt and invoice journals cannot be reversed as general journals. Correct the source purchase document instead.");
         }
 
         var period = await GetRequiredOpenPeriodAsync(
