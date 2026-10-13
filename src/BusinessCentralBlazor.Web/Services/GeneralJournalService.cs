@@ -549,7 +549,7 @@ public sealed class GeneralJournalService(
             company.CompanyId,
             input.DefaultAccountingPeriodId);
         var template = await dbContext.GeneralJournalTemplates.SingleOrDefaultAsync(item =>
-            item.CompanyId == company.CompanyId && item.Type == JournalTemplateType.General);
+            item.CompanyId == company.CompanyId && item.Code == "GENERAL");
         if (template is null)
         {
             template = new GeneralJournalTemplate
