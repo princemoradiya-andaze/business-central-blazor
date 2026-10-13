@@ -3,7 +3,7 @@
     min-height: calc(100vh - 7rem);
     margin: 0 auto;
     padding: 1.25rem;
-    background: transparent;
+    background: linear-gradient(135deg, #e7f6f7 0%, #eef8f9 52%, #e5f4f5 100%);
 }
 
 .directory-heading {
@@ -55,12 +55,11 @@
 
 .directory-group a {
     display: flex;
-    min-height: 1.75rem;
+    min-height: 1.5rem;
     align-items: center;
     justify-content: space-between;
     gap: 0.5rem;
-    padding: 0.15rem 0.35rem;
-    border-radius: 0.2rem;
+    padding: 0 0.35rem;
     color: #007f83;
     text-decoration: none;
 }
@@ -73,8 +72,8 @@
 .directory-group a:hover,
 .directory-group a:focus-visible {
     color: #005e63;
-    background: #e5f0f2;
-    text-decoration: none;
+    background: transparent;
+    text-decoration: underline;
 }
 
 @media (max-width: 760px) {
