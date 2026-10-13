@@ -1,93 +1,137 @@
-﻿<div class="top-row ps-3 navbar navbar-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="">Business Central Blazor</a>
-    </div>
-</div>
+@implements IAsyncDisposable
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
 
-<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+<AuthorizeView>
+    <Authorized>
+        @if (!IsNavigationDirectory)
+        {
+            <nav class="company-navigation" aria-label="Company navigation" @ref="companyNavigation">
+                <div class="company-navigation-main">
+                    <div class="company-identity">
+                        <ActiveCompanyIndicator />
+                    </div>
+                    <div class="module-links" aria-label="Modules">
+                        @foreach (var group in NavigationMenuCatalog.Groups)
+                        {
+                            <div class="module-menu">
+                                <button class="module-menu-toggle @(IsGroupActive(group) ? "active" : null)"
+                                        type="button"
+                                        aria-expanded="@(openMenu == group.Key)"
+                                        aria-controls="@($"module-menu-{group.Key}")"
+                                        @onclick="() => ToggleMenu(group.Key)">
+                                    @group.Label
+                                    <span class="menu-chevron" aria-hidden="true"></span>
+                                </button>
+                                <div class="module-menu-panel"
+                                     id="@($"module-menu-{group.Key}")"
+                                     role="group"
+                                     aria-label="@($"{group.Label} pages")"
+                                     hidden="@(openMenu != group.Key)">
+                                    @foreach (var item in group.Items)
+                                    {
+                                        <a href="@item.Href" @onclick="CloseMenu">@item.Label</a>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+                    <a class="navigation-menu-link" href="/navigation" aria-label="All pages" title="All pages">
+                        <span aria-hidden="true">☰</span>
+                    </a>
+                </div>
+                @if (IsHomePage)
+                {
+                    <nav class="home-quick-links" aria-label="Home shortcuts">
+                        <a href="/financial/sales#customers-heading">Customers</a>
+                        <a href="/financial/purchasing#vendors-heading">Vendors</a>
+                        <a href="/financial/inventory#items-heading">Items</a>
+                        <a href="/financial/banks">Bank Accounts</a>
+                        <a href="/financial/general-ledger/accounts">Chart of Accounts</a>
+                    </nav>
+                }
+            </nav>
+        }
+    </Authorized>
+    <NotAuthorized>
+        <nav class="company-navigation anonymous-navigation" aria-label="Account navigation">
+            <div class="company-navigation-main">
+                <NavLink class="anonymous-signin" href="/account/login">Sign in</NavLink>
+            </div>
+        </nav>
+    </NotAuthorized>
+</AuthorizeView>
 
-<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
-    <nav class="nav flex-column">
-        <AuthorizeView>
-            <Authorized>
-                <ActiveCompanyIndicator />
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                        <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="workspace/notes">
-                        <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Workspace notes
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="financial/general-ledger/accounts">
-                        Chart of Accounts
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="financial/general-ledger/entries">
-                        General ledger entries
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="financial/general-ledger/trial-balance">
-                        Trial balance
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="financial/dimensions">
-                        Dimensions
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="financial/inventory">
-                        Inventory
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="financial/sales">
-                        Sales &amp; receivables
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="financial/purchasing">
-                        Purchasing &amp; payables
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="financial/journals">
-                        General journals
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="financial/tax-setup">
-                        Tax setup
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="financial/banks">
-                        Banking &amp; reconciliation
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="financial/accounting-periods">
-                        Accounting periods
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <form method="post" action="/account/logout">
-                        <AntiforgeryToken />
-                        <button class="nav-link btn btn-link" type="submit">Sign out</button>
-                    </form>
-                </div>
-            </Authorized>
-            <NotAuthorized>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="/account/login">Sign in</NavLink>
-                </div>
-            </NotAuthorized>
-        </AuthorizeView>
-    </nav>
-</div>
+@code {
+    private string? openMenu;
+    private ElementReference companyNavigation;
+    private IJSObjectReference? outsideClickModule;
+    private DotNetObjectReference<NavMenu>? dotNetReference;
+    private int? outsideClickListenerId;
+    private string CurrentPath => "/" + Navigation.ToBaseRelativePath(Navigation.Uri).Split('?', '#')[0];
+    private bool IsHomePage => CurrentPath.Equals("/", StringComparison.OrdinalIgnoreCase);
+    private bool IsNavigationDirectory => CurrentPath.Equals("/navigation", StringComparison.OrdinalIgnoreCase);
+
+    protected override void OnInitialized()
+    {
+        Navigation.LocationChanged += OnLocationChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (outsideClickListenerId is not null || companyNavigation.Context is null)
+        {
+            return;
+        }
+
+        outsideClickModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/outsideClick.js");
+        dotNetReference ??= DotNetObjectReference.Create(this);
+        outsideClickListenerId = await outsideClickModule.InvokeAsync<int>(
+            "bindOutsideClick",
+            companyNavigation,
+            dotNetReference,
+            nameof(CloseMenuFromOutside));
+    }
+
+    private bool IsGroupActive(NavigationGroup group) =>
+        group.ActivePrefixes.Any(prefix => CurrentPath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
+
+    private void ToggleMenu(string key) => openMenu = openMenu == key ? null : key;
+
+    private void CloseMenu() => openMenu = null;
+
+    [JSInvokable]
+    public Task CloseMenuFromOutside()
+    {
+        if (openMenu is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        openMenu = null;
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        openMenu = null;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        Navigation.LocationChanged -= OnLocationChanged;
+
+        if (outsideClickListenerId is not null && outsideClickModule is not null)
+        {
+            await outsideClickModule.InvokeVoidAsync("unbindOutsideClick", outsideClickListenerId);
+        }
+
+        dotNetReference?.Dispose();
+
+        if (outsideClickModule is not null)
+        {
+            await outsideClickModule.DisposeAsync();
+        }
+    }
+}

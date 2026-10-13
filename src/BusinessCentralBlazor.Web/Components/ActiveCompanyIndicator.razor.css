@@ -1,0 +1,21 @@
+.company-switcher {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    color: #17212b;
+    font-size: 0.85rem;
+}
+
+.company-name {
+    overflow: hidden;
+    color: #17212b;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.company-code {
+    color: #66727f;
+    font-weight: 400;
+    margin-left: 0.25rem;
+}

@@ -1,0 +1,119 @@
+.navigation-directory {
+    box-sizing: border-box;
+    width: 100vw;
+    margin-left: calc(50% - 50vw);
+    padding: 1.25rem clamp(1.25rem, 3.2vw, 4rem) 2rem;
+    background: transparent;
+}
+
+.directory-heading {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    margin: 0.3rem 0 1.5rem;
+}
+
+.directory-back-link {
+    display: grid;
+    width: 2.5rem;
+    height: 2.5rem;
+    flex: 0 0 2.5rem;
+    place-items: center;
+    margin-top: 0.25rem;
+    border-radius: 50%;
+    color: #344054;
+    background: #fff;
+    text-decoration: none;
+}
+
+.directory-back-link svg {
+    width: 1.25rem;
+    height: 1.25rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.7;
+}
+
+.directory-back-link:hover,
+.directory-back-link:focus-visible {
+    color: #005e63;
+    text-decoration: none;
+}
+
+.directory-heading-content {
+    min-width: 0;
+}
+
+.directory-heading h1 {
+    margin-bottom: 0.45rem;
+}
+
+.directory-heading p:last-child {
+    margin-bottom: 0;
+    color: #5a707a;
+}
+
+.directory-eyebrow {
+    margin-bottom: 0.25rem;
+    color: #007f83;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.directory-groups {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+    gap: 0.75rem 1.5rem;
+}
+
+.directory-group {
+    min-width: 0;
+    padding: 0.25rem 0.5rem;
+}
+
+.directory-group h2 {
+    margin: 0 0 0.25rem;
+    color: #294651;
+    font-size: 1rem;
+}
+
+.directory-count {
+    color: #667085;
+    font-size: 0.82em;
+    font-weight: 400;
+}
+
+.directory-group ul {
+    display: grid;
+    gap: 0;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.directory-group a {
+    display: flex;
+    min-height: 1.5rem;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0 0.35rem;
+    color: #007f83;
+    text-decoration: none;
+}
+
+.directory-group a:hover,
+.directory-group a:focus-visible {
+    color: #005e63;
+    background: transparent;
+    text-decoration: underline;
+}
+
+@media (max-width: 760px) {
+    .navigation-directory {
+        padding: 1rem 0.75rem;
+    }
+}

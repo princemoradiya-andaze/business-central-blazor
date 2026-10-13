@@ -92,10 +92,19 @@ public sealed class AuthenticationFlowTests(AuthenticationWebApplicationFactory 
         Assert.Equal("/workspace/notes", response.Headers.Location?.OriginalString);
         using var home = await client.GetAsync("/");
         Assert.Equal(HttpStatusCode.OK, home.StatusCode);
-        Assert.Contains(
-            $"Company: {company.Name} ({company.Code})",
-            await home.Content.ReadAsStringAsync(),
-            StringComparison.Ordinal);
+        var homeHtml = await home.Content.ReadAsStringAsync();
+        Assert.Contains($"Company: {company.Name} ({company.Code})", homeHtml, StringComparison.Ordinal);
+        Assert.Contains("aria-label=\"Home shortcuts\"", homeHtml, StringComparison.Ordinal);
+        Assert.Contains("/financial/sales", homeHtml, StringComparison.Ordinal);
+        Assert.Contains("/financial/purchasing", homeHtml, StringComparison.Ordinal);
+        Assert.Contains("/financial/inventory", homeHtml, StringComparison.Ordinal);
+        Assert.Contains("/financial/banks", homeHtml, StringComparison.Ordinal);
+        Assert.Contains("/financial/general-ledger/accounts", homeHtml, StringComparison.Ordinal);
+        Assert.Contains(">Customers</a>", homeHtml, StringComparison.Ordinal);
+        Assert.Contains(">Vendors</a>", homeHtml, StringComparison.Ordinal);
+        Assert.Contains(">Items</a>", homeHtml, StringComparison.Ordinal);
+        Assert.Contains(">Bank Accounts</a>", homeHtml, StringComparison.Ordinal);
+        Assert.Contains(">Chart of Accounts</a>", homeHtml, StringComparison.Ordinal);
     }
 
     [Fact]

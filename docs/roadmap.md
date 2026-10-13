@@ -44,12 +44,13 @@ Only mark tasks complete when their acceptance criteria have been verified.
 
 ## Later phases
 
-- [ ] Phase 3 tracker: [#53](https://github.com/princemoradiya-andaze/business-central-blazor/issues/53) — sales, receivables, inventory, purchasing, and document lifecycles.
+- [x] Phase 3 tracker: [#53](https://github.com/princemoradiya-andaze/business-central-blazor/issues/53) — inventory, sales/receivables, and purchasing/payables delivered and released to `main` in PR #67. Additional lifecycle capabilities are separately scoped in issues #61–#66.
 - [x] [#54](https://github.com/princemoradiya-andaze/business-central-blazor/issues/54) — company-scoped inventory items and weighted-average costing (merged to `dev` in PR #55; migration applied to the approved local database; 86 Release tests and EF model-drift check passed; user completed local workflow verification).
 - [x] [#56](https://github.com/princemoradiya-andaze/business-central-blazor/issues/56) — sales orders, shipment, invoicing, and open receivables (merged to `dev` in PR #57; user completed local Phase 3 sales verification).
-- [ ] [#59](https://github.com/princemoradiya-andaze/business-central-blazor/issues/59) — purchasing orders, full receipts, vendor invoices, tax, GRNI, and open payables. Implementation and migration are on `feature/59-purchasing`; Release build (0 warnings/errors), all 96 Release tests, EF model-drift check, and migration SQL review passed. After explicit approval, migration `20261013063111_AddPurchasingLifecycle` was applied to `BusinessCentralBlazor_Phase0` on `.\BCDEMO` and verified in migration history. Local SQL Server/browser workflow verification remains.
+- [x] [#59](https://github.com/princemoradiya-andaze/business-central-blazor/issues/59) — purchasing orders, full receipts, vendor invoices, tax, GRNI, and open payables. Merged and released in PR #60/#67. Release build (0 warnings/errors), all 96 Release tests, EF model-drift check, migration SQL review, and local no-tax SQL Server/browser receipt-to-invoice workflow passed. Tax-bearing purchases and SQL Server concurrency were not exercised.
+- [ ] [#68](https://github.com/princemoradiya-andaze/business-central-blazor/issues/68) — shared ERP application UI redesign, beginning with the responsive application shell, navigation, and common page styling.
 - [ ] Advanced capabilities, production operations, and Azure deployment.
 
 ## Current next step
 
-Phase 0–2 have been completed and released. Phase 3 tracker #53 now has inventory (#54) and sales (#56) slices merged to `dev` and locally verified. Purchasing (#59) is implemented and its migration is applied to the explicitly approved `BusinessCentralBlazor_Phase0` database on `.\BCDEMO`; finish local SQL Server/browser workflow verification, update the issue, and open a PR to `dev`. Ask the user before merging any PR. Hosted deployment is not part of the agreed workflow.
+Phase 0–3 have been released to `main`; Phase 3 tracker #53 and the completed inventory, sales, and purchasing issues are closed. Continue with the shared UI redesign (#68) before beginning the separately scoped Phase 3 lifecycle follow-ups (#61–#66). Ask the user before merging any PR. Hosted deployment is not part of the agreed workflow.

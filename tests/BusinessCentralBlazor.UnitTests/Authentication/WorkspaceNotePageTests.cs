@@ -16,6 +16,41 @@ public sealed class WorkspaceNotePageTests(AuthenticationWebApplicationFactory f
     private const string TestPassword = "Valid-Test-Password-2026!";
 
     [Fact]
+    public async Task NavigationDirectoryListsImplementedCompanyPages()
+    {
+        var email = $"navigation-directory-{Guid.NewGuid():N}@example.invalid";
+        await factory.CreateTestUserAsync(email, TestPassword);
+        var company = await factory.AddCompanyMembershipAsync(email, "NAVDIR", "Navigation Directory Company");
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        using var anonymousResponse = await client.GetAsync("/navigation");
+        Assert.Equal(HttpStatusCode.Redirect, anonymousResponse.StatusCode);
+        Assert.StartsWith("/account/login", anonymousResponse.Headers.Location?.AbsolutePath);
+
+        await SignInAsync(client, email);
+        await SelectCompanyAsync(client, company.CompanyId);
+
+        using var response = await client.GetAsync("/navigation");
+        var html = await response.Content.ReadAsStringAsync();
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("All pages", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("aria-label=\"Company navigation\"", html, StringComparison.Ordinal);
+        Assert.Contains("class=\"directory-back-link\" href=\"/\"", html, StringComparison.Ordinal);
+        Assert.Contains("Cash management", html, StringComparison.Ordinal);
+        Assert.Contains("Reports", html, StringComparison.Ordinal);
+        Assert.Contains("directory-count", html, StringComparison.Ordinal);
+        Assert.Contains("(5)", html, StringComparison.Ordinal);
+        Assert.Contains("Workspace notes", html, StringComparison.Ordinal);
+        Assert.Contains("- General journals", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("aria-hidden=\"true\">›", html, StringComparison.Ordinal);
+        Assert.Contains("href=\"/financial/sales#customers-heading\"", html, StringComparison.Ordinal);
+        Assert.Contains("href=\"/financial/purchasing#vendors-heading\"", html, StringComparison.Ordinal);
+        Assert.Contains("href=\"/financial/general-ledger/trial-balance\"", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("Sales quotes", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("Purchase invoices", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task ActiveCompanyNavigationAndNotePagesRenderForSignedInMembers()
     {
         var email = $"workspace-note-pages-{Guid.NewGuid():N}@example.invalid";
@@ -44,8 +79,9 @@ public sealed class WorkspaceNotePageTests(AuthenticationWebApplicationFactory f
         Assert.Contains("Navigation test note", listHtml, StringComparison.Ordinal);
         Assert.Contains("/workspace/notes/new", listHtml, StringComparison.Ordinal);
         Assert.Contains("Company: Notes Page Company (NOTEPAGE)", listHtml, StringComparison.Ordinal);
-        Assert.Contains("text-light", listHtml, StringComparison.Ordinal);
-        Assert.Contains("link-light", listHtml, StringComparison.Ordinal);
+        Assert.DoesNotContain("home-quick-links", listHtml, StringComparison.Ordinal);
+        Assert.Contains("company-switcher", listHtml, StringComparison.Ordinal);
+        Assert.Contains("/account/company", listHtml, StringComparison.Ordinal);
 
         using var detailResponse = await client.GetAsync($"/workspace/notes/{noteId}");
         var detailHtml = await detailResponse.Content.ReadAsStringAsync();
