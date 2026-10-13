@@ -3,7 +3,7 @@
     width: 100vw;
     margin-left: calc(50% - 50vw);
     padding: 1.25rem clamp(1.25rem, 3.2vw, 4rem) 2rem;
-    background: linear-gradient(135deg, #e7f6f7 0%, #eef8f9 52%, #e5f4f5 100%);
+    background: transparent;
 }
 
 .directory-heading {

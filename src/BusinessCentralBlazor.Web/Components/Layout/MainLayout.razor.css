@@ -159,7 +159,10 @@
 }
 
 .workspace-main:has(.navigation-directory) {
+    box-sizing: border-box;
+    min-height: calc(100vh - 6.1rem);
     padding-bottom: 0;
+    background: linear-gradient(135deg, #e7f6f7 0%, #eef8f9 52%, #e5f4f5 100%);
 }
 
 .workspace-content {
