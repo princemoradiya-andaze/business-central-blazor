@@ -1,6 +1,9 @@
 .navigation-directory {
     width: min(100%, 76rem);
+    min-height: calc(100vh - 7rem);
     margin: 0 auto;
+    padding: 1.25rem;
+    background: #eaf1f4;
 }
 
 .directory-heading {
@@ -13,12 +16,12 @@
 
 .directory-heading p:last-child {
     margin-bottom: 0;
-    color: #667085;
+    color: #5a707a;
 }
 
 .directory-eyebrow {
     margin-bottom: 0.25rem;
-    color: #007c91;
+    color: #007f83;
     font-size: 0.7rem;
     font-weight: 700;
     letter-spacing: 0.08em;
@@ -34,14 +37,15 @@
 .directory-group {
     min-width: 0;
     padding: 1rem 1.1rem;
-    border: 1px solid #dfe4ea;
+    border: 1px solid #d5e0e5;
     border-radius: 0.35rem;
-    background: #fff;
+    background: #f8fbfc;
     box-shadow: 0 1px 2px rgb(16 24 40 / 4%);
 }
 
 .directory-group h2 {
     margin: 0 0 0.55rem;
+    color: #294651;
     font-size: 1rem;
 }
 
@@ -61,18 +65,25 @@
     gap: 0.5rem;
     padding: 0.35rem 0.45rem;
     border-radius: 0.2rem;
-    color: #1769aa;
+    color: #007f83;
     text-decoration: none;
 }
 
 .directory-group a span {
-    color: #667085;
+    color: #5a707a;
     font-size: 1.1rem;
 }
 
 .directory-group a:hover,
 .directory-group a:focus-visible {
-    color: #005e6b;
-    background: #f1f7f8;
+    color: #005e63;
+    background: #e5f0f2;
     text-decoration: none;
+}
+
+@media (max-width: 760px) {
+    .navigation-directory {
+        min-height: calc(100vh - 6rem);
+        padding: 1rem 0.75rem;
+    }
 }
