@@ -189,7 +189,8 @@ public sealed class GeneralJournalService(
     IDbContextFactory<ErpDbContext> dbContextFactory,
     ICompanyScopeAuthorizer companyScopeAuthorizer,
     IInventoryJournalPostingService inventoryJournalPostingService,
-    ISalesJournalPostingService salesJournalPostingService) : IGeneralJournalService
+    ISalesJournalPostingService salesJournalPostingService,
+    IPurchasingJournalPostingService purchasingJournalPostingService) : IGeneralJournalService
 {
     private const string EntryNumberSeriesCode = "GL-ENTRY";
     private const decimal MaximumAmount = 999999999999999.9999m;
@@ -778,6 +779,13 @@ public sealed class GeneralJournalService(
             batch,
             lines,
             now);
+        await purchasingJournalPostingService.ApplyForPostingAsync(
+            dbContext,
+            user,
+            company.CompanyId,
+            batch,
+            lines,
+            now);
         var numberSeries = await GetEntryNumberSeriesAsync(dbContext, company.CompanyId);
         var userId = GetUserId(user);
         foreach (var line in lines)
@@ -852,6 +860,17 @@ public sealed class GeneralJournalService(
         {
             throw new ValidationException(
                 "Sales shipment and invoice journals cannot be reversed as general journals. Correct the source sales document instead.");
+        }
+
+        if (await dbContext.PurchaseReceipts.AnyAsync(receipt =>
+                receipt.CompanyId == company.CompanyId &&
+                receipt.JournalBatchId == original.Id) ||
+            await dbContext.PurchaseInvoices.AnyAsync(invoice =>
+                invoice.CompanyId == company.CompanyId &&
+                invoice.JournalBatchId == original.Id))
+        {
+            throw new ValidationException(
+                "Purchase receipt and invoice journals cannot be reversed as general journals. Correct the source purchase document instead.");
         }
 
         var period = await GetRequiredOpenPeriodAsync(

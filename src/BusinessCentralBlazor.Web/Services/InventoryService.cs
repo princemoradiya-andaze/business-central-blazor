@@ -358,6 +358,13 @@ public sealed class InventoryService(
             return;
         }
 
+        if (await dbContext.PurchaseReceipts.AnyAsync(receipt =>
+                receipt.CompanyId == companyId &&
+                receipt.JournalBatchId == batch.Id))
+        {
+            return;
+        }
+
         var movement = await dbContext.InventoryMovements.SingleOrDefaultAsync(candidate =>
             candidate.CompanyId == companyId && candidate.JournalBatchId == batch.Id);
         if (movement is null)

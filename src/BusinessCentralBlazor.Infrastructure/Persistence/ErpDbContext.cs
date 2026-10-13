@@ -35,6 +35,10 @@ public sealed class ErpDbContext(DbContextOptions<ErpDbContext> options)
     public DbSet<SalesOrder> SalesOrders => Set<SalesOrder>();
     public DbSet<SalesOrderLine> SalesOrderLines => Set<SalesOrderLine>();
     public DbSet<SalesInvoice> SalesInvoices => Set<SalesInvoice>();
+    public DbSet<PurchaseOrder> PurchaseOrders => Set<PurchaseOrder>();
+    public DbSet<PurchaseOrderLine> PurchaseOrderLines => Set<PurchaseOrderLine>();
+    public DbSet<PurchaseReceipt> PurchaseReceipts => Set<PurchaseReceipt>();
+    public DbSet<PurchaseInvoice> PurchaseInvoices => Set<PurchaseInvoice>();
     public DbSet<NumberSeries> NumberSeries => Set<NumberSeries>();
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
     public DbSet<BankAccount> BankAccounts => Set<BankAccount>();
@@ -51,6 +55,7 @@ public sealed class ErpDbContext(DbContextOptions<ErpDbContext> options)
         ConfigureAccounting(modelBuilder);
         ConfigureOperations(modelBuilder);
         ConfigureSales(modelBuilder);
+        ConfigurePurchasing(modelBuilder);
         ConfigureBanking(modelBuilder);
     }
 
@@ -130,6 +135,107 @@ public sealed class ErpDbContext(DbContextOptions<ErpDbContext> options)
             entity.HasOne<Customer>().WithMany()
                 .HasForeignKey(invoice => new { invoice.CompanyId, invoice.CustomerId })
                 .HasPrincipalKey(customer => new { customer.CompanyId, customer.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<GeneralJournalBatch>().WithMany()
+                .HasForeignKey(invoice => new { invoice.CompanyId, invoice.JournalBatchId })
+                .HasPrincipalKey(batch => new { batch.CompanyId, batch.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ErpUser>().WithMany()
+                .HasForeignKey(invoice => invoice.PostedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+    }
+
+    private static void ConfigurePurchasing(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<PurchaseOrder>(entity =>
+        {
+            ConfigureCompanyEntity(entity);
+            entity.HasIndex(order => new { order.CompanyId, order.OrderNumber }).IsUnique();
+            entity.HasIndex(order => new { order.CompanyId, order.ReceiptJournalBatchId }).IsUnique()
+                .HasFilter("[ReceiptJournalBatchId] IS NOT NULL");
+            entity.HasIndex(order => new { order.CompanyId, order.InvoiceJournalBatchId }).IsUnique()
+                .HasFilter("[InvoiceJournalBatchId] IS NOT NULL");
+            entity.Property(order => order.OrderNumber).HasMaxLength(32).IsRequired();
+            entity.Property(order => order.Description).HasMaxLength(250).IsRequired();
+            entity.Property(order => order.Status).HasConversion<string>().HasMaxLength(24);
+            entity.Property(order => order.RowVersion).IsRowVersion();
+            entity.HasOne<Vendor>().WithMany()
+                .HasForeignKey(order => new { order.CompanyId, order.VendorId })
+                .HasPrincipalKey(vendor => new { vendor.CompanyId, vendor.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<GeneralJournalBatch>().WithMany()
+                .HasForeignKey(order => new { order.CompanyId, order.ReceiptJournalBatchId })
+                .HasPrincipalKey(batch => new { batch.CompanyId, batch.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<GeneralJournalBatch>().WithMany()
+                .HasForeignKey(order => new { order.CompanyId, order.InvoiceJournalBatchId })
+                .HasPrincipalKey(batch => new { batch.CompanyId, batch.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<PurchaseOrderLine>(entity =>
+        {
+            ConfigureCompanyEntity(entity);
+            entity.HasIndex(line => new { line.CompanyId, line.PurchaseOrderId, line.LineNumber }).IsUnique();
+            entity.HasIndex(line => new { line.CompanyId, line.PurchaseOrderId, line.ItemId }).IsUnique();
+            entity.Property(line => line.Description).HasMaxLength(250).IsRequired();
+            entity.Property(line => line.Quantity).HasPrecision(19, 4);
+            entity.Property(line => line.UnitCost).HasPrecision(19, 4);
+            entity.ToTable(table => table.HasCheckConstraint(
+                "CK_PurchaseOrderLines_PositiveQuantityAndCost",
+                "[Quantity] > 0 AND [UnitCost] > 0"));
+            entity.HasOne<PurchaseOrder>().WithMany()
+                .HasForeignKey(line => new { line.CompanyId, line.PurchaseOrderId })
+                .HasPrincipalKey(order => new { order.CompanyId, order.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Item>().WithMany()
+                .HasForeignKey(line => new { line.CompanyId, line.ItemId })
+                .HasPrincipalKey(item => new { item.CompanyId, item.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<TaxCode>().WithMany()
+                .HasForeignKey(line => new { line.CompanyId, line.TaxCodeId })
+                .HasPrincipalKey(code => new { code.CompanyId, code.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<PurchaseReceipt>(entity =>
+        {
+            ConfigureCompanyEntity(entity);
+            entity.HasIndex(receipt => new { receipt.CompanyId, receipt.PurchaseOrderId }).IsUnique();
+            entity.HasIndex(receipt => new { receipt.CompanyId, receipt.JournalBatchId }).IsUnique();
+            entity.Property(receipt => receipt.PostedAtUtc).HasColumnType("datetimeoffset");
+            entity.HasOne<PurchaseOrder>().WithMany()
+                .HasForeignKey(receipt => new { receipt.CompanyId, receipt.PurchaseOrderId })
+                .HasPrincipalKey(order => new { order.CompanyId, order.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<GeneralJournalBatch>().WithMany()
+                .HasForeignKey(receipt => new { receipt.CompanyId, receipt.JournalBatchId })
+                .HasPrincipalKey(batch => new { batch.CompanyId, batch.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ErpUser>().WithMany()
+                .HasForeignKey(receipt => receipt.PostedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<PurchaseInvoice>(entity =>
+        {
+            ConfigureCompanyEntity(entity);
+            entity.HasIndex(invoice => new { invoice.CompanyId, invoice.InvoiceNumber }).IsUnique();
+            entity.HasIndex(invoice => new { invoice.CompanyId, invoice.JournalBatchId }).IsUnique();
+            entity.HasIndex(invoice => new { invoice.CompanyId, invoice.PurchaseOrderId }).IsUnique();
+            entity.Property(invoice => invoice.InvoiceNumber).HasMaxLength(32).IsRequired();
+            entity.Property(invoice => invoice.NetAmount).HasPrecision(19, 4);
+            entity.Property(invoice => invoice.TaxAmount).HasPrecision(19, 4);
+            entity.Property(invoice => invoice.TotalAmount).HasPrecision(19, 4);
+            entity.Property(invoice => invoice.PostedAtUtc).HasColumnType("datetimeoffset");
+            entity.ToTable(table => table.HasCheckConstraint(
+                "CK_PurchaseInvoices_Amounts",
+                "[NetAmount] > 0 AND [TaxAmount] >= 0 AND [TotalAmount] = [NetAmount] + [TaxAmount]"));
+            entity.HasOne<PurchaseOrder>().WithMany()
+                .HasForeignKey(invoice => new { invoice.CompanyId, invoice.PurchaseOrderId })
+                .HasPrincipalKey(order => new { order.CompanyId, order.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Vendor>().WithMany()
+                .HasForeignKey(invoice => new { invoice.CompanyId, invoice.VendorId })
+                .HasPrincipalKey(vendor => new { vendor.CompanyId, vendor.Id })
                 .OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<GeneralJournalBatch>().WithMany()
                 .HasForeignKey(invoice => new { invoice.CompanyId, invoice.JournalBatchId })
@@ -239,12 +345,17 @@ public sealed class ErpDbContext(DbContextOptions<ErpDbContext> options)
             entity.HasKey(settings => settings.CompanyId);
             entity.Property(settings => settings.BaseCurrencyCode).HasColumnType("char(3)").IsRequired();
             entity.Property(settings => settings.TimeZoneId).HasMaxLength(100).IsRequired();
+            entity.HasIndex(settings => new { settings.CompanyId, settings.GoodsReceivedNotInvoicedAccountId });
             entity.ToTable(table => table.HasCheckConstraint(
                 "CK_CompanySettings_FirstDayOfWeek",
                 "[FirstDayOfWeek] BETWEEN 0 AND 6"));
             entity.HasOne<Company>().WithOne().HasForeignKey<CompanySettings>(settings => settings.CompanyId)
                 .OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<Currency>().WithMany().HasForeignKey(settings => settings.BaseCurrencyCode)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<GeneralLedgerAccount>().WithMany()
+                .HasForeignKey(settings => new { settings.CompanyId, settings.GoodsReceivedNotInvoicedAccountId })
+                .HasPrincipalKey(account => new { account.CompanyId, account.Id })
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
@@ -565,6 +676,14 @@ public sealed class ErpDbContext(DbContextOptions<ErpDbContext> options)
             entity.HasIndex(customer => new { customer.CompanyId, customer.ReceivablesAccountId });
             entity.HasOne<GeneralLedgerAccount>().WithMany()
                 .HasForeignKey(customer => new { customer.CompanyId, customer.ReceivablesAccountId })
+                .HasPrincipalKey(account => new { account.CompanyId, account.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<Vendor>(entity =>
+        {
+            entity.HasIndex(vendor => new { vendor.CompanyId, vendor.PayablesAccountId });
+            entity.HasOne<GeneralLedgerAccount>().WithMany()
+                .HasForeignKey(vendor => new { vendor.CompanyId, vendor.PayablesAccountId })
                 .HasPrincipalKey(account => new { account.CompanyId, account.Id })
                 .OnDelete(DeleteBehavior.Restrict);
         });
