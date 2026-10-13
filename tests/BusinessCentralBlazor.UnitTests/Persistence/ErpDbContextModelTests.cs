@@ -293,7 +293,7 @@ public sealed class ErpDbContextModelTests
             index.Properties.Select(property => property.Name)
                 .SequenceEqual(["CompanyId", "DocumentNumber"]));
         Assert.Contains(movement.GetIndexes(), index =>
-            index.IsUnique &&
+            !index.IsUnique &&
             index.Properties.Select(property => property.Name)
                 .SequenceEqual(["CompanyId", "JournalBatchId"]));
         foreach (var foreignKey in movement.GetForeignKeys()

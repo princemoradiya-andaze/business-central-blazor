@@ -32,6 +32,9 @@ public sealed class ErpDbContext(DbContextOptions<ErpDbContext> options)
     public DbSet<Vendor> Vendors => Set<Vendor>();
     public DbSet<Item> Items => Set<Item>();
     public DbSet<InventoryMovement> InventoryMovements => Set<InventoryMovement>();
+    public DbSet<SalesOrder> SalesOrders => Set<SalesOrder>();
+    public DbSet<SalesOrderLine> SalesOrderLines => Set<SalesOrderLine>();
+    public DbSet<SalesInvoice> SalesInvoices => Set<SalesInvoice>();
     public DbSet<NumberSeries> NumberSeries => Set<NumberSeries>();
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
     public DbSet<BankAccount> BankAccounts => Set<BankAccount>();
@@ -47,7 +50,95 @@ public sealed class ErpDbContext(DbContextOptions<ErpDbContext> options)
         ConfigureTenancy(modelBuilder);
         ConfigureAccounting(modelBuilder);
         ConfigureOperations(modelBuilder);
+        ConfigureSales(modelBuilder);
         ConfigureBanking(modelBuilder);
+    }
+
+    private static void ConfigureSales(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<SalesOrder>(entity =>
+        {
+            ConfigureCompanyEntity(entity);
+            entity.HasIndex(order => new { order.CompanyId, order.OrderNumber }).IsUnique();
+            entity.HasIndex(order => new { order.CompanyId, order.ShipmentJournalBatchId }).IsUnique()
+                .HasFilter("[ShipmentJournalBatchId] IS NOT NULL");
+            entity.HasIndex(order => new { order.CompanyId, order.InvoiceJournalBatchId }).IsUnique()
+                .HasFilter("[InvoiceJournalBatchId] IS NOT NULL");
+            entity.Property(order => order.OrderNumber).HasMaxLength(32).IsRequired();
+            entity.Property(order => order.Description).HasMaxLength(250).IsRequired();
+            entity.Property(order => order.Status).HasConversion<string>().HasMaxLength(24);
+            entity.Property(order => order.RowVersion).IsRowVersion();
+            entity.HasOne<Customer>().WithMany()
+                .HasForeignKey(order => new { order.CompanyId, order.CustomerId })
+                .HasPrincipalKey(customer => new { customer.CompanyId, customer.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<GeneralJournalBatch>().WithMany()
+                .HasForeignKey(order => new { order.CompanyId, order.ShipmentJournalBatchId })
+                .HasPrincipalKey(batch => new { batch.CompanyId, batch.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<GeneralJournalBatch>().WithMany()
+                .HasForeignKey(order => new { order.CompanyId, order.InvoiceJournalBatchId })
+                .HasPrincipalKey(batch => new { batch.CompanyId, batch.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<SalesOrderLine>(entity =>
+        {
+            ConfigureCompanyEntity(entity);
+            entity.HasIndex(line => new { line.CompanyId, line.SalesOrderId, line.LineNumber }).IsUnique();
+            entity.HasIndex(line => new { line.CompanyId, line.SalesOrderId, line.ItemId }).IsUnique();
+            entity.Property(line => line.Description).HasMaxLength(250).IsRequired();
+            entity.Property(line => line.Quantity).HasPrecision(19, 4);
+            entity.Property(line => line.UnitPrice).HasPrecision(19, 4);
+            entity.ToTable(table => table.HasCheckConstraint(
+                "CK_SalesOrderLines_PositiveQuantityAndPrice",
+                "[Quantity] > 0 AND [UnitPrice] > 0"));
+            entity.HasOne<SalesOrder>().WithMany()
+                .HasForeignKey(line => new { line.CompanyId, line.SalesOrderId })
+                .HasPrincipalKey(order => new { order.CompanyId, order.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Item>().WithMany()
+                .HasForeignKey(line => new { line.CompanyId, line.ItemId })
+                .HasPrincipalKey(item => new { item.CompanyId, item.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<GeneralLedgerAccount>().WithMany()
+                .HasForeignKey(line => new { line.CompanyId, line.SalesAccountId })
+                .HasPrincipalKey(account => new { account.CompanyId, account.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<TaxCode>().WithMany()
+                .HasForeignKey(line => new { line.CompanyId, line.TaxCodeId })
+                .HasPrincipalKey(code => new { code.CompanyId, code.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<SalesInvoice>(entity =>
+        {
+            ConfigureCompanyEntity(entity);
+            entity.HasIndex(invoice => new { invoice.CompanyId, invoice.InvoiceNumber }).IsUnique();
+            entity.HasIndex(invoice => new { invoice.CompanyId, invoice.JournalBatchId }).IsUnique();
+            entity.HasIndex(invoice => new { invoice.CompanyId, invoice.SalesOrderId }).IsUnique();
+            entity.Property(invoice => invoice.InvoiceNumber).HasMaxLength(32).IsRequired();
+            entity.Property(invoice => invoice.NetAmount).HasPrecision(19, 4);
+            entity.Property(invoice => invoice.TaxAmount).HasPrecision(19, 4);
+            entity.Property(invoice => invoice.TotalAmount).HasPrecision(19, 4);
+            entity.Property(invoice => invoice.PostedAtUtc).HasColumnType("datetimeoffset");
+            entity.ToTable(table => table.HasCheckConstraint(
+                "CK_SalesInvoices_Amounts",
+                "[NetAmount] > 0 AND [TaxAmount] >= 0 AND [TotalAmount] = [NetAmount] + [TaxAmount]"));
+            entity.HasOne<SalesOrder>().WithMany()
+                .HasForeignKey(invoice => new { invoice.CompanyId, invoice.SalesOrderId })
+                .HasPrincipalKey(order => new { order.CompanyId, order.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Customer>().WithMany()
+                .HasForeignKey(invoice => new { invoice.CompanyId, invoice.CustomerId })
+                .HasPrincipalKey(customer => new { customer.CompanyId, customer.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<GeneralJournalBatch>().WithMany()
+                .HasForeignKey(invoice => new { invoice.CompanyId, invoice.JournalBatchId })
+                .HasPrincipalKey(batch => new { batch.CompanyId, batch.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ErpUser>().WithMany()
+                .HasForeignKey(invoice => invoice.PostedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
     }
 
     private static void ConfigureBanking(ModelBuilder modelBuilder)
@@ -469,6 +560,14 @@ public sealed class ErpDbContext(DbContextOptions<ErpDbContext> options)
 
         ConfigureParty<Customer>(modelBuilder, "Customers");
         ConfigureParty<Vendor>(modelBuilder, "Vendors");
+        modelBuilder.Entity<Customer>(entity =>
+        {
+            entity.HasIndex(customer => new { customer.CompanyId, customer.ReceivablesAccountId });
+            entity.HasOne<GeneralLedgerAccount>().WithMany()
+                .HasForeignKey(customer => new { customer.CompanyId, customer.ReceivablesAccountId })
+                .HasPrincipalKey(account => new { account.CompanyId, account.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+        });
 
         modelBuilder.Entity<Item>(entity =>
         {
@@ -505,7 +604,7 @@ public sealed class ErpDbContext(DbContextOptions<ErpDbContext> options)
         {
             ConfigureCompanyEntity(entity);
             entity.HasIndex(movement => new { movement.CompanyId, movement.DocumentNumber }).IsUnique();
-            entity.HasIndex(movement => new { movement.CompanyId, movement.JournalBatchId }).IsUnique();
+            entity.HasIndex(movement => new { movement.CompanyId, movement.JournalBatchId });
             entity.Property(movement => movement.DocumentNumber).HasMaxLength(64).IsRequired();
             entity.Property(movement => movement.Description).HasMaxLength(250).IsRequired();
             entity.Property(movement => movement.Quantity).HasPrecision(19, 4);

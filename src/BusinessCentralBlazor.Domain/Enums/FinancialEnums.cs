@@ -46,3 +46,12 @@ public enum ItemType
     Service,
     NonInventory
 }
+
+public enum SalesOrderStatus
+{
+    Open,
+    ShipmentDraft,
+    Shipped,
+    InvoiceDraft,
+    Invoiced
+}
