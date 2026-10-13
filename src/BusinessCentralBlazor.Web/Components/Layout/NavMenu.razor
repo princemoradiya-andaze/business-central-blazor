@@ -1,93 +1,41 @@
-﻿<div class="top-row ps-3 navbar navbar-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="">Business Central Blazor</a>
-    </div>
-</div>
+﻿<AuthorizeView>
+    <Authorized>
+        <nav class="company-navigation" aria-label="Company navigation">
+            <div class="company-navigation-main">
+                <div class="company-identity">
+                    <ActiveCompanyIndicator />
+                </div>
+                <div class="module-links" aria-label="Modules">
+                    <NavLink href="financial/general-ledger/accounts">Finance</NavLink>
+                    <NavLink href="financial/banks">Cash management</NavLink>
+                    <NavLink href="financial/sales">Sales</NavLink>
+                    <NavLink href="financial/purchasing">Purchasing</NavLink>
+                    <NavLink href="financial/inventory">Inventory</NavLink>
+                    <NavLink href="financial/general-ledger/trial-balance">Reports</NavLink>
+                    <NavLink href="workspace/notes">More</NavLink>
+                </div>
+                <a class="navigation-menu-link" href="/financial/journals" aria-label="General journals">☰</a>
+            </div>
 
-<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
-
-<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
-    <nav class="nav flex-column">
-        <AuthorizeView>
-            <Authorized>
-                <ActiveCompanyIndicator />
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                        <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="workspace/notes">
-                        <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Workspace notes
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="financial/general-ledger/accounts">
-                        Chart of Accounts
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="financial/general-ledger/entries">
-                        General ledger entries
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="financial/general-ledger/trial-balance">
-                        Trial balance
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="financial/dimensions">
-                        Dimensions
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="financial/inventory">
-                        Inventory
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="financial/sales">
-                        Sales &amp; receivables
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="financial/purchasing">
-                        Purchasing &amp; payables
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="financial/journals">
-                        General journals
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="financial/tax-setup">
-                        Tax setup
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="financial/banks">
-                        Banking &amp; reconciliation
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="financial/accounting-periods">
-                        Accounting periods
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <form method="post" action="/account/logout">
-                        <AntiforgeryToken />
-                        <button class="nav-link btn btn-link" type="submit">Sign out</button>
-                    </form>
-                </div>
-            </Authorized>
-            <NotAuthorized>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="/account/login">Sign in</NavLink>
-                </div>
-            </NotAuthorized>
-        </AuthorizeView>
-    </nav>
-</div>
+            <div class="company-shortcuts" aria-label="Common pages">
+                <NavLink href="financial/sales">Customers</NavLink>
+                <NavLink href="financial/purchasing">Vendors</NavLink>
+                <NavLink href="financial/inventory">Items</NavLink>
+                <NavLink href="financial/banks">Bank accounts</NavLink>
+                <NavLink href="financial/banks">Banking &amp; reconciliation</NavLink>
+                <NavLink href="financial/general-ledger/accounts">Chart of accounts</NavLink>
+                <NavLink href="financial/journals">General journals</NavLink>
+                <NavLink href="financial/dimensions">Dimensions</NavLink>
+                <NavLink href="financial/tax-setup">Tax setup</NavLink>
+                <NavLink href="financial/accounting-periods">Accounting periods</NavLink>
+            </div>
+        </nav>
+    </Authorized>
+    <NotAuthorized>
+        <nav class="company-navigation anonymous-navigation" aria-label="Account navigation">
+            <div class="company-navigation-main">
+                <NavLink class="anonymous-signin" href="/account/login">Sign in</NavLink>
+            </div>
+        </nav>
+    </NotAuthorized>
+</AuthorizeView>

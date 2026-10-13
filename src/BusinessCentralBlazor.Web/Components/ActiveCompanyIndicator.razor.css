@@ -1,0 +1,43 @@
+.company-switcher {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    column-gap: 0.5rem;
+    align-items: baseline;
+    min-width: 0;
+    color: #fff;
+    font-size: 0.77rem;
+}
+
+.company-label {
+    color: #66727f;
+    font-size: 0.68rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.company-name {
+    overflow: hidden;
+    color: #17212b;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.company-code {
+    color: #66727f;
+    font-weight: 400;
+}
+
+.company-change {
+    grid-column: 2;
+    width: fit-content;
+    color: #007c91 !important;
+    font-size: 0.7rem;
+    text-decoration: none;
+}
+
+.company-change:hover,
+.company-change:focus-visible {
+    color: #005b85 !important;
+    text-decoration: underline;
+}

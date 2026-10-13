@@ -1,0 +1,66 @@
+.page-command-bar {
+    display: flex;
+    min-height: 4.25rem;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin: 0 0 1.15rem;
+    padding: 0.5rem 0 0.75rem;
+    border-bottom: 1px solid #d8dde2;
+}
+
+.page-heading {
+    min-width: 0;
+}
+
+.breadcrumb {
+    margin-bottom: 0.15rem;
+    color: #66727f;
+    font-size: 0.72rem;
+}
+
+.breadcrumb span {
+    margin: 0 0.3rem;
+}
+
+.page-heading h1 {
+    margin: 0;
+    color: #17212b;
+    font-size: 1.35rem;
+    font-weight: 600;
+}
+
+.command-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.35rem;
+}
+
+.command-actions a {
+    padding: 0.4rem 0.65rem;
+    border: 1px solid transparent;
+    border-radius: 0.15rem;
+    color: #005b85;
+    font-size: 0.78rem;
+    font-weight: 500;
+    text-decoration: none;
+}
+
+.command-actions a:hover,
+.command-actions a:focus-visible {
+    border-color: #b9d7e5;
+    background: #eaf4f8;
+    text-decoration: underline;
+}
+
+@media (max-width: 760px) {
+    .page-command-bar {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .command-actions {
+        justify-content: flex-start;
+    }
+}
