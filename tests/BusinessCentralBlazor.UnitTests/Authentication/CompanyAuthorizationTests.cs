@@ -112,7 +112,7 @@ public sealed class CompanyAuthorizationTests(AuthenticationWebApplicationFactor
         using var authorizedHome = await client.GetAsync("/");
         Assert.Equal(HttpStatusCode.OK, authorizedHome.StatusCode);
         var authorizedHomeHtml = await authorizedHome.Content.ReadAsStringAsync();
-        Assert.Contains("Manage your company's accounts, dimensions, journals, ledger activity, tax setup, and banking",
+        Assert.Contains("Choose a module menu or open All pages to browse the implemented company workspace.",
             authorizedHomeHtml,
             StringComparison.Ordinal);
         Assert.DoesNotContain("Business modules are not available yet", authorizedHomeHtml, StringComparison.Ordinal);

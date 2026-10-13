@@ -1,0 +1,27 @@
+﻿@page "/navigation"
+@attribute [Authorize(Policy = CompanyAuthorizationPolicies.ActiveCompany)]
+
+<PageTitle>All pages</PageTitle>
+
+<div class="navigation-directory">
+    <header class="directory-heading">
+        <p class="directory-eyebrow">Company workspace</p>
+        <h1>All pages</h1>
+        <p>Browse implemented pages and shortcuts to common tasks in this company.</p>
+    </header>
+
+    <nav class="directory-groups" aria-label="All implemented pages">
+        @foreach (var group in NavigationMenuCatalog.Groups)
+        {
+            <section class="directory-group" aria-labelledby="@($"directory-{group.Key}")">
+                <h2 id="@($"directory-{group.Key}")">@group.Label</h2>
+                <ul>
+                    @foreach (var item in group.Items)
+                    {
+                        <li><a href="@item.Href">@item.Label <span aria-hidden="true">›</span></a></li>
+                    }
+                </ul>
+            </section>
+        }
+    </nav>
+</div>

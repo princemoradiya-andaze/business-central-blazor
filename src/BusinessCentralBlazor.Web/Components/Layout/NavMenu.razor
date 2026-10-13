@@ -1,4 +1,7 @@
-﻿<AuthorizeView>
+﻿@implements IDisposable
+@inject NavigationManager Navigation
+
+<AuthorizeView>
     <Authorized>
         <nav class="company-navigation" aria-label="Company navigation">
             <div class="company-navigation-main">
@@ -6,28 +9,33 @@
                     <ActiveCompanyIndicator />
                 </div>
                 <div class="module-links" aria-label="Modules">
-                    <NavLink href="financial/general-ledger/accounts">Finance</NavLink>
-                    <NavLink href="financial/banks">Cash management</NavLink>
-                    <NavLink href="financial/sales">Sales</NavLink>
-                    <NavLink href="financial/purchasing">Purchasing</NavLink>
-                    <NavLink href="financial/inventory">Inventory</NavLink>
-                    <NavLink href="financial/general-ledger/trial-balance">Reports</NavLink>
-                    <NavLink href="workspace/notes">More</NavLink>
+                    @foreach (var group in NavigationMenuCatalog.Groups)
+                    {
+                        <div class="module-menu">
+                            <button class="module-menu-toggle @(IsGroupActive(group) ? "active" : null)"
+                                    type="button"
+                                    aria-expanded="@(openMenu == group.Key)"
+                                    aria-controls="@($"module-menu-{group.Key}")"
+                                    @onclick="() => ToggleMenu(group.Key)">
+                                @group.Label
+                                <span class="menu-chevron" aria-hidden="true">⌄</span>
+                            </button>
+                            <div class="module-menu-panel"
+                                 id="@($"module-menu-{group.Key}")"
+                                 role="group"
+                                 aria-label="@($"{group.Label} pages")"
+                                 hidden="@(openMenu != group.Key)">
+                                @foreach (var item in group.Items)
+                                {
+                                    <a href="@item.Href" @onclick="CloseMenu">@item.Label</a>
+                                }
+                            </div>
+                        </div>
+                    }
                 </div>
-                <a class="navigation-menu-link" href="/financial/journals" aria-label="General journals">☰</a>
-            </div>
-
-            <div class="company-shortcuts" aria-label="Common pages">
-                <NavLink href="financial/sales">Customers</NavLink>
-                <NavLink href="financial/purchasing">Vendors</NavLink>
-                <NavLink href="financial/inventory">Items</NavLink>
-                <NavLink href="financial/banks">Bank accounts</NavLink>
-                <NavLink href="financial/banks">Banking &amp; reconciliation</NavLink>
-                <NavLink href="financial/general-ledger/accounts">Chart of accounts</NavLink>
-                <NavLink href="financial/journals">General journals</NavLink>
-                <NavLink href="financial/dimensions">Dimensions</NavLink>
-                <NavLink href="financial/tax-setup">Tax setup</NavLink>
-                <NavLink href="financial/accounting-periods">Accounting periods</NavLink>
+                <a class="navigation-menu-link" href="/navigation" aria-label="All pages" title="All pages">
+                    <span aria-hidden="true">☰</span>
+                </a>
             </div>
         </nav>
     </Authorized>
@@ -39,3 +47,31 @@
         </nav>
     </NotAuthorized>
 </AuthorizeView>
+
+@code {
+    private string? openMenu;
+    private string CurrentPath => "/" + Navigation.ToBaseRelativePath(Navigation.Uri).Split('?', '#')[0];
+
+    protected override void OnInitialized()
+    {
+        Navigation.LocationChanged += OnLocationChanged;
+    }
+
+    private bool IsGroupActive(NavigationGroup group) =>
+        group.ActivePrefixes.Any(prefix => CurrentPath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
+
+    private void ToggleMenu(string key) => openMenu = openMenu == key ? null : key;
+
+    private void CloseMenu() => openMenu = null;
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        openMenu = null;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        Navigation.LocationChanged -= OnLocationChanged;
+    }
+}

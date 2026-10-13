@@ -1,0 +1,78 @@
+.navigation-directory {
+    width: min(100%, 76rem);
+    margin: 0 auto;
+}
+
+.directory-heading {
+    margin: 0.3rem 0 1.5rem;
+}
+
+.directory-heading h1 {
+    margin-bottom: 0.45rem;
+}
+
+.directory-heading p:last-child {
+    margin-bottom: 0;
+    color: #667085;
+}
+
+.directory-eyebrow {
+    margin-bottom: 0.25rem;
+    color: #007c91;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.directory-groups {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+    gap: 1rem;
+}
+
+.directory-group {
+    min-width: 0;
+    padding: 1rem 1.1rem;
+    border: 1px solid #dfe4ea;
+    border-radius: 0.35rem;
+    background: #fff;
+    box-shadow: 0 1px 2px rgb(16 24 40 / 4%);
+}
+
+.directory-group h2 {
+    margin: 0 0 0.55rem;
+    font-size: 1rem;
+}
+
+.directory-group ul {
+    display: grid;
+    gap: 0.15rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.directory-group a {
+    display: flex;
+    min-height: 2.25rem;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.35rem 0.45rem;
+    border-radius: 0.2rem;
+    color: #1769aa;
+    text-decoration: none;
+}
+
+.directory-group a span {
+    color: #667085;
+    font-size: 1.1rem;
+}
+
+.directory-group a:hover,
+.directory-group a:focus-visible {
+    color: #005e6b;
+    background: #f1f7f8;
+    text-decoration: none;
+}
