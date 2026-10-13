@@ -1,43 +1,47 @@
-﻿@implements IDisposable
+@implements IAsyncDisposable
 @inject NavigationManager Navigation
+@inject IJSRuntime JS
 
 <AuthorizeView>
     <Authorized>
-        <nav class="company-navigation" aria-label="Company navigation">
-            <div class="company-navigation-main">
-                <div class="company-identity">
-                    <ActiveCompanyIndicator />
-                </div>
-                <div class="module-links" aria-label="Modules">
-                    @foreach (var group in NavigationMenuCatalog.Groups)
-                    {
-                        <div class="module-menu">
-                            <button class="module-menu-toggle @(IsGroupActive(group) ? "active" : null)"
-                                    type="button"
-                                    aria-expanded="@(openMenu == group.Key)"
-                                    aria-controls="@($"module-menu-{group.Key}")"
-                                    @onclick="() => ToggleMenu(group.Key)">
-                                @group.Label
-                                <span class="menu-chevron" aria-hidden="true">⌄</span>
-                            </button>
-                            <div class="module-menu-panel"
-                                 id="@($"module-menu-{group.Key}")"
-                                 role="group"
-                                 aria-label="@($"{group.Label} pages")"
-                                 hidden="@(openMenu != group.Key)">
-                                @foreach (var item in group.Items)
-                                {
-                                    <a href="@item.Href" @onclick="CloseMenu">@item.Label</a>
-                                }
+        @if (!IsNavigationDirectory)
+        {
+            <nav class="company-navigation" aria-label="Company navigation" @ref="companyNavigation">
+                <div class="company-navigation-main">
+                    <div class="company-identity">
+                        <ActiveCompanyIndicator />
+                    </div>
+                    <div class="module-links" aria-label="Modules">
+                        @foreach (var group in NavigationMenuCatalog.Groups)
+                        {
+                            <div class="module-menu">
+                                <button class="module-menu-toggle @(IsGroupActive(group) ? "active" : null)"
+                                        type="button"
+                                        aria-expanded="@(openMenu == group.Key)"
+                                        aria-controls="@($"module-menu-{group.Key}")"
+                                        @onclick="() => ToggleMenu(group.Key)">
+                                    @group.Label
+                                    <span class="menu-chevron" aria-hidden="true"></span>
+                                </button>
+                                <div class="module-menu-panel"
+                                     id="@($"module-menu-{group.Key}")"
+                                     role="group"
+                                     aria-label="@($"{group.Label} pages")"
+                                     hidden="@(openMenu != group.Key)">
+                                    @foreach (var item in group.Items)
+                                    {
+                                        <a href="@item.Href" @onclick="CloseMenu">@item.Label</a>
+                                    }
+                                </div>
                             </div>
-                        </div>
-                    }
+                        }
+                    </div>
+                    <a class="navigation-menu-link" href="/navigation" aria-label="All pages" title="All pages">
+                        <span aria-hidden="true">☰</span>
+                    </a>
                 </div>
-                <a class="navigation-menu-link" href="/navigation" aria-label="All pages" title="All pages">
-                    <span aria-hidden="true">☰</span>
-                </a>
-            </div>
-        </nav>
+            </nav>
+        }
     </Authorized>
     <NotAuthorized>
         <nav class="company-navigation anonymous-navigation" aria-label="Account navigation">
@@ -50,11 +54,32 @@
 
 @code {
     private string? openMenu;
+    private ElementReference companyNavigation;
+    private IJSObjectReference? outsideClickModule;
+    private DotNetObjectReference<NavMenu>? dotNetReference;
+    private int? outsideClickListenerId;
     private string CurrentPath => "/" + Navigation.ToBaseRelativePath(Navigation.Uri).Split('?', '#')[0];
+    private bool IsNavigationDirectory => CurrentPath.Equals("/navigation", StringComparison.OrdinalIgnoreCase);
 
     protected override void OnInitialized()
     {
         Navigation.LocationChanged += OnLocationChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (outsideClickListenerId is not null || companyNavigation.Context is null)
+        {
+            return;
+        }
+
+        outsideClickModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/outsideClick.js");
+        dotNetReference ??= DotNetObjectReference.Create(this);
+        outsideClickListenerId = await outsideClickModule.InvokeAsync<int>(
+            "bindOutsideClick",
+            companyNavigation,
+            dotNetReference,
+            nameof(CloseMenuFromOutside));
     }
 
     private bool IsGroupActive(NavigationGroup group) =>
@@ -64,14 +89,38 @@
 
     private void CloseMenu() => openMenu = null;
 
+    [JSInvokable]
+    public Task CloseMenuFromOutside()
+    {
+        if (openMenu is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        openMenu = null;
+        return InvokeAsync(StateHasChanged);
+    }
+
     private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
     {
         openMenu = null;
         _ = InvokeAsync(StateHasChanged);
     }
 
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
         Navigation.LocationChanged -= OnLocationChanged;
+
+        if (outsideClickListenerId is not null && outsideClickModule is not null)
+        {
+            await outsideClickModule.InvokeVoidAsync("unbindOutsideClick", outsideClickListenerId);
+        }
+
+        dotNetReference?.Dispose();
+
+        if (outsideClickModule is not null)
+        {
+            await outsideClickModule.DisposeAsync();
+        }
     }
 }

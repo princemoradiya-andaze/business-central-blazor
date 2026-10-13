@@ -34,10 +34,15 @@ public sealed class WorkspaceNotePageTests(AuthenticationWebApplicationFactory f
         var html = await response.Content.ReadAsStringAsync();
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains("All pages", html, StringComparison.Ordinal);
-        Assert.Contains("Company: Navigation Directory Company (NAVDIR)", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("aria-label=\"Company navigation\"", html, StringComparison.Ordinal);
+        Assert.Contains("class=\"directory-back-link\" href=\"/\"", html, StringComparison.Ordinal);
         Assert.Contains("Cash management", html, StringComparison.Ordinal);
         Assert.Contains("Reports", html, StringComparison.Ordinal);
+        Assert.Contains("directory-count", html, StringComparison.Ordinal);
+        Assert.Contains("(5)", html, StringComparison.Ordinal);
         Assert.Contains("Workspace notes", html, StringComparison.Ordinal);
+        Assert.Contains("- General journals", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("aria-hidden=\"true\">›", html, StringComparison.Ordinal);
         Assert.Contains("href=\"/financial/sales#customers-heading\"", html, StringComparison.Ordinal);
         Assert.Contains("href=\"/financial/purchasing#vendors-heading\"", html, StringComparison.Ordinal);
         Assert.Contains("href=\"/financial/general-ledger/trial-balance\"", html, StringComparison.Ordinal);
@@ -74,8 +79,8 @@ public sealed class WorkspaceNotePageTests(AuthenticationWebApplicationFactory f
         Assert.Contains("Navigation test note", listHtml, StringComparison.Ordinal);
         Assert.Contains("/workspace/notes/new", listHtml, StringComparison.Ordinal);
         Assert.Contains("Company: Notes Page Company (NOTEPAGE)", listHtml, StringComparison.Ordinal);
-        Assert.Contains("text-light", listHtml, StringComparison.Ordinal);
-        Assert.Contains("link-light", listHtml, StringComparison.Ordinal);
+        Assert.Contains("company-switcher", listHtml, StringComparison.Ordinal);
+        Assert.Contains("/account/company", listHtml, StringComparison.Ordinal);
 
         using var detailResponse = await client.GetAsync($"/workspace/notes/{noteId}");
         var detailHtml = await detailResponse.Content.ReadAsStringAsync();
