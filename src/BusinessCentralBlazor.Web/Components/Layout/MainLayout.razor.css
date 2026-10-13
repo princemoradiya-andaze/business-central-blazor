@@ -1,5 +1,6 @@
 .app-shell {
     min-height: 100vh;
+    overflow-x: clip;
     background: #f5f6f7;
 }
 
@@ -155,6 +156,10 @@
 .workspace-main {
     min-width: 0;
     padding: 1.4rem clamp(1rem, 3vw, 2.5rem) 3rem;
+}
+
+.workspace-main:has(.navigation-directory) {
+    padding-bottom: 0;
 }
 
 .workspace-content {

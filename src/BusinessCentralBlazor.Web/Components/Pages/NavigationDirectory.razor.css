@@ -1,7 +1,6 @@
 .navigation-directory {
     box-sizing: border-box;
     width: 100vw;
-    min-height: calc(100vh - 6.1rem);
     margin-left: calc(50% - 50vw);
     padding: 1.25rem clamp(1.25rem, 3.2vw, 4rem) 2rem;
     background: linear-gradient(135deg, #e7f6f7 0%, #eef8f9 52%, #e5f4f5 100%);
@@ -79,7 +78,6 @@
 
 @media (max-width: 760px) {
     .navigation-directory {
-        min-height: calc(100vh - 6rem);
         padding: 1rem 0.75rem;
     }
 }
