@@ -188,7 +188,8 @@ public interface IGeneralJournalService
 public sealed class GeneralJournalService(
     IDbContextFactory<ErpDbContext> dbContextFactory,
     ICompanyScopeAuthorizer companyScopeAuthorizer,
-    IInventoryJournalPostingService inventoryJournalPostingService) : IGeneralJournalService
+    IInventoryJournalPostingService inventoryJournalPostingService,
+    ISalesJournalPostingService salesJournalPostingService) : IGeneralJournalService
 {
     private const string EntryNumberSeriesCode = "GL-ENTRY";
     private const decimal MaximumAmount = 999999999999999.9999m;
@@ -770,6 +771,13 @@ public sealed class GeneralJournalService(
             batch,
             lines,
             now);
+        await salesJournalPostingService.ApplyForPostingAsync(
+            dbContext,
+            user,
+            company.CompanyId,
+            batch,
+            lines,
+            now);
         var numberSeries = await GetEntryNumberSeriesAsync(dbContext, company.CompanyId);
         var userId = GetUserId(user);
         foreach (var line in lines)
@@ -833,6 +841,17 @@ public sealed class GeneralJournalService(
         {
             throw new ValidationException(
                 "Inventory movement journals cannot be reversed as general journals. Create a compensating inventory movement instead.");
+        }
+
+        if (await dbContext.SalesOrders.AnyAsync(order =>
+                order.CompanyId == company.CompanyId &&
+                order.ShipmentJournalBatchId == original.Id) ||
+            await dbContext.SalesInvoices.AnyAsync(invoice =>
+                invoice.CompanyId == company.CompanyId &&
+                invoice.JournalBatchId == original.Id))
+        {
+            throw new ValidationException(
+                "Sales shipment and invoice journals cannot be reversed as general journals. Correct the source sales document instead.");
         }
 
         var period = await GetRequiredOpenPeriodAsync(

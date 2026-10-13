@@ -351,6 +351,13 @@ public sealed class InventoryService(
         IReadOnlyList<GeneralJournalLine> lines,
         DateTimeOffset postedAtUtc)
     {
+        if (await dbContext.SalesOrders.AnyAsync(order =>
+                order.CompanyId == companyId &&
+                order.ShipmentJournalBatchId == batch.Id))
+        {
+            return;
+        }
+
         var movement = await dbContext.InventoryMovements.SingleOrDefaultAsync(candidate =>
             candidate.CompanyId == companyId && candidate.JournalBatchId == batch.Id);
         if (movement is null)
