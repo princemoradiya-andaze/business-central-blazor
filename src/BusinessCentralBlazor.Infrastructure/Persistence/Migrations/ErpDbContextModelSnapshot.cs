@@ -882,6 +882,79 @@ namespace BusinessCentralBlazor.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("BusinessCentralBlazor.Domain.Entities.InventoryMovement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("AccountingPeriodId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
+                    b.Property<string>("DocumentNumber")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<decimal>("InventoryValue")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("decimal(19,4)");
+
+                    b.Property<Guid>("ItemId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("JournalBatchId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("PostedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("PostedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly>("PostingDate")
+                        .HasColumnType("date");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("decimal(19,4)");
+
+                    b.Property<decimal>("UnitCost")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("decimal(19,4)");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("CompanyId", "Id");
+
+                    b.HasIndex("PostedByUserId");
+
+                    b.HasIndex("CompanyId", "AccountingPeriodId");
+
+                    b.HasIndex("CompanyId", "DocumentNumber")
+                        .IsUnique();
+
+                    b.HasIndex("CompanyId", "ItemId");
+
+                    b.HasIndex("CompanyId", "JournalBatchId")
+                        .IsUnique();
+
+                    b.ToTable("InventoryMovements", t =>
+                        {
+                            t.HasCheckConstraint("CK_InventoryMovements_NonNegativeCost", "[UnitCost] >= 0 AND [InventoryValue] > 0");
+
+                            t.HasCheckConstraint("CK_InventoryMovements_NonzeroQuantity", "[Quantity] <> 0");
+                        });
+                });
+
             modelBuilder.Entity("BusinessCentralBlazor.Domain.Entities.Item", b =>
                 {
                     b.Property<Guid>("Id")
@@ -901,6 +974,19 @@ namespace BusinessCentralBlazor.Infrastructure.Persistence.Migrations
                         .HasMaxLength(250)
                         .HasColumnType("nvarchar(250)");
 
+                    b.Property<Guid?>("InventoryAccountId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("InventoryIncreaseOffsetAccountId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("InventoryIssueExpenseAccountId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("InventoryValue")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("decimal(19,4)");
+
                     b.Property<bool>("IsBlocked")
                         .HasColumnType("bit");
 
@@ -908,6 +994,16 @@ namespace BusinessCentralBlazor.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(32)
                         .HasColumnType("nvarchar(32)");
+
+                    b.Property<decimal>("QuantityOnHand")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("decimal(19,4)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
 
                     b.Property<string>("Type")
                         .IsRequired()
@@ -920,13 +1016,19 @@ namespace BusinessCentralBlazor.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasAlternateKey("CompanyId", "Id");
+                    b.HasIndex("CompanyId", "InventoryAccountId");
+
+                    b.HasIndex("CompanyId", "InventoryIncreaseOffsetAccountId");
+
+                    b.HasIndex("CompanyId", "InventoryIssueExpenseAccountId");
 
                     b.HasIndex("CompanyId", "Number")
                         .IsUnique();
 
                     b.ToTable("Items", t =>
                         {
+                            t.HasCheckConstraint("CK_Items_NonNegativeInventory", "[QuantityOnHand] >= 0 AND [InventoryValue] >= 0");
+
                             t.HasCheckConstraint("CK_Items_NonNegativeUnitCost", "[UnitCost] >= 0");
                         });
                 });
@@ -1737,6 +1839,41 @@ namespace BusinessCentralBlazor.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
                 });
 
+            modelBuilder.Entity("BusinessCentralBlazor.Domain.Entities.InventoryMovement", b =>
+                {
+                    b.HasOne("BusinessCentralBlazor.Domain.Entities.Company", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("BusinessCentralBlazor.Infrastructure.Identity.ErpUser", null)
+                        .WithMany()
+                        .HasForeignKey("PostedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("BusinessCentralBlazor.Domain.Entities.AccountingPeriod", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId", "AccountingPeriodId")
+                        .HasPrincipalKey("CompanyId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("BusinessCentralBlazor.Domain.Entities.Item", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId", "ItemId")
+                        .HasPrincipalKey("CompanyId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("BusinessCentralBlazor.Domain.Entities.GeneralJournalBatch", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId", "JournalBatchId")
+                        .HasPrincipalKey("CompanyId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("BusinessCentralBlazor.Domain.Entities.Item", b =>
                 {
                     b.HasOne("BusinessCentralBlazor.Domain.Entities.Company", null)
@@ -1744,6 +1881,24 @@ namespace BusinessCentralBlazor.Infrastructure.Persistence.Migrations
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.HasOne("BusinessCentralBlazor.Domain.Entities.GeneralLedgerAccount", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId", "InventoryAccountId")
+                        .HasPrincipalKey("CompanyId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("BusinessCentralBlazor.Domain.Entities.GeneralLedgerAccount", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId", "InventoryIncreaseOffsetAccountId")
+                        .HasPrincipalKey("CompanyId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("BusinessCentralBlazor.Domain.Entities.GeneralLedgerAccount", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId", "InventoryIssueExpenseAccountId")
+                        .HasPrincipalKey("CompanyId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("BusinessCentralBlazor.Domain.Entities.JournalLineDimension", b =>

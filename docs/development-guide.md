@@ -118,6 +118,22 @@ generated migration metadata; they do not establish live SQL concurrency or migr
 Bank feeds, credential storage, payment initiation, automatic reconciliation, check printing and FX
 remain out of scope.
 
+## Inventory items and stock movements
+
+`/financial/inventory` configures company-scoped inventory items with an inventory Asset account,
+an opening/increase offset account, and an inventory issue Expense account. Each receipt or issue
+creates a linked general-journal draft; review and post it through General journals to update the
+item balance and G/L in the same transaction. Receipts recalculate weighted-average cost, issues use
+the current average and cannot create negative stock, and generic journal reversal is blocked for
+inventory-linked batches. Correct posted stock movements with a compensating inventory movement.
+The initial slice uses one company-wide balance per item and does not include warehouses or bins.
+
+Migration `20261013035640_AddInventoryFoundation` has been applied to the local
+`BusinessCentralBlazor_Phase0` database on `.\BCDEMO`; migration history, the `InventoryMovements`
+table, rowversion column, checks, and company-scoped foreign keys were verified. Automated tests
+cover inventory costing/posting and the authorized page; full browser-based SQL Server workflow and
+concurrency verification remain outstanding.
+
 ## Branch and review workflow
 
 - `main` is production-ready; `dev` is the integration branch.

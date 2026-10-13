@@ -42,6 +42,7 @@ public sealed class ErpDbContextModelTests
             "Customers",
             "Vendors",
             "Items",
+            "InventoryMovements",
             "NumberSeries",
             "AuditEntries",
             "AspNetUsers",
@@ -257,5 +258,50 @@ public sealed class ErpDbContextModelTests
         Assert.Equal(19, line.FindProperty(nameof(BankStatementLine.Amount))!.GetPrecision());
         Assert.Equal(4, line.FindProperty(nameof(BankStatementLine.Amount))!.GetScale());
         Assert.Contains(line.GetCheckConstraints(), constraint => constraint.Name == "CK_BankStatementLines_NonzeroAmount");
+    }
+
+    [Fact]
+    public void InventoryItemsAndMovementsUseCompanyScopedReferencesAndWeightedAverageBalances()
+    {
+        using var context = CreateContext();
+        var model = context.GetService<IDesignTimeModel>().Model;
+        var item = model.FindEntityType(typeof(Item))!;
+        var movement = model.FindEntityType(typeof(InventoryMovement))!;
+
+        foreach (var accountProperty in new[]
+                 {
+                     nameof(Item.InventoryAccountId),
+                     nameof(Item.InventoryIncreaseOffsetAccountId),
+                     nameof(Item.InventoryIssueExpenseAccountId)
+                 })
+        {
+            var foreignKey = Assert.Single(item.GetForeignKeys(), candidate =>
+                candidate.Properties.Select(property => property.Name)
+                    .SequenceEqual(["CompanyId", accountProperty]));
+            Assert.Equal(
+                ["CompanyId", "Id"],
+                foreignKey.PrincipalKey.Properties.Select(property => property.Name));
+        }
+
+        Assert.True(item.FindProperty(nameof(Item.RowVersion))!.IsConcurrencyToken);
+        Assert.Equal(4, item.FindProperty(nameof(Item.QuantityOnHand))!.GetScale());
+        Assert.Equal(4, item.FindProperty(nameof(Item.InventoryValue))!.GetScale());
+        Assert.Contains(item.GetCheckConstraints(), constraint =>
+            constraint.Name == "CK_Items_NonNegativeInventory");
+        Assert.Contains(movement.GetIndexes(), index =>
+            index.IsUnique &&
+            index.Properties.Select(property => property.Name)
+                .SequenceEqual(["CompanyId", "DocumentNumber"]));
+        Assert.Contains(movement.GetIndexes(), index =>
+            index.IsUnique &&
+            index.Properties.Select(property => property.Name)
+                .SequenceEqual(["CompanyId", "JournalBatchId"]));
+        foreach (var foreignKey in movement.GetForeignKeys()
+                     .Where(foreignKey => foreignKey.PrincipalEntityType.ClrType != typeof(BusinessCentralBlazor.Infrastructure.Identity.ErpUser)))
+        {
+            Assert.Equal("CompanyId", foreignKey.Properties[0].Name);
+        }
+        Assert.Contains(movement.GetCheckConstraints(), constraint =>
+            constraint.Name == "CK_InventoryMovements_NonzeroQuantity");
     }
 }
