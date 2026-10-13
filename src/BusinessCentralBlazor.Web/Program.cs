@@ -47,6 +47,10 @@ builder.Services.AddScoped<ITaxSetupService, TaxSetupService>();
 builder.Services.AddScoped<IGeneralLedgerInquiryService, GeneralLedgerInquiryService>();
 builder.Services.AddScoped<IBankService, BankService>();
 builder.Services.AddScoped<ICompanySettingsService, CompanySettingsService>();
+builder.Services.AddScoped<InventoryService>();
+builder.Services.AddScoped<IInventoryService>(services => services.GetRequiredService<InventoryService>());
+builder.Services.AddScoped<IInventoryJournalPostingService>(
+    services => services.GetRequiredService<InventoryService>());
 builder.Services.AddRazorPages();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();

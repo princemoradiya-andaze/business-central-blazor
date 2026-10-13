@@ -187,7 +187,8 @@ public interface IGeneralJournalService
 
 public sealed class GeneralJournalService(
     IDbContextFactory<ErpDbContext> dbContextFactory,
-    ICompanyScopeAuthorizer companyScopeAuthorizer) : IGeneralJournalService
+    ICompanyScopeAuthorizer companyScopeAuthorizer,
+    IInventoryJournalPostingService inventoryJournalPostingService) : IGeneralJournalService
 {
     private const string EntryNumberSeriesCode = "GL-ENTRY";
     private const decimal MaximumAmount = 999999999999999.9999m;
@@ -761,8 +762,15 @@ public sealed class GeneralJournalService(
             await ValidatePersistedLineAsync(dbContext, company.CompanyId, line);
         }
 
-        var numberSeries = await GetEntryNumberSeriesAsync(dbContext, company.CompanyId);
         var now = DateTimeOffset.UtcNow;
+        await inventoryJournalPostingService.ApplyForPostingAsync(
+            dbContext,
+            user,
+            company.CompanyId,
+            batch,
+            lines,
+            now);
+        var numberSeries = await GetEntryNumberSeriesAsync(dbContext, company.CompanyId);
         var userId = GetUserId(user);
         foreach (var line in lines)
         {
@@ -817,6 +825,14 @@ public sealed class GeneralJournalService(
         if (original.ReversedByBatchId is not null)
         {
             throw new ValidationException("This journal batch has already been reversed.");
+        }
+
+        if (await dbContext.InventoryMovements.AnyAsync(movement =>
+                movement.CompanyId == company.CompanyId &&
+                movement.JournalBatchId == original.Id))
+        {
+            throw new ValidationException(
+                "Inventory movement journals cannot be reversed as general journals. Create a compensating inventory movement instead.");
         }
 
         var period = await GetRequiredOpenPeriodAsync(

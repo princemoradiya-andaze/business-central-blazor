@@ -31,6 +31,7 @@ public sealed class ErpDbContext(DbContextOptions<ErpDbContext> options)
     public DbSet<Customer> Customers => Set<Customer>();
     public DbSet<Vendor> Vendors => Set<Vendor>();
     public DbSet<Item> Items => Set<Item>();
+    public DbSet<InventoryMovement> InventoryMovements => Set<InventoryMovement>();
     public DbSet<NumberSeries> NumberSeries => Set<NumberSeries>();
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
     public DbSet<BankAccount> BankAccounts => Set<BankAccount>();
@@ -478,7 +479,59 @@ public sealed class ErpDbContext(DbContextOptions<ErpDbContext> options)
             entity.Property(item => item.Type).HasConversion<string>().HasMaxLength(20);
             entity.Property(item => item.BaseUnitOfMeasure).HasMaxLength(20).IsRequired();
             entity.Property(item => item.UnitCost).HasPrecision(19, 4);
-            entity.ToTable(table => table.HasCheckConstraint("CK_Items_NonNegativeUnitCost", "[UnitCost] >= 0"));
+            entity.Property(item => item.QuantityOnHand).HasPrecision(19, 4);
+            entity.Property(item => item.InventoryValue).HasPrecision(19, 4);
+            entity.Property(item => item.RowVersion).IsRowVersion();
+            entity.ToTable(table =>
+            {
+                table.HasCheckConstraint("CK_Items_NonNegativeUnitCost", "[UnitCost] >= 0");
+                table.HasCheckConstraint("CK_Items_NonNegativeInventory", "[QuantityOnHand] >= 0 AND [InventoryValue] >= 0");
+            });
+            entity.HasOne<GeneralLedgerAccount>().WithMany()
+                .HasForeignKey(item => new { item.CompanyId, item.InventoryAccountId })
+                .HasPrincipalKey(account => new { account.CompanyId, account.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<GeneralLedgerAccount>().WithMany()
+                .HasForeignKey(item => new { item.CompanyId, item.InventoryIncreaseOffsetAccountId })
+                .HasPrincipalKey(account => new { account.CompanyId, account.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<GeneralLedgerAccount>().WithMany()
+                .HasForeignKey(item => new { item.CompanyId, item.InventoryIssueExpenseAccountId })
+                .HasPrincipalKey(account => new { account.CompanyId, account.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<InventoryMovement>(entity =>
+        {
+            ConfigureCompanyEntity(entity);
+            entity.HasIndex(movement => new { movement.CompanyId, movement.DocumentNumber }).IsUnique();
+            entity.HasIndex(movement => new { movement.CompanyId, movement.JournalBatchId }).IsUnique();
+            entity.Property(movement => movement.DocumentNumber).HasMaxLength(64).IsRequired();
+            entity.Property(movement => movement.Description).HasMaxLength(250).IsRequired();
+            entity.Property(movement => movement.Quantity).HasPrecision(19, 4);
+            entity.Property(movement => movement.UnitCost).HasPrecision(19, 4);
+            entity.Property(movement => movement.InventoryValue).HasPrecision(19, 4);
+            entity.Property(movement => movement.PostedAtUtc).HasColumnType("datetimeoffset");
+            entity.ToTable(table =>
+            {
+                table.HasCheckConstraint("CK_InventoryMovements_NonzeroQuantity", "[Quantity] <> 0");
+                table.HasCheckConstraint("CK_InventoryMovements_NonNegativeCost", "[UnitCost] >= 0 AND [InventoryValue] > 0");
+            });
+            entity.HasOne<Item>().WithMany()
+                .HasForeignKey(movement => new { movement.CompanyId, movement.ItemId })
+                .HasPrincipalKey(item => new { item.CompanyId, item.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<AccountingPeriod>().WithMany()
+                .HasForeignKey(movement => new { movement.CompanyId, movement.AccountingPeriodId })
+                .HasPrincipalKey(period => new { period.CompanyId, period.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<GeneralJournalBatch>().WithMany()
+                .HasForeignKey(movement => new { movement.CompanyId, movement.JournalBatchId })
+                .HasPrincipalKey(batch => new { batch.CompanyId, batch.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ErpUser>().WithMany()
+                .HasForeignKey(movement => movement.PostedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<NumberSeries>(entity =>

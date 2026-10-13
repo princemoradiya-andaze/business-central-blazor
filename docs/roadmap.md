@@ -44,9 +44,10 @@ Only mark tasks complete when their acceptance criteria have been verified.
 
 ## Later phases
 
-- [ ] Sales, purchasing, inventory, and document lifecycles.
+- [ ] Phase 3 tracker: [#53](https://github.com/princemoradiya-andaze/business-central-blazor/issues/53) — sales, receivables, inventory, purchasing, and document lifecycles.
+- [ ] [#54](https://github.com/princemoradiya-andaze/business-central-blazor/issues/54) — company-scoped inventory items and weighted-average costing. Inventory foundation and journal-linked stock movement drafts are implemented on the feature branch; the migration is generated, reviewed, and applied to the approved local database; all 86 Release tests pass and EF reports no model drift. Browser-based SQL Server workflow and concurrency verification remain.
 - [ ] Advanced capabilities, production operations, and Azure deployment.
 
 ## Current next step
 
-Phase 0 and Phase 1 are complete on `main`. Phase 1 was released in PR #27 and documented in PR #28; the merged `main` commit passed a Release build (0 warnings/errors), all 32 tests, EF model-drift validation, and local HTTP smoke checks. Phase 2 is tracked in #29. Chart of Accounts (#30, PR #31) and dimensions/values (#33, PR #34) are verified on `dev`. General journal posting/reversal (#36, PR #37), general-ledger inquiry/reporting (#38, PR #41), and tax setup/manual journal tax (#39, PR #42) are merged into `dev`. Bank reconciliation (#40) is implemented and automatically verified on its feature branch. Review/integrate the remaining Phase 2 feature PRs, then perform full local end-to-end verification on merged `dev`, including approved tax/bank migration application. Ask the user before merging every PR. Hosted deployment is not part of the agreed workflow.
+Phase 0–2 have been completed and released. Phase 3 is tracked in #53. Its first implementation slice (#54) establishes company-wide inventory using weighted-average costing, no warehouses/bins, and no negative stock; customer payment receipt/application is deferred from the initial sales slice. The migration is applied to the approved local database. Finish browser workflow/concurrency verification of #54, then open a PR to `dev`. Ask the user before applying migrations to any other database and before merging any PR. Hosted deployment is not part of the agreed workflow.
