@@ -23,9 +23,17 @@
     border-radius: 50%;
     color: #344054;
     background: #fff;
-    font-size: 1.5rem;
-    line-height: 1;
     text-decoration: none;
+}
+
+.directory-back-link svg {
+    width: 1.25rem;
+    height: 1.25rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.7;
 }
 
 .directory-back-link:hover,
