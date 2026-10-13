@@ -7,7 +7,35 @@
 }
 
 .directory-heading {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
     margin: 0.3rem 0 1.5rem;
+}
+
+.directory-back-link {
+    display: grid;
+    width: 2.5rem;
+    height: 2.5rem;
+    flex: 0 0 2.5rem;
+    place-items: center;
+    margin-top: 0.25rem;
+    border-radius: 50%;
+    color: #344054;
+    background: #fff;
+    font-size: 1.5rem;
+    line-height: 1;
+    text-decoration: none;
+}
+
+.directory-back-link:hover,
+.directory-back-link:focus-visible {
+    color: #005e63;
+    text-decoration: none;
+}
+
+.directory-heading-content {
+    min-width: 0;
 }
 
 .directory-heading h1 {

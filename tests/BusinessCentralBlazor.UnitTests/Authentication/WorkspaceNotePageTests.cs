@@ -34,7 +34,8 @@ public sealed class WorkspaceNotePageTests(AuthenticationWebApplicationFactory f
         var html = await response.Content.ReadAsStringAsync();
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains("All pages", html, StringComparison.Ordinal);
-        Assert.Contains("Company: Navigation Directory Company (NAVDIR)", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("aria-label=\"Company navigation\"", html, StringComparison.Ordinal);
+        Assert.Contains("class=\"directory-back-link\" href=\"/\"", html, StringComparison.Ordinal);
         Assert.Contains("Cash management", html, StringComparison.Ordinal);
         Assert.Contains("Reports", html, StringComparison.Ordinal);
         Assert.Contains("directory-count", html, StringComparison.Ordinal);
