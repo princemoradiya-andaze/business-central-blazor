@@ -1,6 +1,7 @@
 ﻿@inherits LayoutComponentBase
-@implements IDisposable
+@implements IAsyncDisposable
 @inject NavigationManager Navigation
+@inject IJSRuntime JS
 
 <div class="app-shell">
     <header class="global-header">
@@ -12,7 +13,7 @@
             <span class="environment-label">Environment <strong>Local</strong></span>
             <AuthorizeView>
                 <Authorized>
-                    <div class="settings-menu-container">
+                    <div class="settings-menu-container" @ref="settingsMenuContainer">
                         <button type="button"
                                 class="settings-toggle"
                                 aria-label="Settings"
@@ -59,15 +60,47 @@
 
 @code {
     private bool isSettingsOpen;
+    private ElementReference settingsMenuContainer;
+    private IJSObjectReference? outsideClickModule;
+    private DotNetObjectReference<MainLayout>? dotNetReference;
+    private int? outsideClickListenerId;
 
     protected override void OnInitialized()
     {
         Navigation.LocationChanged += OnLocationChanged;
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (outsideClickListenerId is not null || settingsMenuContainer.Context is null)
+        {
+            return;
+        }
+
+        outsideClickModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/outsideClick.js");
+        dotNetReference ??= DotNetObjectReference.Create(this);
+        outsideClickListenerId = await outsideClickModule.InvokeAsync<int>(
+            "bindOutsideClick",
+            settingsMenuContainer,
+            dotNetReference,
+            nameof(CloseSettingsFromOutside));
+    }
+
     private void ToggleSettings() => isSettingsOpen = !isSettingsOpen;
 
     private void CloseSettings() => isSettingsOpen = false;
+
+    [JSInvokable]
+    public Task CloseSettingsFromOutside()
+    {
+        if (!isSettingsOpen)
+        {
+            return Task.CompletedTask;
+        }
+
+        isSettingsOpen = false;
+        return InvokeAsync(StateHasChanged);
+    }
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
     {
@@ -78,8 +111,20 @@
         }
     }
 
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
         Navigation.LocationChanged -= OnLocationChanged;
+
+        if (outsideClickListenerId is not null && outsideClickModule is not null)
+        {
+            await outsideClickModule.InvokeVoidAsync("unbindOutsideClick", outsideClickListenerId);
+        }
+
+        dotNetReference?.Dispose();
+
+        if (outsideClickModule is not null)
+        {
+            await outsideClickModule.DisposeAsync();
+        }
     }
 }

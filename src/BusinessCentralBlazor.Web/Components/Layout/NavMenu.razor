@@ -1,9 +1,10 @@
-﻿@implements IDisposable
+@implements IAsyncDisposable
 @inject NavigationManager Navigation
+@inject IJSRuntime JS
 
 <AuthorizeView>
     <Authorized>
-        <nav class="company-navigation" aria-label="Company navigation">
+        <nav class="company-navigation" aria-label="Company navigation" @ref="companyNavigation">
             <div class="company-navigation-main">
                 <div class="company-identity">
                     <ActiveCompanyIndicator />
@@ -50,11 +51,31 @@
 
 @code {
     private string? openMenu;
+    private ElementReference companyNavigation;
+    private IJSObjectReference? outsideClickModule;
+    private DotNetObjectReference<NavMenu>? dotNetReference;
+    private int? outsideClickListenerId;
     private string CurrentPath => "/" + Navigation.ToBaseRelativePath(Navigation.Uri).Split('?', '#')[0];
 
     protected override void OnInitialized()
     {
         Navigation.LocationChanged += OnLocationChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (outsideClickListenerId is not null || companyNavigation.Context is null)
+        {
+            return;
+        }
+
+        outsideClickModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/outsideClick.js");
+        dotNetReference ??= DotNetObjectReference.Create(this);
+        outsideClickListenerId = await outsideClickModule.InvokeAsync<int>(
+            "bindOutsideClick",
+            companyNavigation,
+            dotNetReference,
+            nameof(CloseMenuFromOutside));
     }
 
     private bool IsGroupActive(NavigationGroup group) =>
@@ -64,14 +85,38 @@
 
     private void CloseMenu() => openMenu = null;
 
+    [JSInvokable]
+    public Task CloseMenuFromOutside()
+    {
+        if (openMenu is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        openMenu = null;
+        return InvokeAsync(StateHasChanged);
+    }
+
     private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
     {
         openMenu = null;
         _ = InvokeAsync(StateHasChanged);
     }
 
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
         Navigation.LocationChanged -= OnLocationChanged;
+
+        if (outsideClickListenerId is not null && outsideClickModule is not null)
+        {
+            await outsideClickModule.InvokeVoidAsync("unbindOutsideClick", outsideClickListenerId);
+        }
+
+        dotNetReference?.Dispose();
+
+        if (outsideClickModule is not null)
+        {
+            await outsideClickModule.DisposeAsync();
+        }
     }
 }
