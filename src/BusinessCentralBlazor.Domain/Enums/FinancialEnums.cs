@@ -55,3 +55,12 @@ public enum SalesOrderStatus
     InvoiceDraft,
     Invoiced
 }
+
+public enum PurchaseOrderStatus
+{
+    Open,
+    ReceiptDraft,
+    Received,
+    InvoiceDraft,
+    Invoiced
+}

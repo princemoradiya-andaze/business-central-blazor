@@ -134,6 +134,22 @@ table, rowversion column, checks, and company-scoped foreign keys were verified.
 cover inventory costing/posting and the authorized page; full browser-based SQL Server workflow and
 concurrency verification remain outstanding.
 
+## Purchase orders, receipts, invoices, and payables
+
+`/financial/purchasing` configures the company's GRNI liability account and vendor payables accounts,
+creates purchase orders for inventory items, and creates separate full-quantity receipt and vendor
+invoice journal drafts. Review and post each draft through General journals. Receipt posting increases
+inventory at the purchase-order cost and credits GRNI; invoice posting clears GRNI, debits recoverable
+tax where configured, and credits vendor payables. The open-payables inquiry lists posted invoices at
+their full unpaid balance. Partial receipts, purchase-price variances, vendor payments/application,
+returns, and credit memos are not included.
+
+Migration `20261013063111_AddPurchasingLifecycle` was applied, after explicit approval, to the local
+`BusinessCentralBlazor_Phase0` database on `.\BCDEMO`; EF migration history confirms it is current.
+The Release solution build, all 96 Release tests, EF model-drift check, and generated migration SQL
+review passed. The automated service tests use the existing in-memory harness; complete the live
+SQL Server/browser purchasing workflow verification before merging the purchasing slice.
+
 ## Branch and review workflow
 
 - `main` is production-ready; `dev` is the integration branch.

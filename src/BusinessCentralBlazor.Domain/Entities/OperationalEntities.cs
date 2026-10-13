@@ -20,6 +20,7 @@ public sealed class Vendor
     public string Number { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public string? CurrencyCode { get; set; }
+    public Guid? PayablesAccountId { get; set; }
     public bool IsBlocked { get; set; }
 }
 

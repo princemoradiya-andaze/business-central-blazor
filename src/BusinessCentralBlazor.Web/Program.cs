@@ -55,6 +55,10 @@ builder.Services.AddScoped<SalesService>();
 builder.Services.AddScoped<ISalesService>(services => services.GetRequiredService<SalesService>());
 builder.Services.AddScoped<ISalesJournalPostingService>(
     services => services.GetRequiredService<SalesService>());
+builder.Services.AddScoped<PurchasingService>();
+builder.Services.AddScoped<IPurchasingService>(services => services.GetRequiredService<PurchasingService>());
+builder.Services.AddScoped<IPurchasingJournalPostingService>(
+    services => services.GetRequiredService<PurchasingService>());
 builder.Services.AddRazorPages();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
