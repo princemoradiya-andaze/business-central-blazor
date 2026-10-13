@@ -2,22 +2,25 @@
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject IActiveCompanyContext ActiveCompanyContext
 
-<div class="nav-item px-3 small text-light" aria-live="polite">
+<div class="company-switcher text-light" aria-live="polite" aria-label="@CompanyAccessibleLabel">
     @if (activeCompany is null)
     {
-        <span>No active company</span>
+        <span class="company-label">Company</span>
+        <span class="company-name">No active company</span>
     }
     else
     {
-        <span>Company: @activeCompany.Name (@activeCompany.Code)</span>
+        <span class="company-label">Company</span>
+        <span class="company-name">@activeCompany.Name <span class="company-code">(@activeCompany.Code)</span></span>
     }
-    <div>
-        <a class="link-light" href="/account/company" data-enhance-nav="false">Select company</a>
-    </div>
+    <a class="company-change link-light" href="/account/company" data-enhance-nav="false">Change company</a>
 </div>
 
 @code {
     private CompanyMembershipOption? activeCompany;
+    private string CompanyAccessibleLabel => activeCompany is null
+        ? "No active company"
+        : $"Company: {activeCompany.Name} ({activeCompany.Code})";
 
     protected override async Task OnInitializedAsync()
     {

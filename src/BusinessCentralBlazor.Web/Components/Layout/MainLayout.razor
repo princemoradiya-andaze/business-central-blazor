@@ -1,18 +1,32 @@
 ﻿@inherits LayoutComponentBase
 
-<div class="page">
-    <div class="sidebar">
-        <NavMenu />
-    </div>
-
-    <main>
-        <div class="top-row px-4">
-            <a class="small text-body-secondary" href="/financial/company-settings">Company workspace settings</a>
+<div class="app-shell">
+    <header class="global-header">
+        <a class="app-brand" href="/" aria-label="Business Central Blazor home">
+            <span class="app-launcher" aria-hidden="true">▦</span>
+            <span class="brand-name">Business Central Blazor</span>
+        </a>
+        <div class="global-actions">
+            <span class="environment-label">Environment <strong>Local</strong></span>
+            <AuthorizeView>
+                <Authorized>
+                    <a href="/financial/company-settings">Company workspace settings</a>
+                    <form method="post" action="/account/logout">
+                        <AntiforgeryToken />
+                        <button type="submit">Sign out</button>
+                    </form>
+                </Authorized>
+            </AuthorizeView>
         </div>
+    </header>
 
-        <article class="content px-4">
+    <NavMenu />
+
+    <main class="workspace-main">
+        <div class="workspace-content">
+            <PageCommandBar />
             @Body
-        </article>
+        </div>
     </main>
 </div>
 

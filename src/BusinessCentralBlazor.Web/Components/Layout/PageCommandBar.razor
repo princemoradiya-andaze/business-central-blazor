@@ -1,0 +1,81 @@
+@implements IDisposable
+@inject NavigationManager Navigation
+
+@if (CurrentPage is { } currentPage)
+{
+    <section class="page-command-bar" aria-label="@($"{currentPage.Title} commands")">
+        <div class="page-heading">
+            <div class="breadcrumb">Home <span aria-hidden="true">›</span> @currentPage.Area</div>
+            <h1>@currentPage.Title</h1>
+        </div>
+        <nav class="command-actions" aria-label="Page actions">
+            @foreach (var action in currentPage.Actions)
+            {
+                <a href="@action.Href">@action.Label</a>
+            }
+        </nav>
+    </section>
+}
+
+@code {
+    private static readonly PageDefinition[] Pages =
+    [
+        new("/financial/sales", "Sales", "Customers",
+        [
+            new("New customer", "#customers-heading"),
+            new("New sales order", "#sales-order-heading"),
+            new("Ship and invoice", "#fulfillment-heading")
+        ]),
+        new("/financial/purchasing", "Purchasing", "Vendors and purchase orders",
+        [
+            new("New vendor", "#vendors-heading"),
+            new("New purchase order", "#purchase-order-heading"),
+            new("Receive and invoice", "#receipt-invoice-heading")
+        ]),
+        new("/financial/inventory", "Inventory", "Items",
+        [
+            new("New item", "#items-heading"),
+            new("New stock movement", "#movement-heading")
+        ]),
+        new("/financial/journals", "Finance", "General journals",
+        [
+            new("New journal batch", "/financial/journals/new")
+        ]),
+        new("/financial/general-ledger/accounts", "Finance", "Chart of accounts",
+        [
+            new("New account", "/financial/general-ledger/accounts/new"),
+            new("Trial balance", "/financial/general-ledger/trial-balance")
+        ]),
+        new("/financial/dimensions", "Finance", "Dimensions",
+        [
+            new("New dimension", "/financial/dimensions/new")
+        ]),
+        new("/financial/accounting-periods", "Finance", "Accounting periods",
+        [
+            new("New period", "#new-period-heading")
+        ])
+    ];
+
+    private PageDefinition? CurrentPage => Pages.FirstOrDefault(page =>
+        string.Equals(CurrentPath, page.Path, StringComparison.OrdinalIgnoreCase));
+
+    private string CurrentPath => "/" + Navigation.ToBaseRelativePath(Navigation.Uri).Split('?', '#')[0];
+
+    protected override void OnInitialized()
+    {
+        Navigation.LocationChanged += OnLocationChanged;
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        Navigation.LocationChanged -= OnLocationChanged;
+    }
+
+    private sealed record PageDefinition(string Path, string Area, string Title, CommandAction[] Actions);
+    private sealed record CommandAction(string Label, string Href);
+}
