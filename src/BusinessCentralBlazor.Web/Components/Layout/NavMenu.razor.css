@@ -15,6 +15,27 @@
     padding: 0 clamp(1rem, 7.8vw, 9.5rem);
 }
 
+.home-quick-links {
+    display: flex;
+    min-height: 2.5rem;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 0 clamp(1rem, 7.8vw, 9.5rem);
+}
+
+.home-quick-links a {
+    color: #007c91;
+    font-size: 0.84rem;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.home-quick-links a:hover,
+.home-quick-links a:focus-visible {
+    color: #005e6b;
+    text-decoration: underline;
+}
+
 .company-identity {
     display: flex;
     min-width: 0;
@@ -199,6 +220,12 @@
         padding: 0.65rem;
         overflow-y: auto;
         overflow-x: hidden;
+    }
+
+    .home-quick-links {
+        flex-wrap: wrap;
+        gap: 0.5rem 1rem;
+        padding: 0.5rem 0.65rem;
     }
 
     .navigation-menu-link {

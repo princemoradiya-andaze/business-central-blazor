@@ -40,6 +40,16 @@
                         <span aria-hidden="true">☰</span>
                     </a>
                 </div>
+                @if (IsHomePage)
+                {
+                    <nav class="home-quick-links" aria-label="Home shortcuts">
+                        <a href="/financial/sales#customers-heading">Customers</a>
+                        <a href="/financial/purchasing#vendors-heading">Vendors</a>
+                        <a href="/financial/inventory#items-heading">Items</a>
+                        <a href="/financial/banks">Bank Accounts</a>
+                        <a href="/financial/general-ledger/accounts">Chart of Accounts</a>
+                    </nav>
+                }
             </nav>
         }
     </Authorized>
@@ -59,6 +69,7 @@
     private DotNetObjectReference<NavMenu>? dotNetReference;
     private int? outsideClickListenerId;
     private string CurrentPath => "/" + Navigation.ToBaseRelativePath(Navigation.Uri).Split('?', '#')[0];
+    private bool IsHomePage => CurrentPath.Equals("/", StringComparison.OrdinalIgnoreCase);
     private bool IsNavigationDirectory => CurrentPath.Equals("/navigation", StringComparison.OrdinalIgnoreCase);
 
     protected override void OnInitialized()

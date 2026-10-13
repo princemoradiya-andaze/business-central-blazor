@@ -79,6 +79,7 @@ public sealed class WorkspaceNotePageTests(AuthenticationWebApplicationFactory f
         Assert.Contains("Navigation test note", listHtml, StringComparison.Ordinal);
         Assert.Contains("/workspace/notes/new", listHtml, StringComparison.Ordinal);
         Assert.Contains("Company: Notes Page Company (NOTEPAGE)", listHtml, StringComparison.Ordinal);
+        Assert.DoesNotContain("home-quick-links", listHtml, StringComparison.Ordinal);
         Assert.Contains("company-switcher", listHtml, StringComparison.Ordinal);
         Assert.Contains("/account/company", listHtml, StringComparison.Ordinal);
 
