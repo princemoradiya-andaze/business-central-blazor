@@ -1,8 +1,9 @@
 .navigation-directory {
-    width: 100%;
-    min-height: calc(100vh - 7rem);
-    margin: 0 auto;
-    padding: 1.25rem;
+    box-sizing: border-box;
+    width: 100vw;
+    min-height: calc(100vh - 6.1rem);
+    margin-left: calc(50% - 50vw);
+    padding: 1.25rem clamp(1.25rem, 3.2vw, 4rem) 2rem;
     background: linear-gradient(135deg, #e7f6f7 0%, #eef8f9 52%, #e5f4f5 100%);
 }
 
@@ -45,6 +46,12 @@
     font-size: 1rem;
 }
 
+.directory-count {
+    color: #667085;
+    font-size: 0.82em;
+    font-weight: 400;
+}
+
 .directory-group ul {
     display: grid;
     gap: 0;
@@ -57,16 +64,10 @@
     display: flex;
     min-height: 1.5rem;
     align-items: center;
-    justify-content: space-between;
     gap: 0.5rem;
     padding: 0 0.35rem;
     color: #007f83;
     text-decoration: none;
-}
-
-.directory-group a span {
-    color: #5a707a;
-    font-size: 1.1rem;
 }
 
 .directory-group a:hover,

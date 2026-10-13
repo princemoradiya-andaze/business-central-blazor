@@ -37,7 +37,11 @@ public sealed class WorkspaceNotePageTests(AuthenticationWebApplicationFactory f
         Assert.Contains("Company: Navigation Directory Company (NAVDIR)", html, StringComparison.Ordinal);
         Assert.Contains("Cash management", html, StringComparison.Ordinal);
         Assert.Contains("Reports", html, StringComparison.Ordinal);
+        Assert.Contains("directory-count", html, StringComparison.Ordinal);
+        Assert.Contains("(5)", html, StringComparison.Ordinal);
         Assert.Contains("Workspace notes", html, StringComparison.Ordinal);
+        Assert.Contains("- General journals", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("aria-hidden=\"true\">›", html, StringComparison.Ordinal);
         Assert.Contains("href=\"/financial/sales#customers-heading\"", html, StringComparison.Ordinal);
         Assert.Contains("href=\"/financial/purchasing#vendors-heading\"", html, StringComparison.Ordinal);
         Assert.Contains("href=\"/financial/general-ledger/trial-balance\"", html, StringComparison.Ordinal);

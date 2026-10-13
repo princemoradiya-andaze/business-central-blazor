@@ -14,11 +14,13 @@
         @foreach (var group in NavigationMenuCatalog.Groups)
         {
             <section class="directory-group" aria-labelledby="@($"directory-{group.Key}")">
-                <h2 id="@($"directory-{group.Key}")">@group.Label</h2>
+                <h2 id="@($"directory-{group.Key}")">
+                    @group.Label <span class="directory-count">(@group.Items.Count)</span>
+                </h2>
                 <ul>
                     @foreach (var item in group.Items)
                     {
-                        <li><a href="@item.Href">@item.Label <span aria-hidden="true">›</span></a></li>
+                        <li><a href="@item.Href">- @item.Label</a></li>
                     }
                 </ul>
             </section>
