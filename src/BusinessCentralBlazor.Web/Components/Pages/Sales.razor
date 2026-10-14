@@ -44,13 +44,6 @@ else
                         @CustomerStatusFilterLabel
                         <span class="customer-view-filter-chevron" aria-hidden="true"></span>
                     </button>
-                    @if (isCustomerStatusMenuOpen)
-                    {
-                        <button class="customer-view-filter-backdrop" type="button"
-                                aria-label="Close customer status options"
-                                tabindex="-1"
-                                @onclick="CloseCustomerStatusMenu"></button>
-                    }
                     <div id="customer-status-options" class="customer-view-filter-menu"
                          role="menu" aria-label="Customer status"
                          hidden="@(!isCustomerStatusMenuOpen)">

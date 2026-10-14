@@ -7,7 +7,7 @@
     min-height: 2rem;
     align-items: center;
     gap: 0;
-    overflow-x: auto;
+    overflow: visible;
     border-bottom: 1px solid #dfe4ea;
 }
 
@@ -82,17 +82,6 @@
 
 .customer-view-filter-menu[hidden] {
     display: none;
-}
-
-.customer-view-filter-backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: 11;
-    width: 100%;
-    height: 100%;
-    border: 0;
-    background: transparent;
-    cursor: default;
 }
 
 .customer-view-filter-option {
@@ -277,7 +266,7 @@
 
 @media (max-width: 760px) {
     .customer-action-bar {
-        overflow-x: auto;
+        overflow: visible;
     }
 
     .customer-search-input.expanded {
