@@ -37,7 +37,7 @@ public sealed class HomeDashboardPageTests(AuthenticationWebApplicationFactory f
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains("Authentication test user", html, StringComparison.Ordinal);
         Assert.Matches("Good (morning|afternoon|evening), Authentication test user", html);
-        Assert.Contains("Company overview", html, StringComparison.Ordinal);
+        Assert.Contains("Headline", html, StringComparison.Ordinal);
         Assert.Contains("id=\"home-heading\"", html, StringComparison.Ordinal);
         Assert.Contains("Actions", html, StringComparison.Ordinal);
         Assert.Contains("Sales order", html, StringComparison.Ordinal);

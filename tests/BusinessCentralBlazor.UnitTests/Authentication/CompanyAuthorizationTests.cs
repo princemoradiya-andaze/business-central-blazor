@@ -112,7 +112,7 @@ public sealed class CompanyAuthorizationTests(AuthenticationWebApplicationFactor
         using var authorizedHome = await client.GetAsync("/");
         Assert.Equal(HttpStatusCode.OK, authorizedHome.StatusCode);
         var authorizedHomeHtml = await authorizedHome.Content.ReadAsStringAsync();
-        Assert.Contains("Company overview", authorizedHomeHtml, StringComparison.Ordinal);
+        Assert.Contains("Headline", authorizedHomeHtml, StringComparison.Ordinal);
         Assert.Contains("Authentication test user", authorizedHomeHtml, StringComparison.Ordinal);
         Assert.DoesNotContain("Business modules are not available yet", authorizedHomeHtml, StringComparison.Ordinal);
 

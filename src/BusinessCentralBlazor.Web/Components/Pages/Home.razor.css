@@ -12,10 +12,9 @@
 
 .home-dashboard-heading h1 {
     margin: 0;
-    color: #252525;
-    font-size: clamp(2rem, 3.3vw, 3.25rem);
-    font-weight: 300;
-    letter-spacing: -0.02em;
+    color: #536171;
+    font-size: 0.8rem;
+    font-weight: 400;
 }
 
 .home-dashboard-greeting {
@@ -37,7 +36,6 @@
     min-height: 9rem;
     margin: 0;
     padding: 0.75rem 1rem 1rem;
-    border: 1px solid #c8cfd6;
     background: transparent;
 }
 
