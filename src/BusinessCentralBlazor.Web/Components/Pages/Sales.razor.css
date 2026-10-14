@@ -4,7 +4,7 @@
 
 .customer-action-bar {
     display: flex;
-    min-height: 2.75rem;
+    min-height: 2rem;
     align-items: center;
     gap: 0;
     overflow-x: auto;
@@ -123,7 +123,7 @@
 
 .customer-actions {
     display: flex;
-    min-height: 2.75rem;
+    min-height: 2rem;
     flex: 0 0 auto;
     align-items: center;
     gap: 0;
