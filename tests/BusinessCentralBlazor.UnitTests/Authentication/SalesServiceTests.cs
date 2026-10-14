@@ -18,6 +18,86 @@ public sealed class SalesServiceTests(AuthenticationWebApplicationFactory factor
     private static readonly DateOnly PostingDate = new(2026, 10, 12);
 
     [Fact]
+    public async Task CustomerCanBeEditedDeactivatedAndReactivatedWithoutChangingBlockedStatus()
+    {
+        var setup = await SetupAsync("sales-customer-status");
+        await using var scope = factory.Services.CreateAsyncScope();
+        var sales = scope.ServiceProvider.GetRequiredService<ISalesService>();
+        var customerNumber = $"C{Guid.NewGuid():N}"[..8].ToUpperInvariant();
+        await sales.CreateCustomerAsync(setup.User, new SalesCustomerInput
+        {
+            Number = customerNumber,
+            Name = "Customer before edit",
+            ReceivablesAccountId = setup.ReceivablesAccountId
+        });
+
+        var createdCustomer = Assert.Single(await sales.GetCustomersAsync(setup.User));
+        Assert.False(createdCustomer.IsInactive);
+        Assert.False(createdCustomer.IsBlocked);
+
+        await using (var dbContext = await ContextAsync())
+        {
+            var customer = await dbContext.Customers.SingleAsync(candidate => candidate.Id == createdCustomer.Id);
+            customer.IsBlocked = true;
+            await dbContext.SaveChangesAsync();
+        }
+
+        await sales.SetCustomerInactiveAsync(setup.User, createdCustomer.Id, true);
+        var inactiveCustomer = Assert.Single(await sales.GetCustomersAsync(setup.User));
+        Assert.True(inactiveCustomer.IsInactive);
+        Assert.True(inactiveCustomer.IsBlocked);
+
+        await Assert.ThrowsAsync<ValidationException>(() => sales.CreateOrderAsync(setup.User, new SalesOrderInput
+        {
+            OrderNumber = "SO-INACTIVE",
+            Description = "Order for inactive customer",
+            CustomerId = createdCustomer.Id,
+            OrderDate = PostingDate,
+            Lines =
+            [
+                new SalesOrderLineInput
+                {
+                    ItemId = setup.ItemId,
+                    Quantity = 1m,
+                    UnitPrice = 10m,
+                    SalesAccountId = setup.RevenueAccountId
+                }
+            ]
+        }));
+
+        await sales.UpdateCustomerAsync(setup.User, createdCustomer.Id, new SalesCustomerInput
+        {
+            Number = customerNumber,
+            Name = "Updated customer name",
+            ReceivablesAccountId = setup.ReceivablesAccountId
+        });
+        await sales.SetCustomerInactiveAsync(setup.User, createdCustomer.Id, false);
+
+        var reactivatedCustomer = Assert.Single(await sales.GetCustomersAsync(setup.User));
+        Assert.False(reactivatedCustomer.IsInactive);
+        Assert.True(reactivatedCustomer.IsBlocked);
+        Assert.Equal("Updated customer name", reactivatedCustomer.Name);
+
+        await using var verificationContext = await ContextAsync();
+        var persistedCustomer = await verificationContext.Customers
+            .SingleAsync(customer => customer.Id == createdCustomer.Id);
+        Assert.False(persistedCustomer.IsInactive);
+        Assert.True(persistedCustomer.IsBlocked);
+        Assert.Contains(await verificationContext.AuditEntries
+            .Where(entry => entry.CompanyId == setup.CompanyId)
+            .Select(entry => entry.Action)
+            .ToListAsync(), action => action == "SalesCustomerDeactivated");
+        Assert.Contains(await verificationContext.AuditEntries
+            .Where(entry => entry.CompanyId == setup.CompanyId)
+            .Select(entry => entry.Action)
+            .ToListAsync(), action => action == "SalesCustomerReactivated");
+        Assert.Contains(await verificationContext.AuditEntries
+            .Where(entry => entry.CompanyId == setup.CompanyId)
+            .Select(entry => entry.Action)
+            .ToListAsync(), action => action == "SalesCustomerUpdated");
+    }
+
+    [Fact]
     public async Task SalesOrderShipsAndInvoicesThroughBalancedJournalsWithOpenReceivable()
     {
         var setup = await SetupAsync("sales-lifecycle");

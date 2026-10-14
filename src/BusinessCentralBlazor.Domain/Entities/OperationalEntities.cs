@@ -11,6 +11,7 @@ public sealed class Customer
     public string? CurrencyCode { get; set; }
     public Guid? ReceivablesAccountId { get; set; }
     public bool IsBlocked { get; set; }
+    public bool IsInactive { get; set; }
 }
 
 public sealed class Vendor

@@ -459,6 +459,11 @@ namespace BusinessCentralBlazor.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsBlocked")
                         .HasColumnType("bit");
 
+                    b.Property<bool>("IsInactive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(160)

@@ -37,10 +37,49 @@ public sealed class SalesPageTests(AuthenticationWebApplicationFactory factory)
         using var response = await client.GetAsync("/financial/sales");
         var html = await response.Content.ReadAsStringAsync();
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Contains("Sales and receivables", html, StringComparison.Ordinal);
-        Assert.Contains("Create customer", html, StringComparison.Ordinal);
-        Assert.Contains("Create sales order", html, StringComparison.Ordinal);
-        Assert.Contains("Open receivables", html, StringComparison.Ordinal);
+        Assert.Contains("Customers", html, StringComparison.Ordinal);
+        Assert.Contains("class=\"customer-action-bar\"", html, StringComparison.Ordinal);
+        Assert.Contains(">+ New</a>", html, StringComparison.Ordinal);
+        Assert.Contains("Edit", html, StringComparison.Ordinal);
+        Assert.Contains("Delete", html, StringComparison.Ordinal);
+        Assert.Contains("Search customers", html, StringComparison.Ordinal);
+        Assert.Contains("customer-status", html, StringComparison.Ordinal);
+        Assert.Contains("customer-view-filter", html, StringComparison.Ordinal);
+        Assert.Contains("aria-expanded", html, StringComparison.Ordinal);
+        Assert.Contains("aria-hidden", html, StringComparison.Ordinal);
+        Assert.Contains("class=\"customer-command-separator\"", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("customer-list-toolbar", html, StringComparison.Ordinal);
+        Assert.Contains("Inactive", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("class=\"breadcrumb\"", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("class=\"page-command-bar\"", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("class=\"card", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("id=\"sales-customer-number\"", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("id=\"sales-order-heading\"", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("id=\"receivables-heading\"", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("module-menu-toggle active", html, StringComparison.Ordinal);
+
+        var routes = new Dictionary<string, (string expected, string excluded)>
+        {
+            ["/financial/sales/customers"] = ("aria-label=\"Customers\"", "id=\"sales-order-heading\""),
+            ["/financial/sales/customers/new"] = ("id=\"new-customer-heading\"", "id=\"customer-search\""),
+            ["/financial/sales/create-order"] = ("id=\"sales-order-heading\"", "id=\"receivables-heading\""),
+            ["/financial/sales/orders"] = ("id=\"orders-heading\"", "id=\"new-customer-heading\""),
+            ["/financial/sales/fulfillment"] = ("id=\"fulfillment-heading\"", "id=\"receivables-heading\""),
+            ["/financial/sales/receivables"] = ("id=\"receivables-heading\"", "id=\"new-customer-heading\"")
+        };
+
+        foreach (var (route, content) in routes)
+        {
+            using var sectionResponse = await client.GetAsync(route);
+            var sectionHtml = await sectionResponse.Content.ReadAsStringAsync();
+            Assert.Equal(HttpStatusCode.OK, sectionResponse.StatusCode);
+            Assert.Contains(content.expected, sectionHtml, StringComparison.Ordinal);
+            Assert.DoesNotContain(content.excluded, sectionHtml, StringComparison.Ordinal);
+            if (route.StartsWith("/financial/sales/customers", StringComparison.Ordinal))
+            {
+                Assert.DoesNotContain("module-menu-toggle active", sectionHtml, StringComparison.Ordinal);
+            }
+        }
     }
 
     private static async Task SignInAsync(HttpClient client, string email)
