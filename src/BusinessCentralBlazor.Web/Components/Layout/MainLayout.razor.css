@@ -159,7 +159,7 @@
 }
 
 .workspace-main.customer-list-main {
-    padding-top: 0;
+    padding: 0 clamp(1rem, 7.8vw, 9.5rem) 3rem;
 }
 
 .workspace-main:has(.navigation-directory) {
@@ -199,6 +199,12 @@
     top: 0.5rem;
 }
 
+@media (min-width: 761px) and (max-width: 900px) {
+    .workspace-main.customer-list-main {
+        padding: 0 0.65rem 3rem;
+    }
+}
+
 @media (max-width: 760px) {
     .global-header {
         min-height: 2.8rem;
@@ -215,5 +221,9 @@
 
     .workspace-main {
         padding: 1rem 0.65rem 2rem;
+    }
+
+    .workspace-main.customer-list-main {
+        padding: 0 0.65rem 2rem;
     }
 }

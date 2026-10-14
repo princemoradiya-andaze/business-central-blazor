@@ -32,13 +32,46 @@ else
         <section class="customer-workspace" aria-label="Customers">
             <div class="customer-action-bar" aria-label="Customer actions">
                 <h1>Customers</h1>
+                <span class="customer-command-separator" aria-hidden="true"></span>
+                <label class="visually-hidden" for="customer-status">Filter customers</label>
+                <select id="customer-status" class="customer-view-filter"
+                        @bind="customerStatusFilter" @bind:after="ClearCustomerSelection">
+                    <option value="all">All</option>
+                    <option value="active">Active</option>
+                    <option value="blocked">Blocked</option>
+                    <option value="inactive">Inactive</option>
+                </select>
+                <button class="customer-search-toggle" type="button"
+                        aria-label="Search customers"
+                        aria-expanded="@(isCustomerSearchExpanded ? "true" : "false")"
+                        aria-controls="customer-search"
+                        title="Search customers"
+                        @onclick="ToggleCustomerSearch">
+                    <span class="customer-search-icon" aria-hidden="true"></span>
+                </button>
+                <label class="visually-hidden" for="customer-search">Search customers</label>
+                <input id="customer-search"
+                       @ref="customerSearchInput"
+                       class="customer-search-input @(isCustomerSearchExpanded ? "expanded" : null)"
+                       type="search"
+                       placeholder="Search customers"
+                       disabled="@(!isCustomerSearchExpanded)"
+                       tabindex="@(isCustomerSearchExpanded ? 0 : -1)"
+                       aria-hidden="@(isCustomerSearchExpanded ? "false" : "true")"
+                       @bind="customerSearchTerm"
+                       @bind:event="oninput"
+                       @bind:after="ClearCustomerSelection"
+                       @onkeydown="HandleCustomerSearchKeyDown" />
+                <span class="customer-command-separator" aria-hidden="true"></span>
                 <div class="customer-actions">
                     <a class="customer-action-button" href="/financial/sales/customers/new">+ New</a>
+                    <span class="customer-command-separator" aria-hidden="true"></span>
                     <button class="customer-action-button" type="button"
                             disabled="@(SelectedCustomer is null)"
                             @onclick="EditSelectedCustomer">
                         Edit
                     </button>
+                    <span class="customer-command-separator" aria-hidden="true"></span>
                     @if (SelectedCustomer is { IsInactive: true })
                     {
                         <button class="customer-action-button" type="button" @onclick="ReactivateSelectedCustomerAsync">
@@ -53,6 +86,7 @@ else
                             Delete
                         </button>
                     }
+                    <span class="customer-command-separator" aria-hidden="true"></span>
                 </div>
             </div>
             @if (PendingDeactivationCustomer is { } pendingCustomer)
@@ -63,24 +97,6 @@ else
                     <button class="btn btn-sm btn-outline-secondary" type="button" @onclick="CancelCustomerDeactivation">Cancel</button>
                 </div>
             }
-            <div class="customer-list-toolbar">
-                <label class="visually-hidden" for="customer-search">Search customers</label>
-                <input id="customer-search"
-                       class="form-control customer-search"
-                       type="search"
-                       placeholder="Search customers"
-                       @bind="customerSearchTerm"
-                       @bind:event="oninput"
-                       @bind:after="ClearCustomerSelection" />
-                <label class="visually-hidden" for="customer-status">Filter customer status</label>
-                <select id="customer-status" class="form-select customer-status"
-                        @bind="customerStatusFilter" @bind:after="ClearCustomerSelection">
-                    <option value="all">All customers</option>
-                    <option value="active">Active</option>
-                    <option value="blocked">Blocked</option>
-                    <option value="inactive">Inactive</option>
-                </select>
-            </div>
             @if (!FilteredCustomers.Any())
             {
                 <p>@(customers.Count == 0
@@ -490,6 +506,8 @@ else
     private string customerStatusFilter = "all";
     private Guid? selectedCustomerId;
     private Guid? pendingDeactivationCustomerId;
+    private bool isCustomerSearchExpanded;
+    private ElementReference customerSearchInput;
 
     [Parameter]
     public Guid? CustomerId { get; set; }
@@ -643,6 +661,30 @@ else
     {
         selectedCustomerId = null;
         pendingDeactivationCustomerId = null;
+    }
+
+    private async Task ToggleCustomerSearch()
+    {
+        isCustomerSearchExpanded = !isCustomerSearchExpanded;
+        if (isCustomerSearchExpanded)
+        {
+            await InvokeAsync(StateHasChanged);
+            await customerSearchInput.FocusAsync();
+            return;
+        }
+
+        customerSearchTerm = string.Empty;
+        ClearCustomerSelection();
+    }
+
+    private Task HandleCustomerSearchKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key == "Escape" && isCustomerSearchExpanded)
+        {
+            return ToggleCustomerSearch();
+        }
+
+        return Task.CompletedTask;
     }
 
     private void EditSelectedCustomer()
