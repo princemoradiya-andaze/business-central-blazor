@@ -155,11 +155,11 @@
 
 .workspace-main {
     min-width: 0;
-    padding: 1.4rem clamp(1rem, 3vw, 2.5rem) 3rem;
+    padding: 1.4rem clamp(1rem, 7.8vw, 9.5rem) 3rem;
 }
 
 .workspace-main.customer-list-main {
-    padding: 0 clamp(1rem, 7.8vw, 9.5rem) 3rem;
+    padding-top: 0;
 }
 
 .workspace-main:has(.navigation-directory) {
@@ -170,12 +170,8 @@
 }
 
 .workspace-content {
-    width: min(100%, 98rem);
-    margin: 0 auto;
-}
-
-.workspace-content.customer-list-content {
     width: 100%;
+    margin: 0;
 }
 
 #blazor-error-ui {
@@ -199,9 +195,10 @@
     top: 0.5rem;
 }
 
-@media (min-width: 761px) and (max-width: 900px) {
-    .workspace-main.customer-list-main {
-        padding: 0 0.65rem 3rem;
+@media (max-width: 900px) {
+    .workspace-main {
+        padding-left: 0.65rem;
+        padding-right: 0.65rem;
     }
 }
 
@@ -221,9 +218,5 @@
 
     .workspace-main {
         padding: 1rem 0.65rem 2rem;
-    }
-
-    .workspace-main.customer-list-main {
-        padding: 0 0.65rem 2rem;
     }
 }
