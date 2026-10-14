@@ -1,7 +1,7 @@
 @implements IDisposable
 @inject NavigationManager Navigation
 
-@if (CurrentPage is { } currentPage)
+@if (!IsCustomerListPage && CurrentPage is { } currentPage)
 {
     <section class="page-command-bar" aria-label="@($"{currentPage.Title} commands")">
         <div class="page-heading">
@@ -73,6 +73,9 @@
         string.Equals(CurrentPath, page.Path, StringComparison.OrdinalIgnoreCase));
 
     private string CurrentPath => "/" + Navigation.ToBaseRelativePath(Navigation.Uri).Split('?', '#')[0];
+    private bool IsCustomerListPage =>
+        CurrentPath.Equals("/financial/sales", StringComparison.OrdinalIgnoreCase) ||
+        CurrentPath.Equals("/financial/sales/customers", StringComparison.OrdinalIgnoreCase);
 
     protected override void OnInitialized()
     {

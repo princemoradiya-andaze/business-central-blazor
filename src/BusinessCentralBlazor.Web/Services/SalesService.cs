@@ -59,8 +59,10 @@ public sealed record SalesCustomerOption(
     Guid Id,
     string Number,
     string Name,
+    Guid ReceivablesAccountId,
     string ReceivablesAccountNumber,
-    bool IsBlocked);
+    bool IsBlocked,
+    bool IsInactive);
 
 public sealed record SalesItemOption(Guid Id, string Number, string Description, decimal QuantityOnHand, bool IsBlocked);
 
@@ -108,6 +110,8 @@ public interface ISalesService
     Task<IReadOnlyList<SalesOrderDetail>> GetOrdersAsync(ClaimsPrincipal user);
     Task<IReadOnlyList<SalesReceivableDetail>> GetOpenReceivablesAsync(ClaimsPrincipal user);
     Task CreateCustomerAsync(ClaimsPrincipal user, SalesCustomerInput input);
+    Task UpdateCustomerAsync(ClaimsPrincipal user, Guid customerId, SalesCustomerInput input);
+    Task SetCustomerInactiveAsync(ClaimsPrincipal user, Guid customerId, bool isInactive);
     Task<Guid> CreateOrderAsync(ClaimsPrincipal user, SalesOrderInput input);
     Task<Guid> CreateShipmentDraftAsync(
         ClaimsPrincipal user,
@@ -152,8 +156,10 @@ public sealed class SalesService(
                 customer.Id,
                 customer.Number,
                 customer.Name,
+                account.Id,
                 account.Number,
-                customer.IsBlocked))
+                customer.IsBlocked,
+                customer.IsInactive))
             .ToListAsync();
     }
 
@@ -333,14 +339,95 @@ public sealed class SalesService(
             input.ReceivablesAccountId,
             AccountCategory.Asset,
             "accounts receivable");
-        dbContext.Customers.Add(new Customer
+        var customer = new Customer
         {
             Id = Guid.NewGuid(),
             CompanyId = companyId,
             Number = input.Number,
             Name = input.Name,
             ReceivablesAccountId = input.ReceivablesAccountId
-        });
+        };
+        dbContext.Customers.Add(customer);
+        AddSalesAudit(
+            dbContext,
+            companyId,
+            user,
+            "SalesCustomerCreated",
+            nameof(Customer),
+            customer.Id,
+            DateTimeOffset.UtcNow,
+            new { customer.Number, customer.Name });
+        await dbContext.SaveChangesAsync();
+    }
+
+    public async Task UpdateCustomerAsync(ClaimsPrincipal user, Guid customerId, SalesCustomerInput input)
+    {
+        var companyId = await GetRequiredCompanyIdAsync(user);
+        NormalizeAndValidate(input);
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync();
+        var customer = await dbContext.Customers.SingleOrDefaultAsync(candidate =>
+            candidate.CompanyId == companyId && candidate.Id == customerId);
+        if (customer is null)
+        {
+            throw new ValidationException("The customer is not available in the active company.");
+        }
+
+        if (await dbContext.Customers.AnyAsync(candidate =>
+                candidate.CompanyId == companyId &&
+                candidate.Id != customerId &&
+                candidate.Number == input.Number))
+        {
+            throw new ValidationException("A customer with this number already exists in the active company.");
+        }
+
+        await ValidatePostingAccountAsync(
+            dbContext,
+            companyId,
+            input.ReceivablesAccountId,
+            AccountCategory.Asset,
+            "accounts receivable");
+
+        customer.Number = input.Number;
+        customer.Name = input.Name;
+        customer.ReceivablesAccountId = input.ReceivablesAccountId;
+        AddSalesAudit(
+            dbContext,
+            companyId,
+            user,
+            "SalesCustomerUpdated",
+            nameof(Customer),
+            customer.Id,
+            DateTimeOffset.UtcNow,
+            new { customer.Number, customer.Name });
+        await dbContext.SaveChangesAsync();
+    }
+
+    public async Task SetCustomerInactiveAsync(ClaimsPrincipal user, Guid customerId, bool isInactive)
+    {
+        var companyId = await GetRequiredCompanyIdAsync(user);
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync();
+        var customer = await dbContext.Customers.SingleOrDefaultAsync(candidate =>
+            candidate.CompanyId == companyId && candidate.Id == customerId);
+        if (customer is null)
+        {
+            throw new ValidationException("The customer is not available in the active company.");
+        }
+
+        if (customer.IsInactive == isInactive)
+        {
+            return;
+        }
+
+        customer.IsInactive = isInactive;
+        AddSalesAudit(
+            dbContext,
+            companyId,
+            user,
+            isInactive ? "SalesCustomerDeactivated" : "SalesCustomerReactivated",
+            nameof(Customer),
+            customer.Id,
+            DateTimeOffset.UtcNow,
+            new { customer.Number, customer.IsInactive });
         await dbContext.SaveChangesAsync();
     }
 
@@ -358,7 +445,10 @@ public sealed class SalesService(
         }
 
         var customer = await dbContext.Customers.SingleOrDefaultAsync(candidate =>
-            candidate.CompanyId == companyId && candidate.Id == input.CustomerId && !candidate.IsBlocked);
+            candidate.CompanyId == companyId &&
+            candidate.Id == input.CustomerId &&
+            !candidate.IsBlocked &&
+            !candidate.IsInactive);
         if (customer?.ReceivablesAccountId is not { } receivablesAccountId)
         {
             throw new ValidationException("Select an active customer with a configured receivables account.");

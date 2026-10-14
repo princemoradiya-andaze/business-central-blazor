@@ -38,9 +38,15 @@ public sealed class SalesPageTests(AuthenticationWebApplicationFactory factory)
         var html = await response.Content.ReadAsStringAsync();
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains("Customers", html, StringComparison.Ordinal);
-        Assert.Contains("New customer", html, StringComparison.Ordinal);
+        Assert.Contains("class=\"customer-action-bar\"", html, StringComparison.Ordinal);
+        Assert.Contains(">+ New</a>", html, StringComparison.Ordinal);
+        Assert.Contains("Edit", html, StringComparison.Ordinal);
+        Assert.Contains("Delete", html, StringComparison.Ordinal);
         Assert.Contains("Search customers", html, StringComparison.Ordinal);
         Assert.Contains("customer-status", html, StringComparison.Ordinal);
+        Assert.Contains("Inactive", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("class=\"breadcrumb\"", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("class=\"page-command-bar\"", html, StringComparison.Ordinal);
         Assert.DoesNotContain("class=\"card", html, StringComparison.Ordinal);
         Assert.DoesNotContain("id=\"sales-customer-number\"", html, StringComparison.Ordinal);
         Assert.DoesNotContain("id=\"sales-order-heading\"", html, StringComparison.Ordinal);

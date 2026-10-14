@@ -2,12 +2,73 @@
     min-width: 0;
 }
 
+.customer-action-bar {
+    display: flex;
+    min-height: 3.1rem;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    border-bottom: 1px solid #dfe4ea;
+}
+
+.customer-action-bar h1 {
+    margin: 0;
+    color: #17212b;
+    font-size: 1.05rem;
+    font-weight: 500;
+}
+
+.customer-actions {
+    display: flex;
+    min-height: 3.1rem;
+    align-items: stretch;
+    gap: 0.1rem;
+}
+
+.customer-action-button {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.4rem 0.75rem;
+    border: 0;
+    border-radius: 0;
+    color: #005b85;
+    background: transparent;
+    font: inherit;
+    font-size: 0.82rem;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.customer-action-button:hover,
+.customer-action-button:focus-visible {
+    color: #004d70;
+    background: #eaf4f8;
+    text-decoration: underline;
+}
+
+.customer-action-button:disabled {
+    color: #98a2b3;
+    background: transparent;
+    cursor: not-allowed;
+    text-decoration: none;
+}
+
+.customer-deactivation-confirmation {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.customer-deactivation-confirmation span {
+    flex: 1 1 20rem;
+}
+
 .customer-list-toolbar {
     display: flex;
     align-items: center;
     gap: 0.75rem;
     margin: 0 0 0.65rem;
-    padding: 0.45rem 0;
+    padding: 0.65rem 0;
     border-bottom: 1px solid #dfe4ea;
 }
 
@@ -20,19 +81,17 @@
     min-width: 10rem;
 }
 
-.customer-new-link {
-    display: inline-flex;
-    min-height: 2.35rem;
-    align-items: center;
-    margin-left: 0.35rem;
+.customer-number-select {
+    padding: 0;
+    border: 0;
     color: #007c91;
-    font-weight: 600;
+    background: transparent;
+    font: inherit;
     text-decoration: none;
-    white-space: nowrap;
 }
 
-.customer-new-link:hover,
-.customer-new-link:focus-visible {
+.customer-number-select:hover,
+.customer-number-select:focus-visible {
     color: #005e6b;
     text-decoration: underline;
 }
@@ -54,11 +113,29 @@
     --bs-table-striped-bg: #b8e8eb;
 }
 
+.customer-table tbody tr.customer-row-selected {
+    --bs-table-bg: #b8e8eb;
+    --bs-table-striped-bg: #b8e8eb;
+}
+
 .sales-workflow-section {
     margin-bottom: 1.5rem;
 }
 
 @media (max-width: 760px) {
+    .customer-action-bar {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 0;
+        padding-top: 0.55rem;
+    }
+
+    .customer-actions {
+        width: 100%;
+        min-height: 2.75rem;
+        overflow-x: auto;
+    }
+
     .customer-list-toolbar {
         flex-wrap: wrap;
     }

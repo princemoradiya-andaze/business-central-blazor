@@ -1,6 +1,7 @@
 @page "/financial/sales"
 @page "/financial/sales/customers"
 @page "/financial/sales/customers/new"
+@page "/financial/sales/customers/{CustomerId:guid}/edit"
 @page "/financial/sales/create-order"
 @page "/financial/sales/orders"
 @page "/financial/sales/fulfillment"
@@ -29,6 +30,39 @@ else
     @if (CurrentSection == "customers")
     {
         <section class="customer-workspace" aria-label="Customers">
+            <div class="customer-action-bar" aria-label="Customer actions">
+                <h1>Customers</h1>
+                <div class="customer-actions">
+                    <a class="customer-action-button" href="/financial/sales/customers/new">+ New</a>
+                    <button class="customer-action-button" type="button"
+                            disabled="@(SelectedCustomer is null)"
+                            @onclick="EditSelectedCustomer">
+                        Edit
+                    </button>
+                    @if (SelectedCustomer is { IsInactive: true })
+                    {
+                        <button class="customer-action-button" type="button" @onclick="ReactivateSelectedCustomerAsync">
+                            Activate
+                        </button>
+                    }
+                    else
+                    {
+                        <button class="customer-action-button" type="button"
+                                disabled="@(SelectedCustomer is null)"
+                                @onclick="RequestCustomerDeactivation">
+                            Delete
+                        </button>
+                    }
+                </div>
+            </div>
+            @if (PendingDeactivationCustomer is { } pendingCustomer)
+            {
+                <div class="alert alert-warning customer-deactivation-confirmation" role="alert">
+                    <span>Delete @pendingCustomer.Name? The customer will be marked Inactive and can be reactivated later.</span>
+                    <button class="btn btn-sm btn-danger" type="button" @onclick="DeactivateCustomerAsync">Confirm delete</button>
+                    <button class="btn btn-sm btn-outline-secondary" type="button" @onclick="CancelCustomerDeactivation">Cancel</button>
+                </div>
+            }
             <div class="customer-list-toolbar">
                 <label class="visually-hidden" for="customer-search">Search customers</label>
                 <input id="customer-search"
@@ -36,22 +70,22 @@ else
                        type="search"
                        placeholder="Search customers"
                        @bind="customerSearchTerm"
-                       @bind:event="oninput" />
+                       @bind:event="oninput"
+                       @bind:after="ClearCustomerSelection" />
                 <label class="visually-hidden" for="customer-status">Filter customer status</label>
-                <select id="customer-status" class="form-select customer-status" @bind="customerStatusFilter">
+                <select id="customer-status" class="form-select customer-status"
+                        @bind="customerStatusFilter" @bind:after="ClearCustomerSelection">
                     <option value="all">All customers</option>
                     <option value="active">Active</option>
                     <option value="blocked">Blocked</option>
+                    <option value="inactive">Inactive</option>
                 </select>
-                <a class="customer-new-link" href="/financial/sales/customers/new">+ New</a>
             </div>
-            @if (customers.Count == 0)
+            @if (!FilteredCustomers.Any())
             {
-                <p>No sales customers have been created for this company.</p>
-            }
-            else if (!FilteredCustomers.Any())
-            {
-                <p>No customers match the current search and status filter.</p>
+                <p>@(customers.Count == 0
+                    ? "No sales customers have been created for this company."
+                    : "No customers match the current search and status filter.")</p>
             }
             else
             {
@@ -64,17 +98,68 @@ else
                         <tbody>
                             @foreach (var customer in FilteredCustomers)
                             {
-                                <tr>
-                                    <th scope="row">@customer.Number</th>
+                                <tr class="@(selectedCustomerId == customer.Id ? "customer-row-selected" : null)">
+                                    <th scope="row">
+                                        <button class="customer-number-select" type="button"
+                                                aria-pressed="@(selectedCustomerId == customer.Id)"
+                                                @onclick="() => SelectCustomer(customer.Id)">
+                                            @customer.Number
+                                        </button>
+                                    </th>
                                     <td>@customer.Name</td>
                                     <td>@customer.ReceivablesAccountNumber</td>
-                                    <td>@(customer.IsBlocked ? "Blocked" : "Active")</td>
+                                    <td>@CustomerStatus(customer)</td>
                                 </tr>
                             }
                         </tbody>
                     </table>
                 </div>
             }
+        </section>
+    }
+
+    @if (CurrentSection == "edit-customer")
+    {
+        <section aria-labelledby="edit-customer-heading">
+            <h2 id="edit-customer-heading" class="h4">Edit customer</h2>
+            @if (!EligibleReceivablesAccounts.Any())
+            {
+                <div class="alert alert-info" role="status">
+                    Create an unblocked Asset posting account for accounts receivable before editing a customer.
+                </div>
+            }
+            <EditForm Model="@customerInput" OnValidSubmit="UpdateCustomerAsync" FormName="edit-sales-customer">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+                <fieldset disabled="@isSaving">
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label" for="sales-customer-number">Customer number</label>
+                            <InputText id="sales-customer-number" class="form-control" @bind-Value="customerInput.Number" />
+                            <ValidationMessage For="@(() => customerInput.Number)" />
+                        </div>
+                        <div class="col-md-5">
+                            <label class="form-label" for="sales-customer-name">Name</label>
+                            <InputText id="sales-customer-name" class="form-control" @bind-Value="customerInput.Name" />
+                            <ValidationMessage For="@(() => customerInput.Name)" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="sales-customer-ar">Receivables account</label>
+                            <InputSelect id="sales-customer-ar" class="form-select" @bind-Value="customerInput.ReceivablesAccountId">
+                                <option value="@Guid.Empty">Select Asset posting account</option>
+                                @foreach (var account in EligibleReceivablesAccounts)
+                                {
+                                    <option value="@account.Id">@account.Number - @account.Name</option>
+                                }
+                            </InputSelect>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary mt-3" type="submit" disabled="@(!EligibleReceivablesAccounts.Any())">
+                        @(isSaving ? "Saving..." : "Save")
+                    </button>
+                    <a class="btn btn-outline-secondary mt-3" href="/financial/sales/customers">Cancel</a>
+                </fieldset>
+            </EditForm>
         </section>
     }
 
@@ -403,10 +488,16 @@ else
     private string? errorMessage;
     private string customerSearchTerm = string.Empty;
     private string customerStatusFilter = "all";
+    private Guid? selectedCustomerId;
+    private Guid? pendingDeactivationCustomerId;
+
+    [Parameter]
+    public Guid? CustomerId { get; set; }
 
     private string CurrentSection => CurrentPath switch
     {
         "/financial/sales/customers/new" => "new-customer",
+        _ when CurrentPath.EndsWith("/edit", StringComparison.OrdinalIgnoreCase) => "edit-customer",
         "/financial/sales/create-order" => "create-order",
         "/financial/sales/orders" => "orders",
         "/financial/sales/fulfillment" => "fulfillment",
@@ -418,6 +509,8 @@ else
     private string CurrentSectionTitle => CurrentSection switch
     {
         "customers" => "Customers",
+        "new-customer" => "New customer",
+        "edit-customer" => "Edit customer",
         "create-order" => "Create sales order",
         "orders" => "Sales orders",
         "fulfillment" => "Ship and invoice orders",
@@ -425,14 +518,23 @@ else
         _ => "Sales"
     };
 
-    private IEnumerable<SalesCustomerOption> EligibleCustomers => customers.Where(customer => !customer.IsBlocked);
+    private IEnumerable<SalesCustomerOption> EligibleCustomers =>
+        customers.Where(customer => !customer.IsBlocked && !customer.IsInactive);
     private IEnumerable<SalesCustomerOption> FilteredCustomers => customers.Where(customer =>
-        (customerStatusFilter == "all" ||
-         customerStatusFilter == "active" && !customer.IsBlocked ||
-         customerStatusFilter == "blocked" && customer.IsBlocked) &&
+        (customerStatusFilter switch
+        {
+            "active" => !customer.IsInactive && !customer.IsBlocked,
+            "blocked" => !customer.IsInactive && customer.IsBlocked,
+            "inactive" => customer.IsInactive,
+            _ => !customer.IsInactive
+        }) &&
         (string.IsNullOrWhiteSpace(customerSearchTerm) ||
          customer.Number.Contains(customerSearchTerm, StringComparison.OrdinalIgnoreCase) ||
          customer.Name.Contains(customerSearchTerm, StringComparison.OrdinalIgnoreCase)));
+    private SalesCustomerOption? SelectedCustomer => FilteredCustomers
+        .SingleOrDefault(customer => customer.Id == selectedCustomerId);
+    private SalesCustomerOption? PendingDeactivationCustomer => customers
+        .SingleOrDefault(customer => customer.Id == pendingDeactivationCustomerId);
     private IReadOnlyList<SalesItemOption> EligibleItems => items.Where(item => !item.IsBlocked).ToArray();
     private IReadOnlyList<SalesAccountOption> EligibleSalesAccounts => accounts
         .Where(account => account.Category == AccountCategory.Income &&
@@ -449,6 +551,20 @@ else
         try
         {
             await LoadAsync();
+            if (CurrentSection == "edit-customer" && CustomerId is { } customerId)
+            {
+                var customer = customers.SingleOrDefault(candidate => candidate.Id == customerId);
+                if (customer is null)
+                {
+                    errorMessage = "The customer is not available in the active company.";
+                }
+                else
+                {
+                    customerInput.Number = customer.Number;
+                    customerInput.Name = customer.Name;
+                    customerInput.ReceivablesAccountId = customer.ReceivablesAccountId;
+                }
+            }
         }
         catch (UnauthorizedAccessException)
         {
@@ -500,6 +616,87 @@ else
             Navigation.NavigateTo("/financial/sales/customers");
         });
     }
+
+    private async Task UpdateCustomerAsync()
+    {
+        if (CustomerId is not { } customerId)
+        {
+            errorMessage = "The customer to edit is not available.";
+            return;
+        }
+
+        await ExecuteAsync(async user =>
+        {
+            await SalesService.UpdateCustomerAsync(user, customerId, customerInput);
+            statusMessage = "Customer updated.";
+            Navigation.NavigateTo("/financial/sales/customers");
+        });
+    }
+
+    private void SelectCustomer(Guid customerId)
+    {
+        selectedCustomerId = selectedCustomerId == customerId ? null : customerId;
+        pendingDeactivationCustomerId = null;
+    }
+
+    private void ClearCustomerSelection()
+    {
+        selectedCustomerId = null;
+        pendingDeactivationCustomerId = null;
+    }
+
+    private void EditSelectedCustomer()
+    {
+        if (SelectedCustomer is { } customer)
+        {
+            Navigation.NavigateTo($"/financial/sales/customers/{customer.Id}/edit");
+        }
+    }
+
+    private void RequestCustomerDeactivation()
+    {
+        if (SelectedCustomer is { IsInactive: false } customer)
+        {
+            pendingDeactivationCustomerId = customer.Id;
+        }
+    }
+
+    private void CancelCustomerDeactivation() => pendingDeactivationCustomerId = null;
+
+    private async Task DeactivateCustomerAsync()
+    {
+        if (PendingDeactivationCustomer is not { IsInactive: false } customer)
+        {
+            return;
+        }
+
+        await ExecuteAsync(async user =>
+        {
+            await SalesService.SetCustomerInactiveAsync(user, customer.Id, true);
+            selectedCustomerId = null;
+            pendingDeactivationCustomerId = null;
+            statusMessage = "Customer marked inactive.";
+        });
+    }
+
+    private async Task ReactivateSelectedCustomerAsync()
+    {
+        if (SelectedCustomer is not { IsInactive: true } customer)
+        {
+            return;
+        }
+
+        await ExecuteAsync(async user =>
+        {
+            await SalesService.SetCustomerInactiveAsync(user, customer.Id, false);
+            selectedCustomerId = null;
+            customerStatusFilter = "all";
+            statusMessage = "Customer reactivated.";
+        });
+    }
+
+    private static string CustomerStatus(SalesCustomerOption customer) =>
+        customer.IsInactive ? "Inactive" : customer.IsBlocked ? "Blocked" : "Active";
 
     private void AddOrderLine() => orderInput.Lines.Add(new SalesOrderLineInput());
 
