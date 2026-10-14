@@ -1,4 +1,5 @@
 .company-navigation {
+    --navigation-separator-height: 1.5rem;
     position: sticky;
     top: 2.85rem;
     z-index: 15;
@@ -37,6 +38,7 @@
 
 .company-identity {
     display: flex;
+    height: var(--navigation-separator-height);
     min-width: 0;
     max-width: 22rem;
     align-items: center;
@@ -152,16 +154,26 @@
 }
 
 .navigation-menu-link {
+    position: relative;
     display: grid;
     width: 2.5rem;
     height: 2.6rem;
     flex: 0 0 auto;
     place-items: center;
-    border-left: 1px solid #d9dde1;
     margin-left: 0.35rem;
     color: #44566a;
     font-size: 1.15rem;
     text-decoration: none;
+}
+
+.navigation-menu-link::before {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    height: var(--navigation-separator-height);
+    border-left: 1px solid #d9dde1;
+    content: "";
+    transform: translateY(-50%);
 }
 
 .navigation-menu-link:hover,
