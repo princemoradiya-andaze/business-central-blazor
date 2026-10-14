@@ -34,7 +34,7 @@ else
                 <h1>Customers</h1>
                 <span class="customer-command-separator" aria-hidden="true"></span>
                 <label class="visually-hidden" for="customer-status">Filter customers</label>
-                <select id="customer-status" class="customer-view-filter"
+                <select id="customer-status" class="customer-view-filter customer-view-filter-@customerStatusFilter"
                         @bind="customerStatusFilter" @bind:after="ClearCustomerSelection">
                     <option value="all">All</option>
                     <option value="active">Active</option>

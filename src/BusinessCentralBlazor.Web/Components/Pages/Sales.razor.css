@@ -4,7 +4,7 @@
 
 .customer-action-bar {
     display: flex;
-    min-height: 3.25rem;
+    min-height: 2.75rem;
     align-items: center;
     gap: 0;
     overflow-x: auto;
@@ -15,27 +15,49 @@
     margin: 0;
     flex: 0 0 auto;
     color: #17212b;
-    font-size: 1.05rem;
+    font-size: 1rem;
     font-weight: 500;
     white-space: nowrap;
 }
 
 .customer-command-separator {
     width: 1px;
-    height: 1.75rem;
+    height: 1.5rem;
     flex: 0 0 1px;
-    margin: 0 0.45rem;
+    margin: 0 0.35rem;
     background: #cbd2d9;
 }
 
 .customer-view-filter {
     flex: 0 0 auto;
-    padding: 0.4rem 0.55rem;
+    height: 2rem;
+    padding: 0.25rem 1.25rem 0.25rem 0.4rem;
     border: 0;
     color: #005b85;
     background-color: transparent;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='m1 1 4 4 4-4' fill='none' stroke='%23005b85' stroke-width='1.5'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.35rem center;
+    appearance: none;
     font: inherit;
+    font-size: 0.875rem;
     cursor: pointer;
+}
+
+.customer-view-filter-all {
+    width: 3rem;
+}
+
+.customer-view-filter-active {
+    width: 4.15rem;
+}
+
+.customer-view-filter-blocked {
+    width: 4.8rem;
+}
+
+.customer-view-filter-inactive {
+    width: 4.65rem;
 }
 
 .customer-view-filter:focus-visible,
@@ -46,9 +68,9 @@
 
 .customer-search-toggle {
     display: grid;
-    width: 2rem;
-    height: 2.1rem;
-    flex: 0 0 2rem;
+    width: 1.85rem;
+    height: 2rem;
+    flex: 0 0 1.85rem;
     place-items: center;
     border: 0;
     color: #005b85;
@@ -57,7 +79,7 @@
 }
 
 .customer-search-toggle:hover {
-    background: #eaf4f8;
+    background: #d8f3f3;
 }
 
 .customer-search-icon {
@@ -101,7 +123,7 @@
 
 .customer-actions {
     display: flex;
-    min-height: 3.25rem;
+    min-height: 2.75rem;
     flex: 0 0 auto;
     align-items: center;
     gap: 0;
@@ -110,7 +132,8 @@
 .customer-action-button {
     display: inline-flex;
     align-items: center;
-    padding: 0.4rem 0.65rem;
+    min-height: 2rem;
+    padding: 0.25rem 0.5rem;
     border: 0;
     border-radius: 0;
     color: #005b85;
@@ -124,8 +147,8 @@
 .customer-action-button:hover,
 .customer-action-button:focus-visible {
     color: #004d70;
-    background: #eaf4f8;
-    text-decoration: underline;
+    background: #d8f3f3;
+    text-decoration: none;
 }
 
 .customer-action-button:disabled {
