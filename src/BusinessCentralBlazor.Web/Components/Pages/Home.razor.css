@@ -3,21 +3,84 @@
 }
 
 .home-dashboard-heading {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(22rem, 1fr);
+    align-items: center;
+    gap: 2rem;
     margin-bottom: 1.25rem;
+}
+
+.home-dashboard-eyebrow {
+    display: block;
+    margin-bottom: 0.4rem;
+    color: #536171;
+    font-size: 0.82rem;
 }
 
 .home-dashboard-heading h1 {
     margin: 0;
-    color: #173b4d;
-    font-size: 1.65rem;
-    font-weight: 500;
+    color: #252525;
+    font-size: clamp(2rem, 3.3vw, 3.25rem);
+    font-weight: 300;
     letter-spacing: -0.02em;
 }
 
 .home-dashboard-heading p {
-    margin: 0.3rem 0 0;
+    margin: 0.75rem 0 0;
     color: #596779;
-    font-size: 0.9rem;
+    font-size: 1rem;
+    font-style: italic;
+}
+
+.home-actions {
+    width: 100%;
+    min-height: 9rem;
+    margin: 0;
+    padding: 0.75rem 1rem 1rem;
+    border: 1px solid #c8cfd6;
+    background: #f8fafb;
+}
+
+.home-actions h2 {
+    margin: 0 0 0.6rem;
+    color: #536171;
+    font-size: 0.8rem;
+    font-weight: 400;
+}
+
+.home-action-groups {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.65rem 1rem;
+}
+
+.home-action-group {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.home-action-group a {
+    overflow: hidden;
+    color: #007c91;
+    font-size: 0.88rem;
+    text-decoration: none;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.home-action-group a:hover,
+.home-action-group a:focus-visible {
+    color: #005e6b;
+    text-decoration: underline;
+}
+
+.home-action-group a span {
+    display: inline-block;
+    width: 1.1rem;
+    font-size: 1rem;
+    text-align: center;
 }
 
 .dashboard-group-heading {
@@ -142,6 +205,19 @@
 }
 
 @media (max-width: 760px) {
+    .home-dashboard-heading {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    .home-actions {
+        margin-bottom: 1.4rem;
+    }
+
+    .home-action-groups {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
     .dashboard-secondary-grid {
         grid-template-columns: 1fr;
         gap: 1.25rem;
@@ -150,6 +226,10 @@
 }
 
 @media (max-width: 480px) {
+    .home-action-groups {
+        grid-template-columns: 1fr;
+    }
+
     .dashboard-metric-grid,
     .dashboard-compact-grid {
         gap: 0.4rem;

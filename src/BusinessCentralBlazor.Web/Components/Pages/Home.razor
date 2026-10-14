@@ -2,15 +2,39 @@
 @attribute [Authorize(Policy = CompanyAuthorizationPolicies.ActiveCompany)]
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject IHomeDashboardService HomeDashboardService
+@inject Microsoft.AspNetCore.Identity.UserManager<BusinessCentralBlazor.Infrastructure.Identity.ErpUser> UserManager
 
 <PageTitle>Home</PageTitle>
 
 <section class="home-dashboard" aria-labelledby="home-heading">
     <header class="home-dashboard-heading">
         <div>
-            <h1 id="home-heading">Company overview</h1>
-            <p>Quick counts and direct access to your day-to-day work.</p>
+            <span class="home-dashboard-eyebrow">Company overview</span>
+            <h1 id="home-heading">@Greeting, @DisplayName</h1>
+            <p>Here are a few things you can do today.</p>
         </div>
+        <section class="home-actions" aria-labelledby="home-actions-heading">
+            <h2 id="home-actions-heading">Actions</h2>
+            <div class="home-action-groups">
+                <div class="home-action-group">
+                    <a href="/financial/sales/create-order"><span aria-hidden="true">＋</span> Sales order</a>
+                    <a href="/financial/sales/customers/new"><span aria-hidden="true">＋</span> Customer</a>
+                </div>
+                <div class="home-action-group">
+                    <a href="/financial/purchasing#purchase-order-heading"><span aria-hidden="true">＋</span> Purchase order</a>
+                    <a href="/financial/purchasing#vendors-heading"><span aria-hidden="true">＋</span> Vendor</a>
+                </div>
+                <div class="home-action-group">
+                    <a href="/financial/journals/new"><span aria-hidden="true">›</span> New journal</a>
+                    <a href="/financial/general-ledger/entries"><span aria-hidden="true">›</span> Find entries</a>
+                    <a href="/financial/sales/receivables"><span aria-hidden="true">›</span> Receivables</a>
+                </div>
+                <div class="home-action-group">
+                    <a href="/navigation"><span aria-hidden="true">›</span> All pages</a>
+                    <a href="/financial/general-ledger/trial-balance"><span aria-hidden="true">▤</span> Trial balance</a>
+                </div>
+            </div>
+        </section>
     </header>
 
     @if (isLoading)
@@ -99,13 +123,29 @@
     private HomeDashboardSummary? summary;
     private bool isLoading = true;
     private string? errorMessage;
+    private string displayName = "there";
+    private string DisplayName => displayName;
+    private string Greeting => DateTime.Now.Hour switch
+    {
+        < 12 => "Good morning",
+        < 17 => "Good afternoon",
+        _ => "Good evening"
+    };
+    private System.Security.Claims.ClaimsPrincipal? currentUser;
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
-            summary = await HomeDashboardService.GetSummaryAsync(user);
+            currentUser = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+            var identityUser = await UserManager.GetUserAsync(currentUser);
+            displayName = !string.IsNullOrWhiteSpace(identityUser?.DisplayName)
+                ? identityUser.DisplayName
+                : identityUser?.UserName
+                    ?? currentUser.Identity?.Name
+                    ?? currentUser.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value
+                    ?? "there";
+            summary = await HomeDashboardService.GetSummaryAsync(currentUser);
         }
         catch (UnauthorizedAccessException)
         {

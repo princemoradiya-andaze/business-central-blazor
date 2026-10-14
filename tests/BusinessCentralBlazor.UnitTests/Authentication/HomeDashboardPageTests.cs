@@ -35,7 +35,15 @@ public sealed class HomeDashboardPageTests(AuthenticationWebApplicationFactory f
         var html = await response.Content.ReadAsStringAsync();
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("Authentication test user", html, StringComparison.Ordinal);
+        Assert.Matches("Good (morning|afternoon|evening), Authentication test user", html);
         Assert.Contains("Company overview", html, StringComparison.Ordinal);
+        Assert.Contains("Actions", html, StringComparison.Ordinal);
+        Assert.Contains("Sales order", html, StringComparison.Ordinal);
+        Assert.Contains("Purchase order", html, StringComparison.Ordinal);
+        Assert.Contains("New journal", html, StringComparison.Ordinal);
+        Assert.Contains("Find entries", html, StringComparison.Ordinal);
+        Assert.Contains("Trial balance", html, StringComparison.Ordinal);
         Assert.Contains("Business overview", html, StringComparison.Ordinal);
         Assert.Contains("Customers", html, StringComparison.Ordinal);
         Assert.Contains("Vendors", html, StringComparison.Ordinal);
@@ -48,6 +56,14 @@ public sealed class HomeDashboardPageTests(AuthenticationWebApplicationFactory f
         Assert.Contains("href=\"/financial/sales/customers\"", html, StringComparison.Ordinal);
         Assert.Contains("href=\"/financial/sales/orders\"", html, StringComparison.Ordinal);
         Assert.Contains("href=\"/financial/general-ledger/accounts\"", html, StringComparison.Ordinal);
+        Assert.Contains("href=\"/financial/sales/create-order\"", html, StringComparison.Ordinal);
+        Assert.Contains("href=\"/financial/sales/customers/new\"", html, StringComparison.Ordinal);
+        Assert.Contains("href=\"/financial/purchasing#purchase-order-heading\"", html, StringComparison.Ordinal);
+        Assert.Contains("href=\"/financial/purchasing#vendors-heading\"", html, StringComparison.Ordinal);
+        Assert.Contains("href=\"/financial/journals/new\"", html, StringComparison.Ordinal);
+        Assert.Contains("href=\"/financial/general-ledger/entries\"", html, StringComparison.Ordinal);
+        Assert.Contains("href=\"/financial/general-ledger/trial-balance\"", html, StringComparison.Ordinal);
+        Assert.Contains("href=\"/navigation\"", html, StringComparison.Ordinal);
     }
 
     private static async Task SignInAsync(HttpClient client, string email)
