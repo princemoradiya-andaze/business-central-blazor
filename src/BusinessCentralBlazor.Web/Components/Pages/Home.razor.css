@@ -10,19 +10,19 @@
     margin-bottom: 1.25rem;
 }
 
-.home-dashboard-eyebrow {
-    display: block;
-    margin-bottom: 0.4rem;
-    color: #536171;
-    font-size: 0.82rem;
-}
-
 .home-dashboard-heading h1 {
     margin: 0;
     color: #252525;
     font-size: clamp(2rem, 3.3vw, 3.25rem);
     font-weight: 300;
     letter-spacing: -0.02em;
+}
+
+.home-dashboard-greeting {
+    margin: 0.35rem 0 0;
+    color: #536171;
+    font-size: 1.25rem;
+    font-weight: 400;
 }
 
 .home-dashboard-heading p {
@@ -38,7 +38,7 @@
     margin: 0;
     padding: 0.75rem 1rem 1rem;
     border: 1px solid #c8cfd6;
-    background: #f8fafb;
+    background: transparent;
 }
 
 .home-actions h2 {
