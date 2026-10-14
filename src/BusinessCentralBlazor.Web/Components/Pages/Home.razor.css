@@ -53,15 +53,15 @@
 
 .dashboard-metric-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, 9.125rem);
+    grid-template-columns: repeat(auto-fill, 7.625rem);
     align-items: start;
     gap: 0.5rem;
 }
 
 .dashboard-metric-card {
     display: flex;
-    width: 9.125rem;
-    height: 10.375rem;
+    width: 7.625rem;
+    height: 8.625rem;
     flex-direction: column;
     padding: 0.8rem 0.85rem 0.6rem;
     color: #fff;
@@ -116,13 +116,13 @@
 
 .dashboard-compact-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, 9.125rem);
+    grid-template-columns: repeat(auto-fill, 7.625rem);
     align-items: start;
     gap: 0.5rem;
 }
 
 .dashboard-metric-card-compact {
-    height: 10.375rem;
+    height: 8.625rem;
     padding: 0.8rem 0.85rem 0.6rem;
 }
 
@@ -156,7 +156,7 @@
     }
 
     .dashboard-metric-card {
-        width: min(9.125rem, 100%);
+        width: min(7.625rem, 100%);
     }
 
     .dashboard-metric-value {
