@@ -155,7 +155,11 @@
 
 .workspace-main {
     min-width: 0;
-    padding: 1.4rem clamp(1rem, 3vw, 2.5rem) 3rem;
+    padding: 1.4rem clamp(1rem, 7.8vw, 9.5rem) 3rem;
+}
+
+.workspace-main.customer-list-main {
+    padding-top: 0;
 }
 
 .workspace-main:has(.navigation-directory) {
@@ -166,8 +170,8 @@
 }
 
 .workspace-content {
-    width: min(100%, 98rem);
-    margin: 0 auto;
+    width: 100%;
+    margin: 0;
 }
 
 #blazor-error-ui {
@@ -189,6 +193,13 @@
     position: absolute;
     right: 0.75rem;
     top: 0.5rem;
+}
+
+@media (max-width: 900px) {
+    .workspace-main {
+        padding-left: 0.65rem;
+        padding-right: 0.65rem;
+    }
 }
 
 @media (max-width: 760px) {

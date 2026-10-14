@@ -674,6 +674,7 @@ public sealed class ErpDbContext(DbContextOptions<ErpDbContext> options)
         modelBuilder.Entity<Customer>(entity =>
         {
             entity.HasIndex(customer => new { customer.CompanyId, customer.ReceivablesAccountId });
+            entity.Property(customer => customer.IsInactive).HasDefaultValue(false);
             entity.HasOne<GeneralLedgerAccount>().WithMany()
                 .HasForeignKey(customer => new { customer.CompanyId, customer.ReceivablesAccountId })
                 .HasPrincipalKey(account => new { account.CompanyId, account.Id })

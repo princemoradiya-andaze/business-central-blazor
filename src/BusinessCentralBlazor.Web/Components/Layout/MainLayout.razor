@@ -44,7 +44,7 @@
 
     <NavMenu />
 
-    <main class="workspace-main">
+    <main class="workspace-main @(IsCustomersListPage ? "customer-list-main" : null)">
         <div class="workspace-content">
             <PageCommandBar />
             @Body
@@ -64,6 +64,15 @@
     private IJSObjectReference? outsideClickModule;
     private DotNetObjectReference<MainLayout>? dotNetReference;
     private int? outsideClickListenerId;
+    private bool IsCustomersListPage
+    {
+        get
+        {
+            var path = "/" + Navigation.ToBaseRelativePath(Navigation.Uri).Split('?', '#')[0];
+            return path.Equals("/financial/sales", StringComparison.OrdinalIgnoreCase) ||
+                   path.Equals("/financial/sales/customers", StringComparison.OrdinalIgnoreCase);
+        }
+    }
 
     protected override void OnInitialized()
     {
