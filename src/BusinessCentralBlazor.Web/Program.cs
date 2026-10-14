@@ -40,6 +40,7 @@ builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddScoped<IActiveCompanyContext, ActiveCompanyContext>();
 builder.Services.AddScoped<ICompanyScopeAuthorizer, CompanyScopeAuthorizer>();
 builder.Services.AddScoped<IWorkspaceNoteService, WorkspaceNoteService>();
+builder.Services.AddScoped<IHomeDashboardService, HomeDashboardService>();
 builder.Services.AddScoped<IGeneralLedgerAccountService, GeneralLedgerAccountService>();
 builder.Services.AddScoped<IDimensionService, DimensionService>();
 builder.Services.AddScoped<IGeneralJournalService, GeneralJournalService>();
