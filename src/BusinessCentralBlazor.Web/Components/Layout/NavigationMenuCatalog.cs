@@ -15,11 +15,11 @@ internal static class NavigationMenuCatalog
         ["/financial/journals", "/financial/general-ledger/accounts", "/financial/dimensions", "/financial/accounting-periods", "/financial/tax-setup"]),
         new("sales", "Sales",
         [
-            new("Customers", "/financial/sales#customers-heading"),
-            new("Create sales order", "/financial/sales#sales-order-heading"),
-            new("Sales orders", "/financial/sales#orders-heading"),
-            new("Ship and invoice orders", "/financial/sales#fulfillment-heading"),
-            new("Open receivables", "/financial/sales#receivables-heading")
+            new("Customers", "/financial/sales/customers"),
+            new("Create sales order", "/financial/sales/create-order"),
+            new("Sales orders", "/financial/sales/orders"),
+            new("Ship and invoice orders", "/financial/sales/fulfillment"),
+            new("Open receivables", "/financial/sales/receivables")
         ],
         ["/financial/sales"]),
         new("purchasing", "Purchasing",

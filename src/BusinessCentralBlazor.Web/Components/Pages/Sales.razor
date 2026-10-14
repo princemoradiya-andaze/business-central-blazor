@@ -1,15 +1,16 @@
 @page "/financial/sales"
+@page "/financial/sales/customers"
+@page "/financial/sales/customers/new"
+@page "/financial/sales/create-order"
+@page "/financial/sales/orders"
+@page "/financial/sales/fulfillment"
+@page "/financial/sales/receivables"
 @attribute [Authorize(Policy = CompanyAuthorizationPolicies.ActiveCompany)]
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject ISalesService SalesService
 @inject NavigationManager Navigation
 
-<PageTitle>Sales and receivables</PageTitle>
-<h1>Sales and receivables</h1>
-<p class="text-body-secondary">
-    Create customer orders, ship the full order through inventory, and invoice it through the general journal.
-    Customer payments and partial shipments are not included in this first sales release.
-</p>
+<PageTitle>@CurrentSectionTitle</PageTitle>
 
 @if (!string.IsNullOrWhiteSpace(statusMessage))
 {
@@ -21,27 +22,47 @@
 }
 @if (isLoading)
 {
-    <p role="status">Loading sales...</p>
+    <p role="status">Loading @CurrentSectionTitle.ToLowerInvariant()...</p>
 }
 else
 {
-    <section class="card mb-4" aria-labelledby="customers-heading">
-        <div class="card-body">
-            <h2 id="customers-heading" class="h4">Customers</h2>
+    @if (CurrentSection == "customers")
+    {
+        <section class="customer-workspace" aria-label="Customers">
+            <div class="customer-list-toolbar">
+                <label class="visually-hidden" for="customer-search">Search customers</label>
+                <input id="customer-search"
+                       class="form-control customer-search"
+                       type="search"
+                       placeholder="Search customers"
+                       @bind="customerSearchTerm"
+                       @bind:event="oninput" />
+                <label class="visually-hidden" for="customer-status">Filter customer status</label>
+                <select id="customer-status" class="form-select customer-status" @bind="customerStatusFilter">
+                    <option value="all">All customers</option>
+                    <option value="active">Active</option>
+                    <option value="blocked">Blocked</option>
+                </select>
+                <a class="customer-new-link" href="/financial/sales/customers/new">+ New</a>
+            </div>
             @if (customers.Count == 0)
             {
                 <p>No sales customers have been created for this company.</p>
             }
+            else if (!FilteredCustomers.Any())
+            {
+                <p>No customers match the current search and status filter.</p>
+            }
             else
             {
                 <div class="table-responsive">
-                    <table class="table table-striped align-middle">
+                    <table class="table customer-table align-middle">
                         <caption>Sales customers and their receivables accounts</caption>
                         <thead>
-                            <tr><th scope="col">Number</th><th scope="col">Name</th><th scope="col">Receivables account</th><th scope="col">Status</th></tr>
+                            <tr><th scope="col">No.</th><th scope="col">Name</th><th scope="col">Receivables account</th><th scope="col">Status</th></tr>
                         </thead>
                         <tbody>
-                            @foreach (var customer in customers)
+                            @foreach (var customer in FilteredCustomers)
                             {
                                 <tr>
                                     <th scope="row">@customer.Number</th>
@@ -54,8 +75,13 @@ else
                     </table>
                 </div>
             }
+        </section>
+    }
 
-            <h3 class="h5 mt-4">Create customer</h3>
+    @if (CurrentSection == "new-customer")
+    {
+        <section aria-labelledby="new-customer-heading">
+            <h2 id="new-customer-heading" class="h4">New customer</h2>
             @if (!EligibleReceivablesAccounts.Any())
             {
                 <div class="alert alert-info" role="status">
@@ -89,14 +115,16 @@ else
                         </div>
                     </div>
                     <button class="btn btn-primary mt-3" type="submit" disabled="@(!EligibleReceivablesAccounts.Any())">
-                        @(isSaving ? "Saving..." : "Create customer")
+                        @(isSaving ? "Saving..." : "Save")
                     </button>
                 </fieldset>
             </EditForm>
-        </div>
-    </section>
+        </section>
+    }
 
-    <section class="card mb-4" aria-labelledby="sales-order-heading">
+    @if (CurrentSection == "create-order")
+    {
+    <section class="sales-workflow-section" aria-labelledby="sales-order-heading">
         <div class="card-body">
             <h2 id="sales-order-heading" class="h4">Create sales order</h2>
             @if (!EligibleCustomers.Any() || EligibleItems.Count == 0 || EligibleSalesAccounts.Count == 0)
@@ -202,8 +230,11 @@ else
             </EditForm>
         </div>
     </section>
+    }
 
-    <section class="card mb-4" aria-labelledby="fulfillment-heading">
+    @if (CurrentSection == "fulfillment")
+    {
+    <section class="sales-workflow-section" aria-labelledby="fulfillment-heading">
         <div class="card-body">
             <h2 id="fulfillment-heading" class="h4">Ship and invoice orders</h2>
             @if (orders.Count == 0)
@@ -269,8 +300,11 @@ else
             }
         </div>
     </section>
+    }
 
-    <section class="mb-4" aria-labelledby="orders-heading">
+    @if (CurrentSection == "orders")
+    {
+    <section class="sales-workflow-section" aria-labelledby="orders-heading">
         <h2 id="orders-heading" class="h4">Sales orders</h2>
         @if (orders.Count == 0)
         {
@@ -312,7 +346,10 @@ else
             </div>
         }
     </section>
+    }
 
+    @if (CurrentSection == "receivables")
+    {
     <section aria-labelledby="receivables-heading">
         <h2 id="receivables-heading" class="h4">Open receivables</h2>
         @if (receivables.Count == 0)
@@ -345,6 +382,7 @@ else
             </div>
         }
     </section>
+    }
 }
 
 @code {
@@ -363,8 +401,38 @@ else
     private bool isSaving;
     private string? statusMessage;
     private string? errorMessage;
+    private string customerSearchTerm = string.Empty;
+    private string customerStatusFilter = "all";
+
+    private string CurrentSection => CurrentPath switch
+    {
+        "/financial/sales/customers/new" => "new-customer",
+        "/financial/sales/create-order" => "create-order",
+        "/financial/sales/orders" => "orders",
+        "/financial/sales/fulfillment" => "fulfillment",
+        "/financial/sales/receivables" => "receivables",
+        _ => "customers"
+    };
+    private string CurrentPath => ("/" + Navigation.ToBaseRelativePath(Navigation.Uri).Split('?', '#')[0])
+        .ToLowerInvariant();
+    private string CurrentSectionTitle => CurrentSection switch
+    {
+        "customers" => "Customers",
+        "create-order" => "Create sales order",
+        "orders" => "Sales orders",
+        "fulfillment" => "Ship and invoice orders",
+        "receivables" => "Open receivables",
+        _ => "Sales"
+    };
 
     private IEnumerable<SalesCustomerOption> EligibleCustomers => customers.Where(customer => !customer.IsBlocked);
+    private IEnumerable<SalesCustomerOption> FilteredCustomers => customers.Where(customer =>
+        (customerStatusFilter == "all" ||
+         customerStatusFilter == "active" && !customer.IsBlocked ||
+         customerStatusFilter == "blocked" && customer.IsBlocked) &&
+        (string.IsNullOrWhiteSpace(customerSearchTerm) ||
+         customer.Number.Contains(customerSearchTerm, StringComparison.OrdinalIgnoreCase) ||
+         customer.Name.Contains(customerSearchTerm, StringComparison.OrdinalIgnoreCase)));
     private IReadOnlyList<SalesItemOption> EligibleItems => items.Where(item => !item.IsBlocked).ToArray();
     private IReadOnlyList<SalesAccountOption> EligibleSalesAccounts => accounts
         .Where(account => account.Category == AccountCategory.Income &&
@@ -429,6 +497,7 @@ else
             customerInput.Name = string.Empty;
             customerInput.ReceivablesAccountId = Guid.Empty;
             statusMessage = "Customer created.";
+            Navigation.NavigateTo("/financial/sales/customers");
         });
     }
 

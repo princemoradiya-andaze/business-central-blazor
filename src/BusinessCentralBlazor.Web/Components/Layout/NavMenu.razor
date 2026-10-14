@@ -43,7 +43,7 @@
                 @if (IsHomePage)
                 {
                     <nav class="home-quick-links" aria-label="Home shortcuts">
-                        <a href="/financial/sales#customers-heading">Customers</a>
+                        <a href="/financial/sales/customers">Customers</a>
                         <a href="/financial/purchasing#vendors-heading">Vendors</a>
                         <a href="/financial/inventory#items-heading">Items</a>
                         <a href="/financial/banks">Bank Accounts</a>
@@ -94,6 +94,9 @@
     }
 
     private bool IsGroupActive(NavigationGroup group) =>
+        !(group.Key == "sales" &&
+          (CurrentPath.Equals("/financial/sales", StringComparison.OrdinalIgnoreCase) ||
+           CurrentPath.StartsWith("/financial/sales/customers", StringComparison.OrdinalIgnoreCase))) &&
         group.ActivePrefixes.Any(prefix => CurrentPath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
 
     private void ToggleMenu(string key) => openMenu = openMenu == key ? null : key;

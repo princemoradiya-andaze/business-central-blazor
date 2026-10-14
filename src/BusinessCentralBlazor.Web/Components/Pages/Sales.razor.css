@@ -1,0 +1,70 @@
+.customer-workspace {
+    min-width: 0;
+}
+
+.customer-list-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin: 0 0 0.65rem;
+    padding: 0.45rem 0;
+    border-bottom: 1px solid #dfe4ea;
+}
+
+.customer-search {
+    max-width: 20rem;
+}
+
+.customer-status {
+    width: auto;
+    min-width: 10rem;
+}
+
+.customer-new-link {
+    display: inline-flex;
+    min-height: 2.35rem;
+    align-items: center;
+    margin-left: 0.35rem;
+    color: #007c91;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.customer-new-link:hover,
+.customer-new-link:focus-visible {
+    color: #005e6b;
+    text-decoration: underline;
+}
+
+.customer-table {
+    --bs-table-bg: transparent;
+    --bs-table-striped-bg: rgb(255 255 255 / 45%);
+    --bs-table-border-color: #d5dce1;
+    min-width: 40rem;
+}
+
+.customer-table thead th {
+    color: #475467;
+    font-weight: 500;
+}
+
+.customer-table tbody tr:hover {
+    --bs-table-bg: #b8e8eb;
+    --bs-table-striped-bg: #b8e8eb;
+}
+
+.sales-workflow-section {
+    margin-bottom: 1.5rem;
+}
+
+@media (max-width: 760px) {
+    .customer-list-toolbar {
+        flex-wrap: wrap;
+    }
+
+    .customer-search {
+        flex: 1 1 100%;
+        max-width: none;
+    }
+}

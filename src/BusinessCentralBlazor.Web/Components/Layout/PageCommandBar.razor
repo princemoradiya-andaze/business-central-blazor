@@ -22,10 +22,23 @@
     [
         new("/financial/sales", "Sales", "Customers",
         [
-            new("New customer", "#customers-heading"),
-            new("New sales order", "#sales-order-heading"),
-            new("Ship and invoice", "#fulfillment-heading")
+            new("New customer", "/financial/sales/customers/new")
         ]),
+        new("/financial/sales/customers", "Sales", "Customers",
+        [
+            new("New customer", "/financial/sales/customers/new")
+        ]),
+        new("/financial/sales/customers/new", "Sales", "New customer",
+        [
+            new("Customers", "/financial/sales/customers")
+        ]),
+        new("/financial/sales/create-order", "Sales", "Create sales order", []),
+        new("/financial/sales/orders", "Sales", "Sales orders",
+        [
+            new("Create sales order", "/financial/sales/create-order")
+        ]),
+        new("/financial/sales/fulfillment", "Sales", "Ship and invoice orders", []),
+        new("/financial/sales/receivables", "Sales", "Open receivables", []),
         new("/financial/purchasing", "Purchasing", "Vendors and purchase orders",
         [
             new("New vendor", "#vendors-heading"),
