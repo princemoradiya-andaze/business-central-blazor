@@ -66,6 +66,12 @@
     outline-offset: 1px;
 }
 
+.customer-view-filter:hover,
+.customer-view-filter:focus {
+    color: #004d70;
+    background-color: #d8f3f3;
+}
+
 .customer-search-toggle {
     display: grid;
     width: 1.85rem;
