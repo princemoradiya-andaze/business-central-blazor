@@ -105,6 +105,10 @@ public sealed class AuthenticationFlowTests(AuthenticationWebApplicationFactory 
         Assert.Contains(">Items</a>", homeHtml, StringComparison.Ordinal);
         Assert.Contains(">Bank Accounts</a>", homeHtml, StringComparison.Ordinal);
         Assert.Contains(">Chart of Accounts</a>", homeHtml, StringComparison.Ordinal);
+        var moreIndex = homeHtml.IndexOf(">More", StringComparison.Ordinal);
+        var allPagesMenuIndex = homeHtml.IndexOf("class=\"navigation-menu-link\"", StringComparison.Ordinal);
+        Assert.True(moreIndex >= 0 && allPagesMenuIndex > moreIndex,
+            "The all-pages menu button should follow More in the company navigation.");
     }
 
     [Fact]

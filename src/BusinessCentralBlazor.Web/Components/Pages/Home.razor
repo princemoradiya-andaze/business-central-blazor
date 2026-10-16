@@ -1,8 +1,159 @@
-﻿@page "/"
+@page "/"
 @attribute [Authorize(Policy = CompanyAuthorizationPolicies.ActiveCompany)]
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IHomeDashboardService HomeDashboardService
+@inject Microsoft.AspNetCore.Identity.UserManager<BusinessCentralBlazor.Infrastructure.Identity.ErpUser> UserManager
 
-<PageTitle>Business Central Blazor</PageTitle>
+<PageTitle>Home</PageTitle>
 
-<h1>Business Central Blazor</h1>
+<section class="home-dashboard" aria-labelledby="home-heading">
+    <header class="home-dashboard-heading">
+        <div>
+            <h1 id="home-heading">Headline</h1>
+            <h2 class="home-dashboard-greeting">@Greeting, @DisplayName</h2>
+            <p>Here are a few things you can do today.</p>
+        </div>
+        <section class="home-actions" aria-labelledby="home-actions-heading">
+            <h2 id="home-actions-heading">Actions</h2>
+            <div class="home-action-groups">
+                <div class="home-action-group">
+                    <a href="/financial/sales/create-order"><span aria-hidden="true">＋</span> Sales order</a>
+                    <a href="/financial/sales/customers/new"><span aria-hidden="true">＋</span> Customer</a>
+                </div>
+                <div class="home-action-group">
+                    <a href="/financial/purchasing#purchase-order-heading"><span aria-hidden="true">＋</span> Purchase order</a>
+                    <a href="/financial/purchasing#vendors-heading"><span aria-hidden="true">＋</span> Vendor</a>
+                </div>
+                <div class="home-action-group">
+                    <a href="/financial/journals/new"><span aria-hidden="true">›</span> New journal</a>
+                    <a href="/financial/general-ledger/entries"><span aria-hidden="true">›</span> Find entries</a>
+                    <a href="/financial/sales/receivables"><span aria-hidden="true">›</span> Receivables</a>
+                </div>
+                <div class="home-action-group">
+                    <a href="/navigation"><span aria-hidden="true">›</span> All pages</a>
+                    <a href="/financial/general-ledger/trial-balance"><span aria-hidden="true">▤</span> Trial balance</a>
+                </div>
+            </div>
+        </section>
+    </header>
 
-<p>Choose a module menu or open All pages to browse the implemented company workspace.</p>
+    @if (isLoading)
+    {
+        <p role="status">Loading company overview...</p>
+    }
+    else if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert alert-danger" role="alert">@errorMessage</div>
+    }
+    else if (summary is not null)
+    {
+        <section class="dashboard-group" aria-labelledby="business-overview-heading">
+            <div class="dashboard-group-heading">
+                <h2 id="business-overview-heading">Business overview</h2>
+                <a href="/navigation">View all pages <span aria-hidden="true">›</span></a>
+            </div>
+            <div class="dashboard-metric-grid">
+                <a class="dashboard-metric-card" href="/financial/sales/customers">
+                    <span class="dashboard-metric-label">Customers</span>
+                    <span class="dashboard-metric-value">@summary.CustomerCount</span>
+                    <span class="dashboard-metric-link"><span aria-hidden="true">›</span> View customers</span>
+                </a>
+                <a class="dashboard-metric-card" href="/financial/purchasing#vendors-heading">
+                    <span class="dashboard-metric-label">Vendors</span>
+                    <span class="dashboard-metric-value">@summary.VendorCount</span>
+                    <span class="dashboard-metric-link"><span aria-hidden="true">›</span> View vendors</span>
+                </a>
+                <a class="dashboard-metric-card" href="/financial/sales/orders">
+                    <span class="dashboard-metric-label">Open sales orders</span>
+                    <span class="dashboard-metric-value">@summary.OpenSalesOrderCount</span>
+                    <span class="dashboard-metric-link"><span aria-hidden="true">›</span> Review orders</span>
+                </a>
+                <a class="dashboard-metric-card" href="/financial/purchasing#purchase-order-heading">
+                    <span class="dashboard-metric-label">Open purchase orders</span>
+                    <span class="dashboard-metric-value">@summary.OpenPurchaseOrderCount</span>
+                    <span class="dashboard-metric-link"><span aria-hidden="true">›</span> Review orders</span>
+                </a>
+            </div>
+        </section>
+
+        <div class="dashboard-secondary-grid">
+            <section class="dashboard-group" aria-labelledby="catalog-heading">
+                <div class="dashboard-group-heading">
+                    <h2 id="catalog-heading">Catalog</h2>
+                </div>
+                <div class="dashboard-compact-grid">
+                    <a class="dashboard-metric-card dashboard-metric-card-compact"
+                       href="/financial/inventory#items-heading">
+                        <span class="dashboard-metric-label">Inventory items</span>
+                        <span class="dashboard-metric-value">@summary.InventoryItemCount</span>
+                        <span class="dashboard-metric-link"><span aria-hidden="true">›</span> View items</span>
+                    </a>
+                    <a class="dashboard-metric-card dashboard-metric-card-compact"
+                       href="/financial/general-ledger/accounts">
+                        <span class="dashboard-metric-label">Chart of accounts</span>
+                        <span class="dashboard-metric-value">@summary.AccountCount</span>
+                        <span class="dashboard-metric-link"><span aria-hidden="true">›</span> View accounts</span>
+                    </a>
+                </div>
+            </section>
+            <section class="dashboard-group" aria-labelledby="work-queues-heading">
+                <div class="dashboard-group-heading">
+                    <h2 id="work-queues-heading">Work queues</h2>
+                </div>
+                <div class="dashboard-compact-grid">
+                    <a class="dashboard-metric-card dashboard-metric-card-compact"
+                       href="/financial/sales/receivables">
+                        <span class="dashboard-metric-label">Open receivables</span>
+                        <span class="dashboard-metric-value">@summary.OpenReceivableCount</span>
+                        <span class="dashboard-metric-link"><span aria-hidden="true">›</span> Review receivables</span>
+                    </a>
+                    <a class="dashboard-metric-card dashboard-metric-card-compact"
+                       href="/financial/purchasing#payables-heading">
+                        <span class="dashboard-metric-label">Open vendor payables</span>
+                        <span class="dashboard-metric-value">@summary.OpenPayableCount</span>
+                        <span class="dashboard-metric-link"><span aria-hidden="true">›</span> Review payables</span>
+                    </a>
+                </div>
+            </section>
+        </div>
+    }
+</section>
+
+@code {
+    private HomeDashboardSummary? summary;
+    private bool isLoading = true;
+    private string? errorMessage;
+    private string displayName = "there";
+    private string DisplayName => displayName;
+    private string Greeting => DateTime.Now.Hour switch
+    {
+        < 12 => "Good morning",
+        < 17 => "Good afternoon",
+        _ => "Good evening"
+    };
+    private System.Security.Claims.ClaimsPrincipal? currentUser;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            currentUser = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+            var identityUser = await UserManager.GetUserAsync(currentUser);
+            displayName = !string.IsNullOrWhiteSpace(identityUser?.DisplayName)
+                ? identityUser.DisplayName
+                : identityUser?.UserName
+                    ?? currentUser.Identity?.Name
+                    ?? currentUser.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value
+                    ?? "there";
+            summary = await HomeDashboardService.GetSummaryAsync(currentUser);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            errorMessage = "Your active company is no longer available. Select an active company and try again.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}
