@@ -89,10 +89,15 @@
 }
 
 .module-menu-toggle:hover,
-.module-menu-toggle:focus-visible,
+.module-menu-toggle:focus-visible {
+    color: #006f82;
+    background: transparent;
+    text-decoration: underline;
+}
+
 .module-menu-toggle[aria-expanded="true"] {
     color: #006f82;
-    background: #f7fafb;
+    background: transparent;
 }
 
 .module-menu-toggle.active {
