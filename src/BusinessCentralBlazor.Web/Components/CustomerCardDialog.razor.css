@@ -1,0 +1,31 @@
+.customer-card-dialog {
+    width: min(1240px, calc(100vw - 80px));
+    height: 760px;
+    max-height: calc(100dvh - 70px);
+    padding: 0;
+    border: 0;
+    background: #fff;
+    color: #252525;
+    box-shadow: 0 20px 60px #0003;
+    overflow: auto;
+}
+
+.customer-card-dialog[open] {
+    display: flex;
+    flex-direction: column;
+}
+
+.customer-card-dialog ::deep form {
+    flex: 1;
+}
+
+.customer-card-dialog::backdrop {
+    background: rgb(0 0 0 / 26%);
+}
+
+@media (max-width: 800px) {
+    .customer-card-dialog {
+        width: calc(100vw - 24px);
+        max-height: calc(100dvh - 24px);
+    }
+}

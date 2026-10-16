@@ -34,4 +34,6 @@ See [the architecture overview](docs/architecture/overview.md), [the schema disc
 
 ## Development workflow
 
+The Customers list opens **New customer** as a Customer Card dialog, including direct visits to `/financial/sales/customers/new`. Save creates the customer using the existing company-scoped workflow; Cancel, the back arrow, Close, or Escape dismisses the dialog without saving. Only customer number, name, and receivables account are currently supported.
+
 Use short-lived issue branches and pull requests into `dev`; promote only completed, reviewed, CI-passing releases from `dev` to `main`. See [the development guide](docs/development-guide.md).

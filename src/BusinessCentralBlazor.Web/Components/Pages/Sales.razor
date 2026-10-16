@@ -17,7 +17,7 @@
 {
     <div class="alert alert-success" role="status">@statusMessage</div>
 }
-@if (!string.IsNullOrWhiteSpace(errorMessage))
+@if (CurrentSection != "new-customer" && !string.IsNullOrWhiteSpace(errorMessage))
 {
     <div class="alert alert-danger" role="alert">@errorMessage</div>
 }
@@ -27,7 +27,7 @@
 }
 else
 {
-    @if (CurrentSection == "customers")
+    @if (CurrentSection is "customers" or "new-customer")
     {
         <section class="customer-workspace" aria-label="Customers">
             <div class="customer-action-bar" aria-label="Customer actions">
@@ -201,46 +201,68 @@ else
 
     @if (CurrentSection == "new-customer")
     {
-        <section aria-labelledby="new-customer-heading">
-            <h2 id="new-customer-heading" class="h4">New customer</h2>
-            @if (!EligibleReceivablesAccounts.Any())
-            {
-                <div class="alert alert-info" role="status">
-                    Create an unblocked Asset posting account for accounts receivable before adding a customer.
-                </div>
-            }
+        <CustomerCardDialog OnClose="CloseCustomerCard" IsSaving="isSaving">
+            <div class="customer-card-top">
+                <button class="customer-card-back" type="button" aria-label="Close Customer Card"
+                        disabled="@isSaving" @onclick="CloseCustomerCard">&#8592;</button>
+                <span>New customer</span>
+            </div>
+            <h2 id="new-customer-heading" class="customer-card-title">Customer Card</h2>
             <EditForm Model="@customerInput" OnValidSubmit="CreateCustomerAsync" FormName="sales-customer">
                 <DataAnnotationsValidator />
-                <ValidationSummary />
-                <fieldset disabled="@isSaving">
-                    <div class="row g-3">
-                        <div class="col-md-3">
-                            <label class="form-label" for="sales-customer-number">Customer number</label>
-                            <InputText id="sales-customer-number" class="form-control" @bind-Value="customerInput.Number" />
-                            <ValidationMessage For="@(() => customerInput.Number)" />
+                <div class="customer-card-commands">
+                    <span>Home</span>
+                    <button type="submit" disabled="@(isSaving || !EligibleReceivablesAccounts.Any())">@(isSaving ? "Saving..." : "Save")</button>
+                    <button type="button" disabled="@isSaving" @onclick="CloseCustomerCard">Cancel</button>
+                </div>
+                <div class="customer-card-body">
+                    @if (!string.IsNullOrWhiteSpace(errorMessage))
+                    {
+                        <div class="alert alert-danger" role="alert">@errorMessage</div>
+                    }
+                    @if (!EligibleReceivablesAccounts.Any())
+                    {
+                        <div class="alert alert-info" role="status">
+                            Create an unblocked Asset posting account for accounts receivable before adding a customer.
                         </div>
-                        <div class="col-md-5">
-                            <label class="form-label" for="sales-customer-name">Name</label>
-                            <InputText id="sales-customer-name" class="form-control" @bind-Value="customerInput.Name" />
-                            <ValidationMessage For="@(() => customerInput.Name)" />
+                    }
+                    <ValidationSummary />
+                    <h3 class="customer-card-section">General</h3>
+                    <fieldset disabled="@isSaving">
+                        <div class="customer-card-fields">
+                            <div class="customer-card-column">
+                                <div class="customer-card-field">
+                                    <label for="sales-customer-number">No. <span aria-hidden="true">*</span></label>
+                                    <InputText id="sales-customer-number" class="form-control" aria-label="Customer number" aria-required="true" maxlength="32" autofocus @bind-Value="customerInput.Number" />
+                                </div>
+                                <ValidationMessage For="@(() => customerInput.Number)" />
+                                <div class="customer-card-field">
+                                    <label for="sales-customer-name">Name <span aria-hidden="true">*</span></label>
+                                    <InputText id="sales-customer-name" class="form-control" aria-required="true" maxlength="160" @bind-Value="customerInput.Name" />
+                                </div>
+                                <ValidationMessage For="@(() => customerInput.Name)" />
+                            </div>
+                            <div class="customer-card-column">
+                                <div class="customer-card-field">
+                                    <label for="sales-customer-ar">Receivables account <span aria-hidden="true">*</span></label>
+                                    <InputSelect id="sales-customer-ar" class="form-select" aria-required="true" @bind-Value="customerInput.ReceivablesAccountId">
+                                        <option value="@Guid.Empty">Select Asset posting account</option>
+                                        @foreach (var account in EligibleReceivablesAccounts)
+                                        {
+                                            <option value="@account.Id">@account.Number - @account.Name</option>
+                                        }
+                                    </InputSelect>
+                                </div>
+                            </div>
                         </div>
-                        <div class="col-md-4">
-                            <label class="form-label" for="sales-customer-ar">Receivables account</label>
-                            <InputSelect id="sales-customer-ar" class="form-select" @bind-Value="customerInput.ReceivablesAccountId">
-                                <option value="@Guid.Empty">Select Asset posting account</option>
-                                @foreach (var account in EligibleReceivablesAccounts)
-                                {
-                                    <option value="@account.Id">@account.Number - @account.Name</option>
-                                }
-                            </InputSelect>
-                        </div>
-                    </div>
-                    <button class="btn btn-primary mt-3" type="submit" disabled="@(!EligibleReceivablesAccounts.Any())">
-                        @(isSaving ? "Saving..." : "Save")
-                    </button>
-                </fieldset>
+                    </fieldset>
+                    <p class="customer-card-help">* Required field.</p>
+                </div>
             </EditForm>
-        </section>
+            <footer class="customer-card-footer">
+                <button class="btn btn-outline-secondary" type="button" disabled="@isSaving" @onclick="CloseCustomerCard">Close</button>
+            </footer>
+        </CustomerCardDialog>
     }
 
     @if (CurrentSection == "create-order")
@@ -664,6 +686,18 @@ else
             statusMessage = "Customer created.";
             Navigation.NavigateTo("/financial/sales/customers");
         });
+    }
+
+    private void CloseCustomerCard()
+    {
+        if (!isSaving)
+        {
+            errorMessage = null;
+            customerInput.Number = string.Empty;
+            customerInput.Name = string.Empty;
+            customerInput.ReceivablesAccountId = Guid.Empty;
+            Navigation.NavigateTo("/financial/sales/customers");
+        }
     }
 
     private async Task UpdateCustomerAsync()
