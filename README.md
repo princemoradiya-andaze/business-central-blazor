@@ -36,4 +36,6 @@ See [the architecture overview](docs/architecture/overview.md), [the schema disc
 
 The Customers list opens **New customer** as a Customer Card dialog, including direct visits to `/financial/sales/customers/new`. Save creates the customer using the existing company-scoped workflow; Cancel, the back arrow, Close, or Escape dismisses the dialog without saving. Only customer number, name, and receivables account are currently supported.
 
+The Customers workspace supports List, Tall tiles, and Tiles views, plus independently toggled filter and customer-details panes. Select a row or tile to enable Edit and Delete; Delete marks a customer inactive rather than permanently removing it, and inactive customers can be reactivated.
+
 Use short-lived issue branches and pull requests into `dev`; promote only completed, reviewed, CI-passing releases from `dev` to `main`. See [the development guide](docs/development-guide.md).
