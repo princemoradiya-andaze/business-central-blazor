@@ -44,7 +44,7 @@ public sealed class WorkspaceNotePageTests(AuthenticationWebApplicationFactory f
         Assert.Contains("- General journals", html, StringComparison.Ordinal);
         Assert.DoesNotContain("aria-hidden=\"true\">›", html, StringComparison.Ordinal);
         Assert.Contains("href=\"/financial/sales/customers\"", html, StringComparison.Ordinal);
-        Assert.Contains("href=\"/financial/purchasing#vendors-heading\"", html, StringComparison.Ordinal);
+        Assert.Contains("href=\"/financial/purchasing/vendors\"", html, StringComparison.Ordinal);
         Assert.Contains("href=\"/financial/general-ledger/trial-balance\"", html, StringComparison.Ordinal);
         Assert.DoesNotContain("Sales quotes", html, StringComparison.Ordinal);
         Assert.DoesNotContain("Purchase invoices", html, StringComparison.Ordinal);

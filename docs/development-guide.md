@@ -136,7 +136,22 @@ concurrency verification remain outstanding.
 
 ## Purchase orders, receipts, invoices, and payables
 
-`/financial/purchasing` configures the company's GRNI liability account and vendor payables accounts,
+`/financial/purchasing/vendors` is the dedicated company-scoped Vendors workspace. Choose List,
+Tall Tiles, or Tiles, search by number/name, filter All/Active/Blocked, and independently toggle
+Filters and Details. Select a vendor to edit or block/reactivate it; both status changes require
+confirmation. The workspace follows Customers' compact command bar, expandable search, status/view
+menus, selectable rows/tiles, pane sizing, and responsive layout. New opens a Vendor Card modal with
+the same required-field layout and Save/Cancel/Close behavior as Customer Card; Edit opens the same
+card prefilled over the workspace. Block/reactivate opens a matching confirmation modal; Cancel,
+Close, and Escape do not change status, and closing returns focus to the initiating action
+(or New if the current filter makes that action unavailable after saving).
+Blocking replaces deletion: vendor records and purchasing history remain intact.
+Blocked vendors cannot be used for new orders, receipt/invoice drafts, or posting under the existing
+purchasing checks; reactivate a vendor before continuing those operations. Vendor creation and editing
+require an unblocked, directly-postable Liability payables account separate from the company's GRNI
+account. Changes are audited; no schema migration is required.
+
+`/financial/purchasing` configures the company's GRNI liability account,
 creates purchase orders for inventory items, and creates separate full-quantity receipt and vendor
 invoice journal drafts. Review and post each draft through General journals. Receipt posting increases
 inventory at the purchase-order cost and credits GRNI; invoice posting clears GRNI, debits recoverable

@@ -1,7 +1,7 @@
 @implements IAsyncDisposable
 @inject IJSRuntime JS
 
-<dialog class="customer-card-dialog" aria-labelledby="new-customer-heading" @ref="dialog">
+<dialog class="customer-card-dialog" aria-labelledby="@LabelledBy" aria-describedby="@DescribedBy" @ref="dialog">
     @ChildContent
 </dialog>
 
@@ -9,6 +9,10 @@
     [Parameter, EditorRequired] public RenderFragment ChildContent { get; set; } = default!;
     [Parameter] public EventCallback OnClose { get; set; }
     [Parameter] public bool IsSaving { get; set; }
+    [Parameter] public string LabelledBy { get; set; } = "new-customer-heading";
+    [Parameter] public string? DescribedBy { get; set; }
+    [Parameter] public string ReturnFocusSelector { get; set; } = ".customer-actions a[href='/financial/sales/customers/new']";
+    [Parameter] public string? ReturnFocusFallbackSelector { get; set; }
     private ElementReference dialog;
     private IJSObjectReference? module;
     private DotNetObjectReference<CustomerCardDialog>? reference;
@@ -38,7 +42,7 @@
         {
             try
             {
-                await module.InvokeVoidAsync("cleanup", dialog);
+                await module.InvokeVoidAsync("cleanup", dialog, ReturnFocusSelector, ReturnFocusFallbackSelector);
                 await module.DisposeAsync();
             }
             catch (JSDisconnectedException)

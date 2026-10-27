@@ -60,7 +60,8 @@ public sealed class HomeDashboardPageTests(AuthenticationWebApplicationFactory f
         Assert.Contains("href=\"/financial/sales/create-order\"", html, StringComparison.Ordinal);
         Assert.Contains("href=\"/financial/sales/customers/new\"", html, StringComparison.Ordinal);
         Assert.Contains("href=\"/financial/purchasing#purchase-order-heading\"", html, StringComparison.Ordinal);
-        Assert.Contains("href=\"/financial/purchasing#vendors-heading\"", html, StringComparison.Ordinal);
+        Assert.Contains("href=\"/financial/purchasing/vendors\"", html, StringComparison.Ordinal);
+        Assert.Contains("href=\"/financial/purchasing/vendors/new\"", html, StringComparison.Ordinal);
         Assert.Contains("href=\"/financial/journals/new\"", html, StringComparison.Ordinal);
         Assert.Contains("href=\"/financial/general-ledger/entries\"", html, StringComparison.Ordinal);
         Assert.Contains("href=\"/financial/general-ledger/trial-balance\"", html, StringComparison.Ordinal);

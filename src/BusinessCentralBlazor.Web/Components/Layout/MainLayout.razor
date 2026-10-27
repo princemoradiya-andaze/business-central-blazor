@@ -44,7 +44,7 @@
 
     <NavMenu />
 
-    <main class="workspace-main @(IsCustomersListPage ? "customer-list-main" : null)">
+    <main class="workspace-main @(IsCustomersListPage || IsVendorsPage ? "customer-list-main" : null)">
         <div class="workspace-content">
             <PageCommandBar />
             @Body
@@ -64,6 +64,8 @@
     private IJSObjectReference? outsideClickModule;
     private DotNetObjectReference<MainLayout>? dotNetReference;
     private int? outsideClickListenerId;
+    private bool IsVendorsPage => Navigation.ToBaseRelativePath(Navigation.Uri)
+        .Split('?', '#')[0].Equals("financial/purchasing/vendors", StringComparison.OrdinalIgnoreCase);
     private bool IsCustomersListPage
     {
         get

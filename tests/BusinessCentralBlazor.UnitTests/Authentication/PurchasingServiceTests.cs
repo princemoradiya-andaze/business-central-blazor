@@ -187,6 +187,226 @@ public sealed class PurchasingServiceTests(AuthenticationWebApplicationFactory f
         Assert.Empty(await purchasing.GetOrdersAsync(local.User));
     }
 
+    [Fact]
+    public async Task VendorCanBeEditedBlockedAndReactivatedWithoutLosingPurchasingHistory()
+    {
+        var setup = await SetupAsync("vendor-lifecycle");
+        await using var scope = factory.Services.CreateAsyncScope();
+        var purchasing = scope.ServiceProvider.GetRequiredService<IPurchasingService>();
+        var journals = scope.ServiceProvider.GetRequiredService<IGeneralJournalService>();
+        var orderId = await CreateOrderAsync(purchasing, setup, "PO-HISTORY");
+        await purchasing.UpdateVendorAsync(setup.User, setup.VendorId, new PurchaseVendorInput
+        {
+            Number = " VEND-EDITED ",
+            Name = " Updated vendor ",
+            PayablesAccountId = setup.PayablesAccountId
+        });
+        var edited = Assert.Single(await purchasing.GetVendorsAsync(setup.User));
+        Assert.Equal("VEND-EDITED", edited.Number);
+        Assert.Equal("Updated vendor", edited.Name);
+        Assert.Equal(setup.PayablesAccountId, edited.PayablesAccountId);
+
+        await purchasing.SetVendorBlockedAsync(setup.User, setup.VendorId, true);
+        await purchasing.SetVendorBlockedAsync(setup.User, setup.VendorId, true);
+        Assert.True(Assert.Single(await purchasing.GetVendorsAsync(setup.User)).IsBlocked);
+        await Assert.ThrowsAsync<ValidationException>(() => CreateOrderAsync(purchasing, setup, "PO-BLOCKED"));
+        var posting = new PurchaseDocumentPostingInput
+        {
+            AccountingPeriodId = setup.PeriodId,
+            PostingDate = PostingDate
+        };
+        await Assert.ThrowsAsync<ValidationException>(() =>
+            purchasing.CreateReceiptDraftAsync(setup.User, orderId, posting));
+        Assert.Equal(orderId, Assert.Single(await purchasing.GetOrdersAsync(setup.User)).Id);
+
+        await purchasing.SetVendorBlockedAsync(setup.User, setup.VendorId, false);
+        var receiptId = await purchasing.CreateReceiptDraftAsync(setup.User, orderId, posting);
+        await purchasing.SetVendorBlockedAsync(setup.User, setup.VendorId, true);
+        await Assert.ThrowsAsync<ValidationException>(() => journals.PostBatchAsync(setup.User, receiptId));
+        await purchasing.SetVendorBlockedAsync(setup.User, setup.VendorId, false);
+        await journals.PostBatchAsync(setup.User, receiptId);
+
+        posting.DocumentNumber = "VENDOR-HISTORY-INV";
+        await purchasing.SetVendorBlockedAsync(setup.User, setup.VendorId, true);
+        await Assert.ThrowsAsync<ValidationException>(() =>
+            purchasing.CreateInvoiceDraftAsync(setup.User, orderId, posting));
+        await purchasing.SetVendorBlockedAsync(setup.User, setup.VendorId, false);
+        var invoiceId = await purchasing.CreateInvoiceDraftAsync(setup.User, orderId, posting);
+        await purchasing.SetVendorBlockedAsync(setup.User, setup.VendorId, true);
+        await Assert.ThrowsAsync<ValidationException>(() => journals.PostBatchAsync(setup.User, invoiceId));
+        await purchasing.SetVendorBlockedAsync(setup.User, setup.VendorId, false);
+        await journals.PostBatchAsync(setup.User, invoiceId);
+        await purchasing.SetVendorBlockedAsync(setup.User, setup.VendorId, true);
+
+        Assert.Equal(PurchaseOrderStatus.Invoiced, Assert.Single(await purchasing.GetOrdersAsync(setup.User)).Status);
+        Assert.Equal(10m, Assert.Single(await purchasing.GetOpenPayablesAsync(setup.User)).OpenAmount);
+        await using var db = await ContextAsync();
+        Assert.Single(await db.Vendors.Where(vendor => vendor.CompanyId == setup.CompanyId).ToListAsync());
+        Assert.Single(await db.PurchaseReceipts.Where(receipt => receipt.CompanyId == setup.CompanyId).ToListAsync());
+        Assert.Single(await db.PurchaseInvoices.Where(invoice => invoice.CompanyId == setup.CompanyId).ToListAsync());
+        Assert.NotEmpty(await db.GeneralLedgerEntries.Where(entry => entry.CompanyId == setup.CompanyId).ToListAsync());
+        var audit = await db.AuditEntries.Where(entry =>
+            entry.CompanyId == setup.CompanyId && entry.EntityId == setup.VendorId.ToString()).ToListAsync();
+        Assert.Single(audit, entry => entry.Action == "VendorUpdated");
+        Assert.Equal(5, audit.Count(entry => entry.Action == "VendorBlocked"));
+        Assert.Equal(4, audit.Count(entry => entry.Action == "VendorReactivated"));
+        Assert.All(audit, entry => Assert.Equal(
+            Guid.Parse(setup.User.FindFirstValue(ClaimTypes.NameIdentifier)!), entry.ActorUserId));
+        Assert.Contains(audit, entry => entry.MetadataJson!.Contains("\"IsBlocked\":true", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task VendorReadsAndWritesAreScopedToActiveCompany()
+    {
+        var local = await SetupAsync("vendor-scope-local");
+        var foreign = await SetupAsync("vendor-scope-foreign");
+        await using var scope = factory.Services.CreateAsyncScope();
+        var purchasing = scope.ServiceProvider.GetRequiredService<IPurchasingService>();
+        var input = new PurchaseVendorInput
+        {
+            Number = "CHANGED",
+            Name = "Should not change",
+            PayablesAccountId = local.PayablesAccountId
+        };
+        Assert.Equal(local.VendorId, Assert.Single(await purchasing.GetVendorsAsync(local.User)).Id);
+        foreach (var id in new[] { foreign.VendorId, Guid.NewGuid() })
+        {
+            await Assert.ThrowsAsync<ValidationException>(() => purchasing.UpdateVendorAsync(local.User, id, input));
+            await Assert.ThrowsAsync<ValidationException>(() => purchasing.SetVendorBlockedAsync(local.User, id, true));
+            await Assert.ThrowsAsync<ValidationException>(() => purchasing.SetVendorBlockedAsync(local.User, id, false));
+        }
+        Assert.Equal("VEND-1", Assert.Single(await purchasing.GetVendorsAsync(foreign.User)).Number);
+        Assert.False(Assert.Single(await purchasing.GetVendorsAsync(foreign.User)).IsBlocked);
+        await using var db = await ContextAsync();
+        Assert.Empty(await db.AuditEntries.Where(entry =>
+            entry.CompanyId == local.CompanyId && entry.EntityId == foreign.VendorId.ToString()).ToListAsync());
+    }
+
+    [Theory]
+    [InlineData("foreign")]
+    [InlineData("grni")]
+    [InlineData("asset")]
+    [InlineData("blocked")]
+    [InlineData("non-posting")]
+    [InlineData("no-direct-posting")]
+    [InlineData("missing")]
+    [InlineData("empty")]
+    public async Task VendorCreateAndEditUseTheSamePayablesAccountRules(string invalidKind)
+    {
+        var setup = await SetupAsync($"vendor-{invalidKind}");
+        await using var scope = factory.Services.CreateAsyncScope();
+        var purchasing = scope.ServiceProvider.GetRequiredService<IPurchasingService>();
+        var invalidAccountId = Guid.NewGuid();
+        await using (var db = await ContextAsync())
+        {
+            var account = NewAccount(setup.CompanyId, "2999", "Invalid payables", AccountCategory.Liability);
+            switch (invalidKind)
+            {
+                case "foreign": account.CompanyId = Guid.NewGuid(); break;
+                case "grni": invalidAccountId = setup.GrniAccountId; break;
+                case "asset": account.Category = AccountCategory.Asset; break;
+                case "blocked": account.IsBlocked = true; break;
+                case "non-posting": account.Type = AccountType.Heading; break;
+                case "no-direct-posting": account.AllowsDirectPosting = false; break;
+                case "empty": invalidAccountId = Guid.Empty; break;
+            }
+            if (invalidKind is not ("grni" or "missing" or "empty"))
+            {
+                db.GeneralLedgerAccounts.Add(account);
+                invalidAccountId = account.Id;
+                await db.SaveChangesAsync();
+            }
+        }
+        var input = new PurchaseVendorInput
+        {
+            Number = "VEND-INVALID",
+            Name = "Invalid account",
+            PayablesAccountId = invalidAccountId
+        };
+        await Assert.ThrowsAsync<ValidationException>(() => purchasing.CreateVendorAsync(setup.User, input));
+        await Assert.ThrowsAsync<ValidationException>(() => purchasing.UpdateVendorAsync(setup.User, setup.VendorId, input));
+        var vendor = Assert.Single(await purchasing.GetVendorsAsync(setup.User));
+        Assert.Equal("VEND-1", vendor.Number);
+        Assert.Equal(setup.PayablesAccountId, vendor.PayablesAccountId);
+    }
+
+    [Fact]
+    public async Task VendorEditRejectsDuplicateAndInvalidFieldsButAllowsAnEligibleAccountChange()
+    {
+        var setup = await SetupAsync("vendor-edit-validation");
+        await using var scope = factory.Services.CreateAsyncScope();
+        var purchasing = scope.ServiceProvider.GetRequiredService<IPurchasingService>();
+        await purchasing.CreateVendorAsync(setup.User, new PurchaseVendorInput
+        {
+            Number = "VEND-2", Name = "Second vendor", PayablesAccountId = setup.PayablesAccountId
+        });
+        foreach (var (number, name) in new[]
+        {
+            (" VEND-2 ", "Duplicate"), (" ", "Missing number"), ("VEND-1", " "),
+            (new string('N', 33), "Long number"), ("VEND-1", new string('N', 161))
+        })
+        {
+            await Assert.ThrowsAsync<ValidationException>(() => purchasing.UpdateVendorAsync(
+                setup.User, setup.VendorId, new PurchaseVendorInput
+                {
+                    Number = number, Name = name, PayablesAccountId = setup.PayablesAccountId
+                }));
+        }
+        var replacement = NewAccount(setup.CompanyId, "2300", "Other payables", AccountCategory.Liability);
+        await using (var db = await ContextAsync())
+        {
+            db.GeneralLedgerAccounts.Add(replacement);
+            await db.SaveChangesAsync();
+        }
+        await purchasing.SetVendorBlockedAsync(setup.User, setup.VendorId, true);
+        await purchasing.UpdateVendorAsync(setup.User, setup.VendorId, new PurchaseVendorInput
+        {
+            Number = "VEND-1", Name = "Edited while blocked", PayablesAccountId = replacement.Id
+        });
+        var edited = (await purchasing.GetVendorsAsync(setup.User)).Single(vendor => vendor.Id == setup.VendorId);
+        Assert.True(edited.IsBlocked);
+        Assert.Equal(replacement.Id, edited.PayablesAccountId);
+        await Assert.ThrowsAsync<ValidationException>(() => purchasing.SaveGrniAccountAsync(setup.User, replacement.Id));
+    }
+
+    [Fact]
+    public async Task VendorsWithoutPayablesAccountRemainVisibleAndCanBeBlocked()
+    {
+        var setup = await SetupAsync("vendor-unconfigured");
+        var id = Guid.NewGuid();
+        await using (var db = await ContextAsync())
+        {
+            db.Vendors.Add(new Vendor { Id = id, CompanyId = setup.CompanyId, Number = "LEGACY", Name = "Unconfigured" });
+            await db.SaveChangesAsync();
+        }
+        await using var scope = factory.Services.CreateAsyncScope();
+        var purchasing = scope.ServiceProvider.GetRequiredService<IPurchasingService>();
+        await purchasing.SetVendorBlockedAsync(setup.User, id, true);
+        var vendor = (await purchasing.GetVendorsAsync(setup.User)).Single(candidate => candidate.Id == id);
+        Assert.Null(vendor.PayablesAccountId);
+        Assert.Empty(vendor.PayablesAccountNumber);
+        Assert.True(vendor.IsBlocked);
+    }
+
+    [Fact]
+    public async Task VendorOperationsRejectRevokedMembership()
+    {
+        var setup = await SetupAsync("vendor-revoked");
+        await factory.RemoveCompanyMembershipAsync(
+            Guid.Parse(setup.User.FindFirstValue(ClaimTypes.NameIdentifier)!), setup.CompanyId);
+        await using var scope = factory.Services.CreateAsyncScope();
+        var purchasing = scope.ServiceProvider.GetRequiredService<IPurchasingService>();
+        var input = new PurchaseVendorInput
+        {
+            Number = "REVOKED", Name = "Revoked", PayablesAccountId = setup.PayablesAccountId
+        };
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => purchasing.GetVendorsAsync(setup.User));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => purchasing.CreateVendorAsync(setup.User, input));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => purchasing.UpdateVendorAsync(setup.User, setup.VendorId, input));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => purchasing.SetVendorBlockedAsync(setup.User, setup.VendorId, true));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => purchasing.SetVendorBlockedAsync(setup.User, setup.VendorId, false));
+    }
+
     private async Task<Setup> SetupAsync(string prefix)
     {
         var email = $"{prefix}-{Guid.NewGuid():N}@example.invalid";
