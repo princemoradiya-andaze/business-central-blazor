@@ -61,7 +61,7 @@ public sealed class SalesPageTests(AuthenticationWebApplicationFactory factory)
         var routes = new Dictionary<string, (string expected, string excluded)>
         {
             ["/financial/sales/customers"] = ("aria-label=\"Customers\"", "id=\"sales-order-heading\""),
-            ["/financial/sales/customers/new"] = ("id=\"new-customer-heading\"", "id=\"customer-search\""),
+            ["/financial/sales/customers/new"] = ("id=\"new-customer-heading\"", "class=\"page-command-bar\""),
             ["/financial/sales/create-order"] = ("id=\"sales-order-heading\"", "id=\"receivables-heading\""),
             ["/financial/sales/orders"] = ("id=\"orders-heading\"", "id=\"new-customer-heading\""),
             ["/financial/sales/fulfillment"] = ("id=\"fulfillment-heading\"", "id=\"receivables-heading\""),
@@ -78,6 +78,16 @@ public sealed class SalesPageTests(AuthenticationWebApplicationFactory factory)
             if (route.StartsWith("/financial/sales/customers", StringComparison.Ordinal))
             {
                 Assert.DoesNotContain("module-menu-toggle active", sectionHtml, StringComparison.Ordinal);
+            }
+            if (route.EndsWith("/new", StringComparison.Ordinal))
+            {
+                Assert.Contains("<dialog", sectionHtml, StringComparison.Ordinal);
+                Assert.Contains("Customer Card", sectionHtml, StringComparison.Ordinal);
+                Assert.Contains("aria-label=\"Customers\"", sectionHtml, StringComparison.Ordinal);
+                Assert.Contains("id=\"sales-customer-number\"", sectionHtml, StringComparison.Ordinal);
+                Assert.Contains("id=\"sales-customer-name\"", sectionHtml, StringComparison.Ordinal);
+                Assert.Contains("id=\"sales-customer-ar\"", sectionHtml, StringComparison.Ordinal);
+                Assert.Contains("Close Customer Card", sectionHtml, StringComparison.Ordinal);
             }
         }
     }

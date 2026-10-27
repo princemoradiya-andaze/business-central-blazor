@@ -1,7 +1,7 @@
 @implements IDisposable
 @inject NavigationManager Navigation
 
-@if (!IsCustomerListPage && CurrentPage is { } currentPage)
+@if (!IsCustomerListPage && CurrentPath != "/financial/sales/customers/new" && CurrentPage is { } currentPage)
 {
     <section class="page-command-bar" aria-label="@($"{currentPage.Title} commands")">
         <div class="page-heading">
