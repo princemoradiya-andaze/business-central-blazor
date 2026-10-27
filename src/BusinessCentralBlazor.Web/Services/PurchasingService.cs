@@ -54,7 +54,8 @@ public sealed class PurchaseDocumentPostingInput
     public DateOnly PostingDate { get; set; } = DateOnly.FromDateTime(DateTime.Today);
 }
 
-public sealed record PurchaseVendorOption(Guid Id, string Number, string Name, string PayablesAccountNumber, bool IsBlocked);
+public sealed record PurchaseVendorOption(
+    Guid Id, string Number, string Name, string PayablesAccountNumber, bool IsBlocked, Guid? PayablesAccountId);
 
 public sealed record PurchaseItemOption(
     Guid Id,
@@ -120,6 +121,8 @@ public interface IPurchasingService
     Task<IReadOnlyList<PurchaseOrderDetail>> GetOrdersAsync(ClaimsPrincipal user);
     Task<IReadOnlyList<PurchasePayableDetail>> GetOpenPayablesAsync(ClaimsPrincipal user);
     Task CreateVendorAsync(ClaimsPrincipal user, PurchaseVendorInput input);
+    Task UpdateVendorAsync(ClaimsPrincipal user, Guid vendorId, PurchaseVendorInput input);
+    Task SetVendorBlockedAsync(ClaimsPrincipal user, Guid vendorId, bool isBlocked);
     Task<Guid> CreateOrderAsync(ClaimsPrincipal user, PurchaseOrderInput input);
     Task<Guid> CreateReceiptDraftAsync(ClaimsPrincipal user, Guid orderId, PurchaseDocumentPostingInput input);
     Task<Guid> CreateInvoiceDraftAsync(ClaimsPrincipal user, Guid orderId, PurchaseDocumentPostingInput input);
@@ -207,12 +210,14 @@ public sealed class PurchasingService(
         return await (
             from vendor in db.Vendors.AsNoTracking()
             join account in db.GeneralLedgerAccounts.AsNoTracking()
-                on new { vendor.CompanyId, PayablesAccountId = vendor.PayablesAccountId!.Value }
-                equals new { account.CompanyId, PayablesAccountId = account.Id }
+                on new { vendor.CompanyId, vendor.PayablesAccountId }
+                equals new { account.CompanyId, PayablesAccountId = (Guid?)account.Id } into vendorAccounts
+            from account in vendorAccounts.DefaultIfEmpty()
             where vendor.CompanyId == companyId
             orderby vendor.Number
             select new PurchaseVendorOption(
-                vendor.Id, vendor.Number, vendor.Name, account.Number, vendor.IsBlocked))
+                vendor.Id, vendor.Number, vendor.Name, account == null ? string.Empty : account.Number,
+                vendor.IsBlocked, vendor.PayablesAccountId))
             .ToListAsync();
     }
 
@@ -328,15 +333,10 @@ public sealed class PurchasingService(
 
     public async Task CreateVendorAsync(ClaimsPrincipal user, PurchaseVendorInput input)
     {
-        NormalizeAndValidate(input);
         var companyId = await GetRequiredCompanyIdAsync(user);
+        NormalizeAndValidate(input);
         await using var db = await dbContextFactory.CreateDbContextAsync();
-        await ValidatePostingAccountAsync(db, companyId, input.PayablesAccountId, AccountCategory.Liability, "vendor payables");
-        var configuredGrniAccountId = await RequireConfiguredGrniAccountAsync(db, companyId);
-        if (configuredGrniAccountId == input.PayablesAccountId)
-        {
-            throw new ValidationException("A vendor payables account must be different from the company's GRNI account.");
-        }
+        await ValidateVendorAccountAsync(db, companyId, input.PayablesAccountId);
         if (await db.Vendors.AnyAsync(vendor => vendor.CompanyId == companyId && vendor.Number == input.Number))
         {
             throw new ValidationException("A vendor with this number already exists in the active company.");
@@ -354,6 +354,60 @@ public sealed class PurchasingService(
             companyId, user, "VendorCreated", nameof(Vendor), input.Number, DateTimeOffset.UtcNow,
             new { input.Number, input.PayablesAccountId }));
         await SaveChangesAsync(db);
+    }
+
+    public async Task UpdateVendorAsync(ClaimsPrincipal user, Guid vendorId, PurchaseVendorInput input)
+    {
+        var companyId = await GetRequiredCompanyIdAsync(user);
+        NormalizeAndValidate(input);
+        await using var db = await dbContextFactory.CreateDbContextAsync();
+        var vendor = await db.Vendors.SingleOrDefaultAsync(candidate =>
+            candidate.CompanyId == companyId && candidate.Id == vendorId)
+            ?? throw new ValidationException("The vendor is not available in the active company.");
+        await ValidateVendorAccountAsync(db, companyId, input.PayablesAccountId);
+        if (await db.Vendors.AnyAsync(candidate =>
+                candidate.CompanyId == companyId && candidate.Id != vendorId && candidate.Number == input.Number))
+        {
+            throw new ValidationException("A vendor with this number already exists in the active company.");
+        }
+
+        vendor.Number = input.Number;
+        vendor.Name = input.Name;
+        vendor.PayablesAccountId = input.PayablesAccountId;
+        db.AuditEntries.Add(CreateAuditEntry(
+            companyId, user, "VendorUpdated", nameof(Vendor), vendor.Id.ToString(), DateTimeOffset.UtcNow,
+            new { vendor.Number, vendor.Name, vendor.PayablesAccountId }));
+        await SaveChangesAsync(db);
+    }
+
+    public async Task SetVendorBlockedAsync(ClaimsPrincipal user, Guid vendorId, bool isBlocked)
+    {
+        var companyId = await GetRequiredCompanyIdAsync(user);
+        await using var db = await dbContextFactory.CreateDbContextAsync();
+        var vendor = await db.Vendors.SingleOrDefaultAsync(candidate =>
+            candidate.CompanyId == companyId && candidate.Id == vendorId)
+            ?? throw new ValidationException("The vendor is not available in the active company.");
+        if (vendor.IsBlocked == isBlocked)
+        {
+            return;
+        }
+
+        vendor.IsBlocked = isBlocked;
+        db.AuditEntries.Add(CreateAuditEntry(
+            companyId, user, isBlocked ? "VendorBlocked" : "VendorReactivated",
+            nameof(Vendor), vendor.Id.ToString(), DateTimeOffset.UtcNow,
+            new { vendor.Number, vendor.IsBlocked }));
+        await SaveChangesAsync(db);
+    }
+
+    private static async Task ValidateVendorAccountAsync(ErpDbContext db, Guid companyId, Guid accountId)
+    {
+        await ValidatePostingAccountAsync(db, companyId, accountId, AccountCategory.Liability, "vendor payables");
+        var configuredGrniAccountId = await RequireConfiguredGrniAccountAsync(db, companyId);
+        if (configuredGrniAccountId == accountId)
+        {
+            throw new ValidationException("A vendor payables account must be different from the company's GRNI account.");
+        }
     }
 
     public async Task<Guid> CreateOrderAsync(ClaimsPrincipal user, PurchaseOrderInput input)

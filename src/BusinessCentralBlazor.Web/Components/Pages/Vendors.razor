@@ -1,0 +1,580 @@
+@page "/financial/purchasing/vendors"
+@page "/financial/purchasing/vendors/new"
+@page "/financial/purchasing/vendors/{VendorId:guid}/edit"
+@implements IDisposable
+@using System.Security.Claims
+@attribute [Authorize(Policy = CompanyAuthorizationPolicies.ActiveCompany)]
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IPurchasingService PurchasingService
+@inject NavigationManager Navigation
+
+<PageTitle>Vendors</PageTitle>
+
+@if (!string.IsNullOrWhiteSpace(statusMessage))
+{
+    <div class="alert alert-success" role="status">@statusMessage</div>
+}
+@if (!IsVendorCardOpen && pendingStatusVendor is null && !string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+}
+@if (isLoading)
+{
+    <p role="status">Loading vendors...</p>
+}
+else
+{
+    <section class="vendor-workspace" aria-label="Vendors">
+        <div class="vendor-action-bar" aria-label="Vendor actions">
+            <h1>Vendors</h1>
+            <span class="vendor-command-separator" aria-hidden="true"></span>
+            <div class="vendor-view-filter-container" @onkeydown="HandleStatusKeyDown">
+                <label class="visually-hidden" for="vendor-status">Filter vendors</label>
+                <button id="vendor-status" class="vendor-view-filter" type="button"
+                        aria-haspopup="menu" aria-expanded="@(isStatusMenuOpen ? "true" : "false")" aria-controls="vendor-status-options"
+                        @onclick="() => isStatusMenuOpen = !isStatusMenuOpen">
+                    @StatusFilterOptions.Single(option => option.Value == statusFilter).Label
+                    <span class="vendor-view-filter-chevron" aria-hidden="true"></span>
+                </button>
+                <div id="vendor-status-options" class="vendor-view-filter-menu" role="menu"
+                     aria-label="Vendor status" hidden="@(!isStatusMenuOpen)">
+                    @foreach (var option in StatusFilterOptions)
+                    {
+                        <button class="vendor-view-filter-option" type="button" role="menuitemradio"
+                                aria-checked="@(statusFilter == option.Value ? "true" : "false")" @onclick="() => SetStatusFilter(option.Value)">
+                            <span class="vendor-view-filter-check" aria-hidden="true">@(statusFilter == option.Value ? "✓" : string.Empty)</span>
+                            <span>@option.Label</span>
+                        </button>
+                    }
+                </div>
+            </div>
+            <button class="vendor-search-toggle" type="button" aria-label="Search vendors"
+                    aria-expanded="@(isSearchExpanded ? "true" : "false")" aria-controls="vendor-search"
+                    title="Search vendors" @onclick="ToggleSearchAsync">
+                <span class="vendor-search-icon" aria-hidden="true"></span>
+            </button>
+            <label class="visually-hidden" for="vendor-search">Search vendors</label>
+            <input id="vendor-search" @ref="searchInput"
+                   class="vendor-search-input @(isSearchExpanded ? "expanded" : null)"
+                   type="search" placeholder="Search vendors" disabled="@(!isSearchExpanded)"
+                   tabindex="@(isSearchExpanded ? 0 : -1)" aria-hidden="@(isSearchExpanded ? "false" : "true")"
+                   @bind="searchTerm" @bind:event="oninput" @bind:after="ClearSelection"
+                   @onkeydown="HandleSearchKeyDown" />
+            <span class="vendor-command-separator" aria-hidden="true"></span>
+            <div class="vendor-actions">
+                <a class="vendor-action-button" href="/financial/purchasing/vendors/new">+ New</a>
+                <span class="vendor-command-separator" aria-hidden="true"></span>
+                <button id="vendor-edit-action" class="vendor-action-button" type="button" disabled="@(SelectedVendor is null || isSaving)"
+                        @onclick="EditSelectedVendor">Edit</button>
+                <span class="vendor-command-separator" aria-hidden="true"></span>
+                <button id="vendor-status-action" class="vendor-action-button" type="button" disabled="@(SelectedVendor is null || isSaving)"
+                        @onclick="RequestStatusChange">
+                    @(SelectedVendor?.IsBlocked == true ? "Reactivate" : "Block")
+                </button>
+                <span class="vendor-command-separator" aria-hidden="true"></span>
+            </div>
+            <div class="vendor-view-controls" role="group" aria-label="Vendor view options">
+                <button id="vendor-filter-toggle" class="vendor-view-control @(isFilterPaneOpen ? "active" : null)"
+                        type="button" aria-label="Filters" title="Filters"
+                        aria-pressed="@(isFilterPaneOpen ? "true" : "false")" aria-controls="vendor-filter-pane"
+                        @onclick="() => isFilterPaneOpen = !isFilterPaneOpen">
+                    <svg aria-hidden="true" viewBox="0 0 16 16"><path d="M2 3h12L9.2 8.4v4l-2.4 1.3V8.4z" /></svg>
+                </button>
+                <div class="vendor-view-menu-container">
+                    <button id="vendor-view-toggle" class="vendor-view-control @(isViewMenuOpen ? "active" : null)"
+                            type="button" aria-label="Choose vendor view" title="Choose view"
+                            aria-haspopup="menu" aria-expanded="@(isViewMenuOpen ? "true" : "false")" aria-controls="vendor-view-menu"
+                            @onclick="() => isViewMenuOpen = !isViewMenuOpen">
+                        <svg aria-hidden="true" viewBox="0 0 16 16"><path d="M2 3h12M2 8h12M2 13h12M5 2v2M5 7v2M5 12v2" /></svg>
+                    </button>
+                    <div id="vendor-view-menu" class="vendor-view-menu" role="menu" aria-label="Vendor view"
+                         hidden="@(!isViewMenuOpen)">
+                        @foreach (var option in ViewOptions)
+                        {
+                            <button class="vendor-view-option" type="button" role="menuitemradio"
+                                    aria-checked="@(view == option.Value ? "true" : "false")" @onclick="() => SetView(option.Value)">
+                                <span class="vendor-view-check" aria-hidden="true">@(view == option.Value ? "✓" : string.Empty)</span>
+                                <span class="vendor-view-option-icon" aria-hidden="true">@option.Icon</span>
+                                <span>@option.Label</span>
+                            </button>
+                        }
+                    </div>
+                </div>
+                <button id="vendor-details-toggle" class="vendor-view-control @(isDetailsPaneOpen ? "active" : null)"
+                        type="button" aria-label="Vendor details" title="Vendor details"
+                        aria-pressed="@(isDetailsPaneOpen ? "true" : "false")" aria-controls="vendor-details-pane"
+                        @onclick="() => isDetailsPaneOpen = !isDetailsPaneOpen">
+                    <svg aria-hidden="true" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.5" /><path d="M8 7v4M8 4.5v.1" /></svg>
+                </button>
+            </div>
+        </div>
+
+        <div class="vendor-layout @(isFilterPaneOpen ? "vendor-filter-open" : null) @(isDetailsPaneOpen ? "vendor-details-open" : null)">
+            <aside id="vendor-filter-pane" class="vendor-filter-pane" aria-label="Vendor filters" hidden="@(!isFilterPaneOpen)">
+                <div class="vendor-pane-heading">
+                    <h2>Filters</h2>
+                    <button class="vendor-pane-close" type="button" aria-label="Close filters"
+                            @onclick="() => isFilterPaneOpen = false">×</button>
+                </div>
+                <label for="vendor-filter-search">Name or number</label>
+                <input id="vendor-filter-search" class="form-control"
+                       @bind="searchTerm" @bind:event="oninput" @bind:after="ClearSelection" />
+                <label for="vendor-filter-status">Status</label>
+                <select id="vendor-filter-status" class="form-select" value="@statusFilter"
+                        @onchange="HandleFilterStatusChanged">
+                    @foreach (var option in StatusFilterOptions)
+                    {
+                        <option value="@option.Value">@option.Label</option>
+                    }
+                </select>
+                <button class="vendor-filter-clear" type="button" @onclick="ClearFilters">Clear filters</button>
+            </aside>
+            <div class="vendor-records">
+                @if (!FilteredVendors.Any())
+                {
+                    <p class="vendor-empty-state">@(vendors.Count == 0
+                        ? "No vendors have been created for this company."
+                        : "No vendors match the current search and status filter.")</p>
+                }
+                else if (view == "list")
+                {
+                    <div class="table-responsive">
+                        <table class="table vendor-table align-middle">
+                            <caption>Vendors and their payables accounts</caption>
+                            <thead><tr><th scope="col">No.</th><th scope="col">Name</th><th scope="col">Payables account</th><th scope="col">Status</th></tr></thead>
+                            <tbody>
+                                @foreach (var vendor in FilteredVendors)
+                                {
+                                    <tr class="@(selectedVendorId == vendor.Id ? "vendor-row-selected" : null)"
+                                        @onclick="() => SelectVendor(vendor.Id)" @key="vendor.Id">
+                                        <th scope="row">
+                                            <button class="vendor-number-select" type="button" aria-pressed="@(selectedVendorId == vendor.Id ? "true" : "false")"
+                                                    @onclick="() => SelectVendor(vendor.Id)" @onclick:stopPropagation="true">@vendor.Number</button>
+                                        </th>
+                                        <td>@vendor.Name</td>
+                                        <td>@PayablesAccountLabel(vendor)</td>
+                                        <td>@VendorStatus(vendor)</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                else
+                {
+                    <div class="vendor-tile-grid @(view == "tiles" ? "vendor-tile-grid-compact" : null)">
+                        @foreach (var vendor in FilteredVendors)
+                        {
+                            <button class="vendor-tile @(selectedVendorId == vendor.Id ? "vendor-tile-selected" : null)"
+                                    type="button" aria-pressed="@(selectedVendorId == vendor.Id ? "true" : "false")"
+                                    @onclick="() => SelectVendor(vendor.Id)" @key="vendor.Id">
+                                <span class="vendor-tile-avatar" aria-hidden="true">
+                                    <svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="27" /><circle cx="32" cy="23" r="8" /><path d="M16 51c1-10 7-15 16-15s15 5 16 15" /></svg>
+                                </span>
+                                <span class="vendor-tile-details">
+                                    <span class="vendor-tile-number">@vendor.Number</span>
+                                    <span class="vendor-tile-name">@vendor.Name</span>
+                                    <span class="vendor-tile-meta">Payables account: @PayablesAccountLabel(vendor)</span>
+                                    <span class="vendor-tile-meta">Status: @VendorStatus(vendor)</span>
+                                </span>
+                            </button>
+                        }
+                    </div>
+                }
+            </div>
+            <aside id="vendor-details-pane" class="vendor-details-pane" aria-label="Vendor details" hidden="@(!isDetailsPaneOpen)">
+                <div class="vendor-pane-heading">
+                    <h2>Vendor details</h2>
+                    <button class="vendor-pane-close" type="button" aria-label="Close vendor details"
+                            @onclick="() => isDetailsPaneOpen = false">×</button>
+                </div>
+                @if (SelectedVendor is { } details)
+                {
+                    <h3 class="vendor-details-name">@details.Name</h3>
+                    <dl class="vendor-details-list">
+                        <div><dt>Vendor number</dt><dd>@details.Number</dd></div>
+                        <div><dt>Payables account</dt><dd>@PayablesAccountLabel(details)</dd></div>
+                        <div><dt>Status</dt><dd>@VendorStatus(details)</dd></div>
+                    </dl>
+                }
+                else
+                {
+                    <p class="vendor-details-empty">Select a vendor to see its details.</p>
+                }
+            </aside>
+        </div>
+    </section>
+
+    @if (IsVendorCardOpen)
+    {
+        <CustomerCardDialog @key="VendorId" OnClose="CloseVendorCard" IsSaving="isSaving"
+                            LabelledBy="@(VendorId.HasValue ? "edit-vendor-heading" : "new-vendor-heading")"
+                            ReturnFocusSelector="@(VendorId.HasValue ? "#vendor-edit-action" : ".vendor-actions a")"
+                            ReturnFocusFallbackSelector=".vendor-actions a">
+            <div class="vendor-card-top">
+                <button class="vendor-card-back" type="button" aria-label="Close Vendor Card"
+                        disabled="@isSaving" @onclick="CloseVendorCard">&#8592;</button>
+                <span>@(VendorId.HasValue ? "Edit vendor" : "New vendor")</span>
+            </div>
+            <h2 id="@(VendorId.HasValue ? "edit-vendor-heading" : "new-vendor-heading")" class="vendor-card-title">Vendor Card</h2>
+            <EditForm Model="@vendorInput" OnValidSubmit="SaveVendorAsync" FormName="vendor-card">
+                <DataAnnotationsValidator />
+                <div class="vendor-card-commands">
+                    <span>Home</span>
+                    <button type="submit" disabled="@(isSaving || !EligiblePayablesAccounts.Any())">@(isSaving ? "Saving..." : "Save")</button>
+                    <button type="button" disabled="@isSaving" @onclick="CloseVendorCard">Cancel</button>
+                </div>
+                <div class="vendor-card-body">
+                    @if (!string.IsNullOrWhiteSpace(errorMessage))
+                    {
+                        <div class="alert alert-danger" role="alert">@errorMessage</div>
+                    }
+                    @if (!EligiblePayablesAccounts.Any())
+                    {
+                        <div class="alert alert-info" role="status">
+                            Create an unblocked, directly-postable Liability account separate from GRNI before adding a vendor.
+                        </div>
+                    }
+                    <ValidationSummary />
+                    <h3 class="vendor-card-section">General</h3>
+                    <fieldset disabled="@isSaving">
+                        <div class="vendor-card-fields">
+                            <div class="vendor-card-column">
+                                <div class="vendor-card-field">
+                                    <label for="vendor-number">No. <span aria-hidden="true">*</span></label>
+                                    <InputText id="vendor-number" class="form-control" aria-label="Vendor number" aria-required="true" maxlength="32" autofocus @bind-Value="vendorInput.Number" />
+                                </div>
+                                <ValidationMessage For="@(() => vendorInput.Number)" />
+                                <div class="vendor-card-field">
+                                    <label for="vendor-name">Name <span aria-hidden="true">*</span></label>
+                                    <InputText id="vendor-name" class="form-control" aria-required="true" maxlength="160" @bind-Value="vendorInput.Name" />
+                                </div>
+                                <ValidationMessage For="@(() => vendorInput.Name)" />
+                            </div>
+                            <div class="vendor-card-column">
+                                <div class="vendor-card-field">
+                                    <label for="vendor-payables">Payables account <span aria-hidden="true">*</span></label>
+                                    <InputSelect id="vendor-payables" class="form-select" aria-required="true" @bind-Value="vendorInput.PayablesAccountId">
+                                        <option value="@Guid.Empty">Select Liability posting account</option>
+                                        @foreach (var account in EligiblePayablesAccounts)
+                                        {
+                                            <option value="@account.Id">@account.Number - @account.Name</option>
+                                        }
+                                    </InputSelect>
+                                </div>
+                            </div>
+                        </div>
+                    </fieldset>
+                    <p class="vendor-card-help">* Required field.</p>
+                </div>
+            </EditForm>
+            <footer class="vendor-card-footer">
+                <button class="btn btn-outline-secondary" type="button" disabled="@isSaving" @onclick="CloseVendorCard">Close</button>
+            </footer>
+        </CustomerCardDialog>
+    }
+
+    @if (pendingStatusVendor is { } pending)
+    {
+        <CustomerCardDialog OnClose="CancelStatusChange" IsSaving="isSaving" LabelledBy="vendor-status-heading"
+                            ReturnFocusSelector="#vendor-status-action" ReturnFocusFallbackSelector=".vendor-actions a"
+                            DescribedBy="vendor-status-explanation">
+            <div class="vendor-card-top">
+                <button class="vendor-card-back" type="button" aria-label="Close vendor status confirmation"
+                        disabled="@isSaving" @onclick="CancelStatusChange">&#8592;</button>
+                <span>@(pending.IsBlocked ? "Reactivate vendor" : "Block vendor")</span>
+            </div>
+            <h2 id="vendor-status-heading" class="vendor-card-title">@(pending.IsBlocked ? "Reactivate vendor" : "Block vendor")</h2>
+            <div class="vendor-card-commands">
+                <span>Home</span>
+                <button type="button" disabled="@isSaving" @onclick="ConfirmStatusChangeAsync">
+                    @(isSaving ? "Saving..." : pending.IsBlocked ? "Confirm reactivate" : "Confirm block")
+                </button>
+                <button type="button" disabled="@isSaving" autofocus @onclick="CancelStatusChange">Cancel</button>
+            </div>
+            <div class="vendor-card-body">
+                @if (!string.IsNullOrWhiteSpace(errorMessage))
+                {
+                    <div class="alert alert-danger" role="alert">@errorMessage</div>
+                }
+                <h3 class="vendor-card-section">General</h3>
+                <p id="vendor-status-explanation">@(pending.IsBlocked
+                    ? $"Reactivate {pending.Name}? The vendor will be available for new purchasing documents. Existing history is retained."
+                    : $"Block {pending.Name}? Vendor records, purchase orders, receipts, invoices, and payables history are retained. The vendor cannot be used in new purchasing documents. Existing receipt, invoice, and posting operations also require an active vendor. You can reactivate the vendor later.")</p>
+                <dl class="vendor-details-list">
+                    <div><dt>Vendor number</dt><dd>@pending.Number</dd></div>
+                    <div><dt>Name</dt><dd>@pending.Name</dd></div>
+                    <div><dt>Payables account</dt><dd>@PayablesAccountLabel(pending)</dd></div>
+                    <div><dt>Current status</dt><dd>@VendorStatus(pending)</dd></div>
+                </dl>
+            </div>
+            <footer class="vendor-card-footer">
+                <button class="btn btn-outline-secondary" type="button" disabled="@isSaving" @onclick="CancelStatusChange">Close</button>
+            </footer>
+        </CustomerCardDialog>
+    }
+}
+
+@code {
+    [Parameter] public Guid? VendorId { get; set; }
+    private IReadOnlyList<PurchaseVendorOption> vendors = [];
+    private PurchasingSetupDetail setup = new(null, []);
+    private PurchaseVendorInput vendorInput = new();
+    private Guid? selectedVendorId;
+    private PurchaseVendorOption? pendingStatusVendor;
+    private bool isLoading = true;
+    private bool isSaving;
+    private bool editingVendorAvailable;
+    private bool isFilterPaneOpen;
+    private bool isDetailsPaneOpen;
+    private bool isStatusMenuOpen;
+    private bool isViewMenuOpen;
+    private bool isSearchExpanded;
+    private ElementReference searchInput;
+    private string searchTerm = string.Empty;
+    private string statusFilter = "all";
+    private string view = "list";
+    private string? statusMessage;
+    private string? errorMessage;
+    private bool IsNewVendor => VendorId is null &&
+        new Uri(Navigation.Uri).AbsolutePath.TrimEnd('/').EndsWith("/new", StringComparison.OrdinalIgnoreCase);
+    private bool IsVendorCardOpen => IsNewVendor || (VendorId.HasValue && editingVendorAvailable);
+    private static readonly (string Value, string Label)[] StatusFilterOptions =
+    [
+        ("all", "All"), ("active", "Active"), ("blocked", "Blocked")
+    ];
+    private static readonly (string Value, string Label, string Icon)[] ViewOptions =
+    [
+        ("list", "List", "☷"), ("tall-tiles", "Tall tiles", "▣"), ("tiles", "Tiles", "▦")
+    ];
+    private IEnumerable<PurchaseAccountOption> EligiblePayablesAccounts => setup.Accounts.Where(account =>
+        account.Category == AccountCategory.Liability && account.Type == AccountType.Posting &&
+        account.AllowsDirectPosting && !account.IsBlocked && account.Id != setup.GoodsReceivedNotInvoicedAccountId);
+    private IEnumerable<PurchaseVendorOption> FilteredVendors => vendors.Where(vendor =>
+        (statusFilter == "all" || (statusFilter == "blocked" ? vendor.IsBlocked : !vendor.IsBlocked)) &&
+        (vendor.Number.Contains(searchTerm.Trim(), StringComparison.OrdinalIgnoreCase) ||
+         vendor.Name.Contains(searchTerm.Trim(), StringComparison.OrdinalIgnoreCase)));
+    private PurchaseVendorOption? SelectedVendor => FilteredVendors.SingleOrDefault(vendor => vendor.Id == selectedVendorId);
+    private static string VendorStatus(PurchaseVendorOption vendor) => vendor.IsBlocked ? "Blocked" : "Active";
+    private static string PayablesAccountLabel(PurchaseVendorOption vendor) =>
+        string.IsNullOrEmpty(vendor.PayablesAccountNumber) ? "Not configured" : vendor.PayablesAccountNumber;
+
+    protected override void OnInitialized() => Navigation.LocationChanged += OnLocationChanged;
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        pendingStatusVendor = null;
+        isStatusMenuOpen = false;
+        isViewMenuOpen = false;
+        if (new Uri(args.Location).AbsolutePath.TrimEnd('/').EndsWith("/vendors/new", StringComparison.OrdinalIgnoreCase))
+        {
+            vendorInput = new();
+        }
+        // List and New have identical route parameters, so the router can reuse the existing render.
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose() => Navigation.LocationChanged -= OnLocationChanged;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+        pendingStatusVendor = null;
+        vendorInput = new();
+        editingVendorAvailable = false;
+        try
+        {
+            await LoadAsync();
+            if (VendorId is { } id)
+            {
+                var vendor = vendors.SingleOrDefault(candidate => candidate.Id == id);
+                if (vendor is null)
+                {
+                    errorMessage = "The vendor is not available in the active company.";
+                }
+                else
+                {
+                    editingVendorAvailable = true;
+                    selectedVendorId = id;
+                    vendorInput = new PurchaseVendorInput
+                    {
+                        Number = vendor.Number,
+                        Name = vendor.Name,
+                        PayablesAccountId = vendor.PayablesAccountId ?? Guid.Empty
+                    };
+                }
+            }
+        }
+        catch (UnauthorizedAccessException)
+        {
+            vendors = [];
+            setup = new(null, []);
+            errorMessage = "Your active company is no longer available. Select an active company and try again.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+        vendors = await PurchasingService.GetVendorsAsync(user);
+        setup = await PurchasingService.GetSetupAsync(user);
+    }
+
+    private void SelectVendor(Guid id)
+    {
+        selectedVendorId = selectedVendorId == id ? null : id;
+        pendingStatusVendor = null;
+    }
+
+    private void ClearSelection()
+    {
+        selectedVendorId = null;
+        pendingStatusVendor = null;
+    }
+
+    private void ClearFilters()
+    {
+        searchTerm = string.Empty;
+        statusFilter = "all";
+        ClearSelection();
+    }
+
+    private void SetStatusFilter(string filter)
+    {
+        statusFilter = filter;
+        isStatusMenuOpen = false;
+        ClearSelection();
+    }
+
+    private void HandleFilterStatusChanged(ChangeEventArgs args) =>
+        SetStatusFilter(args.Value?.ToString() ?? "all");
+
+    private void SetView(string selectedView)
+    {
+        if (ViewOptions.Any(option => option.Value == selectedView))
+        {
+            view = selectedView;
+        }
+        isViewMenuOpen = false;
+    }
+
+    private void HandleStatusKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key == "Escape")
+        {
+            isStatusMenuOpen = false;
+        }
+    }
+
+    private async Task ToggleSearchAsync()
+    {
+        isSearchExpanded = !isSearchExpanded;
+        if (isSearchExpanded)
+        {
+            await InvokeAsync(StateHasChanged);
+            await searchInput.FocusAsync();
+            return;
+        }
+        searchTerm = string.Empty;
+        ClearSelection();
+    }
+
+    private Task HandleSearchKeyDown(KeyboardEventArgs args) =>
+        args.Key == "Escape" && isSearchExpanded ? ToggleSearchAsync() : Task.CompletedTask;
+
+    private void CloseVendorCard()
+    {
+        if (!isSaving)
+        {
+            Navigation.NavigateTo("/financial/purchasing/vendors");
+        }
+    }
+
+    private void EditSelectedVendor()
+    {
+        if (SelectedVendor is { } vendor)
+        {
+            Navigation.NavigateTo($"/financial/purchasing/vendors/{vendor.Id}/edit");
+        }
+    }
+
+    private void RequestStatusChange()
+    {
+        errorMessage = null;
+        pendingStatusVendor = SelectedVendor;
+    }
+
+    private void CancelStatusChange()
+    {
+        if (!isSaving)
+        {
+            pendingStatusVendor = null;
+            errorMessage = null;
+        }
+    }
+
+    private async Task SaveVendorAsync() => await ExecuteAsync(async user =>
+    {
+        if (VendorId is { } id)
+        {
+            await PurchasingService.UpdateVendorAsync(user, id, vendorInput);
+        }
+        else
+        {
+            await PurchasingService.CreateVendorAsync(user, vendorInput);
+        }
+        statusMessage = "Vendor saved.";
+        await LoadAsync();
+        Navigation.NavigateTo("/financial/purchasing/vendors");
+    });
+
+    private async Task ConfirmStatusChangeAsync()
+    {
+        if (pendingStatusVendor is not { } vendor)
+        {
+            return;
+        }
+        await ExecuteAsync(async user =>
+        {
+            await PurchasingService.SetVendorBlockedAsync(user, vendor.Id, !vendor.IsBlocked);
+            pendingStatusVendor = null;
+            statusMessage = vendor.IsBlocked ? "Vendor reactivated." : "Vendor blocked. History has been preserved.";
+            await LoadAsync();
+        });
+    }
+
+    private async Task ExecuteAsync(Func<ClaimsPrincipal, Task> action)
+    {
+        if (isSaving)
+        {
+            return;
+        }
+        isSaving = true;
+        errorMessage = null;
+        statusMessage = null;
+        try
+        {
+            await action((await AuthenticationStateProvider.GetAuthenticationStateAsync()).User);
+        }
+        catch (ValidationException exception)
+        {
+            errorMessage = exception.Message;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            vendors = [];
+            setup = new(null, []);
+            editingVendorAvailable = false;
+            errorMessage = "Your active company is no longer available. Select an active company and try again.";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}

@@ -63,60 +63,8 @@ else
     <section class="card mb-4" aria-labelledby="vendors-heading">
         <div class="card-body">
             <h2 id="vendors-heading" class="h4">Vendors</h2>
-            @if (vendors.Count == 0)
-            {
-                <p>No vendors have been created for this company.</p>
-            }
-            else
-            {
-                <div class="table-responsive">
-                    <table class="table table-striped align-middle">
-                        <caption>Vendors and their payables accounts</caption>
-                        <thead><tr><th scope="col">Number</th><th scope="col">Name</th><th scope="col">Payables account</th><th scope="col">Status</th></tr></thead>
-                        <tbody>
-                            @foreach (var vendor in vendors)
-                            {
-                                <tr>
-                                    <th scope="row">@vendor.Number</th>
-                                    <td>@vendor.Name</td>
-                                    <td>@vendor.PayablesAccountNumber</td>
-                                    <td>@(vendor.IsBlocked ? "Blocked" : "Active")</td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
-                </div>
-            }
-            <h3 class="h5 mt-4">Create vendor</h3>
-            <EditForm Model="@vendorInput" OnValidSubmit="CreateVendorAsync" FormName="purchase-vendor">
-                <DataAnnotationsValidator />
-                <ValidationSummary />
-                <fieldset disabled="@isSaving">
-                    <div class="row g-3">
-                        <div class="col-md-3">
-                            <label class="form-label" for="purchase-vendor-number">Vendor number</label>
-                            <InputText id="purchase-vendor-number" class="form-control" @bind-Value="vendorInput.Number" />
-                        </div>
-                        <div class="col-md-5">
-                            <label class="form-label" for="purchase-vendor-name">Name</label>
-                            <InputText id="purchase-vendor-name" class="form-control" @bind-Value="vendorInput.Name" />
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label" for="purchase-vendor-account">Payables account</label>
-                            <InputSelect id="purchase-vendor-account" class="form-select" @bind-Value="vendorInput.PayablesAccountId">
-                                <option value="@Guid.Empty">Select Liability posting account</option>
-                                @foreach (var account in eligibleLiabilityAccounts)
-                                {
-                                    <option value="@account.Id">@account.Number — @account.Name</option>
-                                }
-                            </InputSelect>
-                        </div>
-                    </div>
-                    <button class="btn btn-primary mt-3" type="submit" disabled="@(!eligibleLiabilityAccounts.Any())">
-                        @(isSaving ? "Saving..." : "Create vendor")
-                    </button>
-                </fieldset>
-            </EditForm>
+            <p>Manage vendor records, payables accounts, and blocked status in the dedicated workspace.</p>
+            <a class="btn btn-outline-primary" href="/financial/purchasing/vendors">Open Vendors</a>
         </div>
     </section>
 
@@ -335,7 +283,6 @@ else
 
 @code {
     private readonly SetupInput setupInput = new();
-    private readonly PurchaseVendorInput vendorInput = new();
     private readonly PurchaseOrderInput orderInput = new() { Lines = [new PurchaseOrderLineInput()] };
     private readonly PurchaseDocumentPostingInput postingInput = new();
     private PurchasingSetupDetail setup = new(null, []);
@@ -395,16 +342,6 @@ else
         {
             await PurchasingService.SaveGrniAccountAsync(user, setupInput.GrniAccountId);
             statusMessage = "GRNI liability account saved.";
-        });
-
-    private async Task CreateVendorAsync() =>
-        await ExecuteAsync(async user =>
-        {
-            await PurchasingService.CreateVendorAsync(user, vendorInput);
-            vendorInput.Number = string.Empty;
-            vendorInput.Name = string.Empty;
-            vendorInput.PayablesAccountId = Guid.Empty;
-            statusMessage = "Vendor created.";
         });
 
     private async Task CreateOrderAsync() =>
