@@ -45,6 +45,13 @@ public sealed class SalesPageTests(AuthenticationWebApplicationFactory factory)
         Assert.Contains("Search customers", html, StringComparison.Ordinal);
         Assert.Contains("customer-status", html, StringComparison.Ordinal);
         Assert.Contains("customer-view-filter", html, StringComparison.Ordinal);
+        Assert.Contains("id=\"customer-filter-toggle\"", html, StringComparison.Ordinal);
+        Assert.Contains("id=\"customer-filter-pane\"", html, StringComparison.Ordinal);
+        Assert.Contains("id=\"customer-filter-search\"", html, StringComparison.Ordinal);
+        Assert.Contains("id=\"customer-view-toggle\"", html, StringComparison.Ordinal);
+        Assert.Contains("Tall tiles", html, StringComparison.Ordinal);
+        Assert.Contains("id=\"customer-details-toggle\"", html, StringComparison.Ordinal);
+        Assert.Contains("id=\"customer-details-pane\"", html, StringComparison.Ordinal);
         Assert.Contains("aria-expanded", html, StringComparison.Ordinal);
         Assert.Contains("aria-hidden", html, StringComparison.Ordinal);
         Assert.Contains("class=\"customer-command-separator\"", html, StringComparison.Ordinal);

@@ -108,6 +108,48 @@ else
                     }
                     <span class="customer-command-separator" aria-hidden="true"></span>
                 </div>
+                <div class="customer-view-controls" role="group" aria-label="Customer view options">
+                    <button id="customer-filter-toggle" class="customer-view-control @(isCustomerFilterPaneOpen ? "active" : null)"
+                            type="button" aria-label="Filters" title="Filters"
+                            aria-pressed="@isCustomerFilterPaneOpen"
+                            aria-controls="customer-filter-pane"
+                            @onclick="ToggleCustomerFilterPane">
+                        <svg aria-hidden="true" viewBox="0 0 16 16"><path d="M2 3h12L9.2 8.4v4l-2.4 1.3V8.4z" /></svg>
+                    </button>
+                    <div class="customer-view-menu-container">
+                        <button id="customer-view-toggle" class="customer-view-control @(isCustomerViewMenuOpen ? "active" : null)"
+                                type="button" aria-label="Choose customer view" title="Choose view"
+                                aria-haspopup="menu" aria-expanded="@isCustomerViewMenuOpen"
+                                aria-controls="customer-view-menu"
+                                @onclick="ToggleCustomerViewMenu">
+                            <svg aria-hidden="true" viewBox="0 0 16 16"><path d="M2 3h12M2 8h12M2 13h12M5 2v2M5 7v2M5 12v2" /></svg>
+                        </button>
+                        <div id="customer-view-menu" class="customer-view-menu"
+                             role="menu" aria-label="Customer view"
+                             hidden="@(!isCustomerViewMenuOpen)">
+                            @foreach (var option in CustomerViewOptions)
+                            {
+                                <button class="customer-view-option" type="button"
+                                        role="menuitemradio"
+                                        aria-checked="@(customerView == option.Value)"
+                                        @onclick="() => SetCustomerView(option.Value)">
+                                    <span class="customer-view-check" aria-hidden="true">
+                                        @(customerView == option.Value ? "✓" : string.Empty)
+                                    </span>
+                                    <span class="customer-view-option-icon" aria-hidden="true">@option.Icon</span>
+                                    <span>@option.Label</span>
+                                </button>
+                            }
+                        </div>
+                    </div>
+                    <button id="customer-details-toggle" class="customer-view-control @(isCustomerDetailsPaneOpen ? "active" : null)"
+                            type="button" aria-label="Customer details" title="Customer details"
+                            aria-pressed="@isCustomerDetailsPaneOpen"
+                            aria-controls="customer-details-pane"
+                            @onclick="ToggleCustomerDetailsPane">
+                        <svg aria-hidden="true" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.5" /><path d="M8 7v4M8 4.5v.1" /></svg>
+                    </button>
+                </div>
             </div>
             @if (PendingDeactivationCustomer is { } pendingCustomer)
             {
@@ -117,40 +159,113 @@ else
                     <button class="btn btn-sm btn-outline-secondary" type="button" @onclick="CancelCustomerDeactivation">Cancel</button>
                 </div>
             }
-            @if (!FilteredCustomers.Any())
-            {
-                <p>@(customers.Count == 0
-                    ? "No sales customers have been created for this company."
-                    : "No customers match the current search and status filter.")</p>
-            }
-            else
-            {
-                <div class="table-responsive">
-                    <table class="table customer-table align-middle">
-                        <caption>Sales customers and their receivables accounts</caption>
-                        <thead>
-                            <tr><th scope="col">No.</th><th scope="col">Name</th><th scope="col">Receivables account</th><th scope="col">Status</th></tr>
-                        </thead>
-                        <tbody>
+            <div class="@CustomerLayoutClass">
+                <aside id="customer-filter-pane" class="customer-filter-pane"
+                       aria-label="Customer filters" hidden="@(!isCustomerFilterPaneOpen)">
+                    <div class="customer-pane-heading">
+                        <h2>Filters</h2>
+                        <button class="customer-pane-close" type="button" aria-label="Close filters"
+                                @onclick="ToggleCustomerFilterPane">×</button>
+                    </div>
+                    <label for="customer-filter-search">Name or number</label>
+                    <input id="customer-filter-search" class="form-control"
+                           value="@customerSearchTerm"
+                           @oninput="HandleCustomerFilterSearchInput" />
+                    <label for="customer-filter-status">Status</label>
+                    <select id="customer-filter-status" class="form-select"
+                            value="@customerStatusFilter"
+                            @onchange="HandleCustomerFilterStatusChanged">
+                        @foreach (var option in CustomerStatusFilterOptions)
+                        {
+                            <option value="@option.Value">@option.Label</option>
+                        }
+                    </select>
+                    <button class="customer-filter-clear" type="button" @onclick="ClearCustomerFilters">
+                        Clear filters
+                    </button>
+                </aside>
+                <div class="customer-records">
+                    @if (!FilteredCustomers.Any())
+                    {
+                        <p class="customer-empty-state">@(customers.Count == 0
+                            ? "No sales customers have been created for this company."
+                            : "No customers match the current search and status filter.")</p>
+                    }
+                    else if (customerView == "list")
+                    {
+                        <div class="table-responsive">
+                            <table class="table customer-table align-middle">
+                                <caption>Sales customers and their receivables accounts</caption>
+                                <thead>
+                                    <tr><th scope="col">No.</th><th scope="col">Name</th><th scope="col">Receivables account</th><th scope="col">Status</th></tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var customer in FilteredCustomers)
+                                    {
+                                        <tr class="@(selectedCustomerId == customer.Id ? "customer-row-selected" : null)"
+                                            @onclick="() => SelectCustomer(customer.Id)">
+                                            <th scope="row">
+                                                <button class="customer-number-select" type="button"
+                                                        aria-pressed="@(selectedCustomerId == customer.Id)"
+                                                        @onclick="() => SelectCustomer(customer.Id)"
+                                                        @onclick:stopPropagation="true">
+                                                    @customer.Number
+                                                </button>
+                                            </th>
+                                            <td>@customer.Name</td>
+                                            <td>@customer.ReceivablesAccountNumber</td>
+                                            <td>@CustomerStatus(customer)</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="customer-tile-grid @(customerView == "tiles" ? "customer-tile-grid-compact" : null)">
                             @foreach (var customer in FilteredCustomers)
                             {
-                                <tr class="@(selectedCustomerId == customer.Id ? "customer-row-selected" : null)">
-                                    <th scope="row">
-                                        <button class="customer-number-select" type="button"
-                                                aria-pressed="@(selectedCustomerId == customer.Id)"
-                                                @onclick="() => SelectCustomer(customer.Id)">
-                                            @customer.Number
-                                        </button>
-                                    </th>
-                                    <td>@customer.Name</td>
-                                    <td>@customer.ReceivablesAccountNumber</td>
-                                    <td>@CustomerStatus(customer)</td>
-                                </tr>
+                                <button class="customer-tile @(selectedCustomerId == customer.Id ? "customer-tile-selected" : null)"
+                                        type="button"
+                                        aria-pressed="@(selectedCustomerId == customer.Id)"
+                                        @onclick="() => SelectCustomer(customer.Id)">
+                                    <span class="customer-tile-avatar" aria-hidden="true">
+                                        <svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="27" /><circle cx="32" cy="23" r="8" /><path d="M16 51c1-10 7-15 16-15s15 5 16 15" /></svg>
+                                    </span>
+                                    <span class="customer-tile-details">
+                                        <span class="customer-tile-number">@customer.Number</span>
+                                        <span class="customer-tile-name">@customer.Name</span>
+                                        <span class="customer-tile-meta">Receivables account: @customer.ReceivablesAccountNumber</span>
+                                        <span class="customer-tile-meta">Status: @CustomerStatus(customer)</span>
+                                    </span>
+                                </button>
                             }
-                        </tbody>
-                    </table>
+                        </div>
+                    }
                 </div>
-            }
+                <aside id="customer-details-pane" class="customer-details-pane"
+                       aria-label="Customer details" hidden="@(!isCustomerDetailsPaneOpen)">
+                    <div class="customer-pane-heading">
+                        <h2>Customer details</h2>
+                        <button class="customer-pane-close" type="button" aria-label="Close customer details"
+                                @onclick="ToggleCustomerDetailsPane">×</button>
+                    </div>
+                    @if (SelectedCustomer is { } detailsCustomer)
+                    {
+                        <h3 class="customer-details-name">@detailsCustomer.Name</h3>
+                        <dl class="customer-details-list">
+                            <div><dt>Customer number</dt><dd>@detailsCustomer.Number</dd></div>
+                            <div><dt>Receivables account</dt><dd>@detailsCustomer.ReceivablesAccountNumber</dd></div>
+                            <div><dt>Status</dt><dd>@CustomerStatus(detailsCustomer)</dd></div>
+                        </dl>
+                    }
+                    else
+                    {
+                        <p class="customer-details-empty">Select a customer to see its details.</p>
+                    }
+                </aside>
+            </div>
         </section>
     }
 
@@ -550,6 +665,10 @@ else
     private Guid? selectedCustomerId;
     private Guid? pendingDeactivationCustomerId;
     private bool isCustomerSearchExpanded;
+    private bool isCustomerFilterPaneOpen;
+    private bool isCustomerDetailsPaneOpen;
+    private bool isCustomerViewMenuOpen;
+    private string customerView = "list";
     private ElementReference customerSearchInput;
 
     [Parameter]
@@ -588,6 +707,15 @@ else
         ("blocked", "Blocked"),
         ("inactive", "Inactive")
     ];
+    private static readonly (string Value, string Label, string Icon)[] CustomerViewOptions =
+    [
+        ("list", "List", "☷"),
+        ("tall-tiles", "Tall tiles", "▣"),
+        ("tiles", "Tiles", "▦")
+    ];
+    private string CustomerLayoutClass =>
+        $"customer-layout{(isCustomerFilterPaneOpen ? " customer-filter-open" : string.Empty)}" +
+        $"{(isCustomerDetailsPaneOpen ? " customer-details-open" : string.Empty)}";
 
     private IEnumerable<SalesCustomerOption> EligibleCustomers =>
         customers.Where(customer => !customer.IsBlocked && !customer.IsInactive);
@@ -597,7 +725,7 @@ else
             "active" => !customer.IsInactive && !customer.IsBlocked,
             "blocked" => !customer.IsInactive && customer.IsBlocked,
             "inactive" => customer.IsInactive,
-            _ => !customer.IsInactive
+            _ => true
         }) &&
         (string.IsNullOrWhiteSpace(customerSearchTerm) ||
          customer.Number.Contains(customerSearchTerm, StringComparison.OrdinalIgnoreCase) ||
@@ -743,6 +871,41 @@ else
         customerStatusFilter = filter;
         isCustomerStatusMenuOpen = false;
         ClearCustomerSelection();
+    }
+
+    private void HandleCustomerFilterSearchInput(ChangeEventArgs args)
+    {
+        customerSearchTerm = args.Value?.ToString() ?? string.Empty;
+        ClearCustomerSelection();
+    }
+
+    private void HandleCustomerFilterStatusChanged(ChangeEventArgs args) =>
+        SetCustomerStatusFilter(args.Value?.ToString() ?? "all");
+
+    private void ClearCustomerFilters()
+    {
+        customerSearchTerm = string.Empty;
+        customerStatusFilter = "all";
+        ClearCustomerSelection();
+    }
+
+    private void ToggleCustomerFilterPane() =>
+        isCustomerFilterPaneOpen = !isCustomerFilterPaneOpen;
+
+    private void ToggleCustomerDetailsPane() =>
+        isCustomerDetailsPaneOpen = !isCustomerDetailsPaneOpen;
+
+    private void ToggleCustomerViewMenu() =>
+        isCustomerViewMenuOpen = !isCustomerViewMenuOpen;
+
+    private void SetCustomerView(string view)
+    {
+        if (CustomerViewOptions.Any(option => option.Value == view))
+        {
+            customerView = view;
+        }
+
+        isCustomerViewMenuOpen = false;
     }
 
     private Task HandleCustomerStatusKeyDown(KeyboardEventArgs args)
