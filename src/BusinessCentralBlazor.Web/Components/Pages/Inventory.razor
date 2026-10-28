@@ -1,4 +1,8 @@
 @page "/financial/inventory"
+@page "/financial/inventory/new"
+@page "/financial/inventory/{RecordId:guid}/edit"
+@inject NavigationManager Navigation
+@implements IDisposable
 @attribute [Authorize(Policy = CompanyAuthorizationPolicies.ActiveCompany)]
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject IInventoryService InventoryService
@@ -31,10 +35,7 @@ else
                      EmptyMessage="@(items.Count == 0 ? "No inventory items have been configured for this company." : "No items match the current search and status filter.")">
         <HeaderActions>
             <button id="new-item-action" class="record-workspace-action" type="button" disabled="@isSaving"
-                    @onclick="OpenNewItem">+ New item</button>
-            <span class="record-workspace-separator" aria-hidden="true"></span>
-            <button id="edit-item-action" class="record-workspace-action" type="button"
-                    disabled="@(SelectedItem is null || isSaving)" @onclick="EditSelectedItem">Edit</button>
+                    @onclick='() => Navigation.NavigateTo("/financial/inventory/new")'>+ New item</button>
             <span class="record-workspace-separator" aria-hidden="true"></span>
             <button id="item-status-action" class="record-workspace-action" type="button"
                     disabled="@(SelectedItem is null || isSaving)" @onclick="RequestStatusChange">
@@ -72,8 +73,8 @@ else
                             <tr class="@(selectedItemId == item.Id ? "record-row-selected" : null)"
                                 @onclick="() => SelectItem(item.Id)" @key="item.Id">
                                 <th scope="row">
-                                    <button class="record-select" type="button" aria-pressed="@(selectedItemId == item.Id)"
-                                            @onclick="() => SelectItem(item.Id)" @onclick:stopPropagation="true">@item.Number</button>
+                                    <a class="record-select" href="@($"/financial/inventory/{item.Id}/edit")"
+                                       @onclick:stopPropagation="true">@item.Number</a>
                                 </th>
                                 <td>@item.Description</td>
                                 <td>@item.BaseUnitOfMeasure</td>
@@ -91,15 +92,14 @@ else
             <div class="record-tile-grid">
                 @foreach (var item in FilteredItems)
                 {
-                    <button class="record-tile tall @(selectedItemId == item.Id ? "selected" : null)" type="button"
-                            aria-pressed="@(selectedItemId == item.Id)" @onclick="() => SelectItem(item.Id)" @key="item.Id">
-                        <span class="record-tile-title">@item.Number — @item.Description</span>
+                    <div class="record-tile tall @(selectedItemId == item.Id ? "selected" : null)" @onclick="() => SelectItem(item.Id)" @key="item.Id" tabindex="0" role="group" @onkeydown='args => { if (args.Key is "Enter" or " ") SelectItem(item.Id); }'>
+                        <a class="record-tile-title" href="@($"/financial/inventory/{item.Id}/edit")" @onclick:stopPropagation="true">@item.Number — @item.Description</a>
                         <span class="record-tile-meta">Unit: @item.BaseUnitOfMeasure</span>
                         <span class="record-tile-meta">On hand: @item.QuantityOnHand.ToString("N4")</span>
                         <span class="record-tile-meta">Average cost: @item.UnitCost.ToString("N4")</span>
                         <span class="record-tile-meta">Inventory value: @item.InventoryValue.ToString("N4")</span>
                         <span class="record-tile-meta">Status: @ItemStatus(item)</span>
-                    </button>
+                    </div>
                 }
             </div>
         </TallTilesContent>
@@ -107,12 +107,11 @@ else
             <div class="record-tile-grid">
                 @foreach (var item in FilteredItems)
                 {
-                    <button class="record-tile @(selectedItemId == item.Id ? "selected" : null)" type="button"
-                            aria-pressed="@(selectedItemId == item.Id)" @onclick="() => SelectItem(item.Id)" @key="item.Id">
-                        <span class="record-tile-title">@item.Number — @item.Description</span>
+                    <div class="record-tile @(selectedItemId == item.Id ? "selected" : null)" @onclick="() => SelectItem(item.Id)" @key="item.Id" tabindex="0" role="group" @onkeydown='args => { if (args.Key is "Enter" or " ") SelectItem(item.Id); }'>
+                        <a class="record-tile-title" href="@($"/financial/inventory/{item.Id}/edit")" @onclick:stopPropagation="true">@item.Number — @item.Description</a>
                         <span class="record-tile-meta">On hand: @item.QuantityOnHand.ToString("N4") @item.BaseUnitOfMeasure</span>
                         <span class="record-tile-meta">Status: @ItemStatus(item)</span>
-                    </button>
+                    </div>
                 }
             </div>
         </TilesContent>
@@ -149,52 +148,34 @@ else
 
     @if (isItemDialogOpen)
     {
-        <WorkspaceCardDialog @key="itemDialogKey" OnClose="CloseItemDialog" IsSaving="isSaving"
-                             LabelledBy="item-card-heading"
-                             ReturnFocusSelector="@(editingItemId.HasValue ? "#edit-item-action" : "#new-item-action")"
-                             ReturnFocusFallbackSelector="#new-item-action">
-            <div class="workspace-card-top">
-                <button class="workspace-card-back" type="button" aria-label="Close item card"
-                        disabled="@isSaving" @onclick="CloseItemDialog">←</button>
-                <span>@(editingItemId.HasValue ? "Edit item" : "New item")</span>
-            </div>
-            <h2 id="item-card-heading" class="workspace-card-title">Inventory Item Card</h2>
-            <EditForm Model="@itemInput" OnValidSubmit="SaveItemAsync" FormName="inventory-item-card">
-                <DataAnnotationsValidator />
-                <div class="workspace-card-commands">
-                    <span>Home</span>
-                    <button type="submit" disabled="@isSaving">@(isSaving ? "Saving..." : "Save")</button>
-                    <button type="button" disabled="@isSaving" @onclick="CloseItemDialog">Cancel</button>
-                </div>
-                <div class="workspace-card-body">
-                    @if (!string.IsNullOrWhiteSpace(errorMessage))
-                    {
-                        <div class="alert alert-danger" role="alert">@errorMessage</div>
-                    }
-                    @if (!EligibleAccounts.Any(account => account.Category == AccountCategory.Asset) ||
+        <EntityRecordCard Model="@itemInput" Save="SaveItemAsync"
+                          Module="Items" CardType="Item Card" Title="@(itemInput.Number + " - " + itemInput.Description)"
+                          IsNew="@(!editingItemId.HasValue)" OnClose="CloseItemDialog"
+                          CanPrevious="@(BrowseTarget(-1).HasValue)" CanNext="@(BrowseTarget(1).HasValue)" OnBrowse="BrowseAsync"
+                          ReturnFocusSelector="@(RecordId.HasValue ? $"a[href='/financial/inventory/{RecordId}/edit']" : "#new-item-action")"
+                          ReturnFocusFallbackSelector="#new-item-action">
+                                @if (!EligibleAccounts.Any(account => account.Category == AccountCategory.Asset) ||
                          !EligibleAccounts.Any(account => account.Category == AccountCategory.Expense))
                     {
                         <div class="alert alert-info" role="status">
                             Create eligible Asset and Expense posting accounts in Chart of Accounts before setting up inventory.
                         </div>
                     }
-                    <ValidationSummary />
-                    <h3 class="workspace-card-section">General</h3>
-                    <fieldset disabled="@isSaving">
+                    <fieldset>
                         <div class="row g-3">
                             <div class="col-md-4">
                                 <label class="form-label" for="item-number">Item number</label>
-                                <InputText id="item-number" class="form-control" maxlength="32" @bind-Value="itemInput.Number" />
+                                <CardInputText id="item-number" class="form-control" maxlength="32" @bind-Value="itemInput.Number" />
                                 <ValidationMessage For="@(() => itemInput.Number)" />
                             </div>
                             <div class="col-md-5">
                                 <label class="form-label" for="item-description">Description</label>
-                                <InputText id="item-description" class="form-control" maxlength="250" @bind-Value="itemInput.Description" />
+                                <CardInputText id="item-description" class="form-control" maxlength="250" @bind-Value="itemInput.Description" />
                                 <ValidationMessage For="@(() => itemInput.Description)" />
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label" for="item-unit">Base unit</label>
-                                <InputText id="item-unit" class="form-control" maxlength="20" @bind-Value="itemInput.BaseUnitOfMeasure" />
+                                <CardInputText id="item-unit" class="form-control" maxlength="20" @bind-Value="itemInput.BaseUnitOfMeasure" />
                                 <ValidationMessage For="@(() => itemInput.BaseUnitOfMeasure)" />
                             </div>
                             <div class="col-md-4">
@@ -235,14 +216,36 @@ else
                             </div>
                         </div>
                     </fieldset>
-                </div>
-            </EditForm>
-        </WorkspaceCardDialog>
+        </EntityRecordCard>
     }
 
 }
 
 @code {
+    protected override void OnInitialized() => Navigation.LocationChanged += OnLocationChanged;
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        if (new Uri(args.Location).AbsolutePath.TrimEnd('/').Equals("/financial/inventory/new", StringComparison.OrdinalIgnoreCase))
+            OpenNewItem();
+        else if (new Uri(args.Location).AbsolutePath.TrimEnd('/').Equals("/financial/inventory", StringComparison.OrdinalIgnoreCase))
+            isItemDialogOpen = false;
+        _ = InvokeAsync(StateHasChanged);
+    }
+    public void Dispose() => Navigation.LocationChanged -= OnLocationChanged;
+
+    [Parameter] public Guid? RecordId { get; set; }
+    private void EnsureSelection() => selectedItemId = RecordSelection.Reconcile(FilteredItems.Select(record => record.Id), selectedItemId);
+    private Guid? BrowseTarget(int offset) => editingItemId is { } id
+        ? RecordSelection.Adjacent(FilteredItems.Select(record => record.Id), id, offset) : null;
+    private Task BrowseAsync(int offset)
+    {
+        if (BrowseTarget(offset) is { } id)
+            Navigation.NavigateTo($"/financial/inventory/{id}/edit");
+        else
+            CloseItemDialog();
+        return Task.CompletedTask;
+    }
+
     private IReadOnlyList<InventoryAccountOption> accounts = [];
     private IReadOnlyList<InventoryItemListItem> items = [];
     private InventoryItemInput itemInput = new();
@@ -251,7 +254,6 @@ else
     private byte[] editingItemRowVersion = [];
     private string itemSearchTerm = string.Empty;
     private string itemStatusFilter = "all";
-    private int itemDialogKey;
     private bool isLoading = true;
     private bool isSaving;
     private bool isItemDialogOpen;
@@ -276,11 +278,26 @@ else
          item.Description.Contains(itemSearchTerm, StringComparison.OrdinalIgnoreCase)));
     private InventoryItemListItem? SelectedItem => FilteredItems.SingleOrDefault(item => item.Id == selectedItemId);
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnParametersSetAsync()
     {
+        isItemDialogOpen = false;
+        errorMessage = null;
         try
         {
-            await LoadAsync();
+            if (isLoading) await LoadAsync();
+            if (RecordId is { } id)
+            {
+                selectedItemId = id;
+                if (items.Any(record => record.Id == id))
+                    EditSelectedItem();
+                else
+                    errorMessage = "The record is not available in the active company.";
+            }
+            else if (new Uri(Navigation.Uri).AbsolutePath.TrimEnd('/').EndsWith("/new", StringComparison.OrdinalIgnoreCase))
+                OpenNewItem();
+            else
+                isItemDialogOpen = false;
+            EnsureSelection();
         }
         catch (UnauthorizedAccessException)
         {
@@ -299,32 +316,33 @@ else
         var loadedItems = await InventoryService.GetItemsAsync(user);
         accounts = loadedAccounts;
         items = loadedItems;
+        EnsureSelection();
     }
 
     private Task HandleItemSearchChanged(string searchTerm)
     {
         itemSearchTerm = searchTerm;
-        selectedItemId = null;
+        EnsureSelection();
         return Task.CompletedTask;
     }
 
     private void HandleItemStatusFilterChanged(ChangeEventArgs args)
     {
         itemStatusFilter = args.Value?.ToString() ?? "all";
-        selectedItemId = null;
+        EnsureSelection();
     }
 
     private void HandleWorkspaceStatusFilterChanged(string value)
     {
         itemStatusFilter = value;
-        selectedItemId = null;
+        EnsureSelection();
     }
 
     private void ClearItemFilters()
     {
         itemSearchTerm = string.Empty;
         itemStatusFilter = "all";
-        selectedItemId = null;
+        EnsureSelection();
     }
 
     private void SelectItem(Guid itemId) => selectedItemId = itemId;
@@ -334,7 +352,6 @@ else
         editingItemId = null;
         editingItemRowVersion = [];
         itemInput = new InventoryItemInput();
-        itemDialogKey++;
         isItemDialogOpen = true;
         errorMessage = null;
         statusMessage = null;
@@ -342,7 +359,7 @@ else
 
     private void EditSelectedItem()
     {
-        if (SelectedItem is not { } item)
+        if (items.SingleOrDefault(record => record.Id == RecordId) is not { } item)
         {
             return;
         }
@@ -359,7 +376,6 @@ else
             IssueExpenseAccountId = item.IssueExpenseAccountId,
             IsBlocked = item.IsBlocked
         };
-        itemDialogKey++;
         isItemDialogOpen = true;
         errorMessage = null;
         statusMessage = null;
@@ -368,28 +384,23 @@ else
     private void CloseItemDialog()
     {
         isItemDialogOpen = false;
-        editingItemId = null;
-        editingItemRowVersion = [];
-        itemInput = new InventoryItemInput();
+        Navigation.NavigateTo("/financial/inventory");
     }
 
-    private async Task SaveItemAsync()
+    private async Task SaveItemAsync(InventoryItemInput snapshot)
     {
-        await ExecuteAsync(async user =>
+        var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+        if (editingItemId is { } id)
         {
-            if (editingItemId is { } itemId)
-            {
-                await InventoryService.UpdateItemAsync(user, itemId, editingItemRowVersion, itemInput);
-                statusMessage = "Inventory item saved.";
-            }
-            else
-            {
-                await InventoryService.CreateItemAsync(user, itemInput);
-                statusMessage = "Inventory item created.";
-            }
-
-            CloseItemDialog();
-        });
+            editingItemRowVersion = await InventoryService.UpdateItemAsync(user, id, editingItemRowVersion, snapshot);
+            await LoadAsync();
+        }
+        else
+        {
+            await InventoryService.CreateItemAsync(user, snapshot);
+            await LoadAsync();
+        }
+        await InvokeAsync(StateHasChanged);
     }
 
     private void RequestStatusChange()

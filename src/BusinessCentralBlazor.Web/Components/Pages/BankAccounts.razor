@@ -1,4 +1,8 @@
 @page "/financial/banks"
+@page "/financial/banks/new"
+@page "/financial/banks/{RecordId:guid}/edit"
+@inject NavigationManager Navigation
+@implements IDisposable
 @attribute [Authorize(Policy = CompanyAuthorizationPolicies.ActiveCompany)]
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject IBankService BankService
@@ -32,10 +36,7 @@ else
                      EmptyMessage="@(banks.Count == 0 ? "No bank accounts have been configured for this company." : "No bank accounts match the current search and status filter.")">
         <HeaderActions>
             <button id="new-bank-action" class="record-workspace-action" type="button" disabled="@isSaving"
-                    @onclick="OpenNewAccount">+ New bank account</button>
-            <span class="record-workspace-separator" aria-hidden="true"></span>
-            <button id="edit-bank-action" class="record-workspace-action" type="button"
-                    disabled="@(SelectedBank is null || isSaving)" @onclick="EditSelectedAccount">Edit</button>
+                    @onclick='() => Navigation.NavigateTo("/financial/banks/new")'>+ New bank account</button>
             <span class="record-workspace-separator" aria-hidden="true"></span>
             <button id="bank-status-action" class="record-workspace-action" type="button"
                     disabled="@(SelectedBank is null || isSaving)" @onclick="RequestStatusChange">
@@ -70,8 +71,8 @@ else
                             <tr class="@(selectedBankId == bank.Id ? "record-row-selected" : null)"
                                 @onclick="() => SelectBank(bank.Id)" @key="bank.Id">
                                 <th scope="row">
-                                    <button class="record-select" type="button" aria-pressed="@(selectedBankId == bank.Id)"
-                                            @onclick="() => SelectBank(bank.Id)" @onclick:stopPropagation="true">@bank.Code</button>
+                                    <a class="record-select" href="@($"/financial/banks/{bank.Id}/edit")"
+                                       @onclick:stopPropagation="true">@bank.Code</a>
                                 </th>
                                 <td>@bank.Name</td>
                                 <td>@bank.CurrencyCode</td>
@@ -86,14 +87,13 @@ else
             <div class="record-tile-grid">
                 @foreach (var bank in FilteredBanks)
                 {
-                    <button class="record-tile tall @(selectedBankId == bank.Id ? "selected" : null)" type="button"
-                            aria-pressed="@(selectedBankId == bank.Id)" @onclick="() => SelectBank(bank.Id)" @key="bank.Id">
-                        <span class="record-tile-title">@bank.Code — @bank.Name</span>
+                    <div class="record-tile tall @(selectedBankId == bank.Id ? "selected" : null)" @onclick="() => SelectBank(bank.Id)" @key="bank.Id" tabindex="0" role="group" @onkeydown='args => { if (args.Key is "Enter" or " ") SelectBank(bank.Id); }'>
+                        <a class="record-tile-title" href="@($"/financial/banks/{bank.Id}/edit")" @onclick:stopPropagation="true">@bank.Code — @bank.Name</a>
                         <span class="record-tile-meta">Currency: @bank.CurrencyCode</span>
                         <span class="record-tile-meta">G/L account: @AccountLabel(bank.GeneralLedgerAccountId)</span>
                         <span class="record-tile-meta">Account identifier: @DisplayIdentifier(bank.AccountIdentifier)</span>
                         <span class="record-tile-meta">Status: @BankStatus(bank)</span>
-                    </button>
+                    </div>
                 }
             </div>
         </TallTilesContent>
@@ -101,11 +101,10 @@ else
             <div class="record-tile-grid">
                 @foreach (var bank in FilteredBanks)
                 {
-                    <button class="record-tile @(selectedBankId == bank.Id ? "selected" : null)" type="button"
-                            aria-pressed="@(selectedBankId == bank.Id)" @onclick="() => SelectBank(bank.Id)" @key="bank.Id">
-                        <span class="record-tile-title">@bank.Code — @bank.Name</span>
+                    <div class="record-tile @(selectedBankId == bank.Id ? "selected" : null)" @onclick="() => SelectBank(bank.Id)" @key="bank.Id" tabindex="0" role="group" @onkeydown='args => { if (args.Key is "Enter" or " ") SelectBank(bank.Id); }'>
+                        <a class="record-tile-title" href="@($"/financial/banks/{bank.Id}/edit")" @onclick:stopPropagation="true">@bank.Code — @bank.Name</a>
                         <span class="record-tile-meta">@bank.CurrencyCode · @BankStatus(bank)</span>
-                    </button>
+                    </div>
                 }
             </div>
         </TilesContent>
@@ -140,49 +139,31 @@ else
 
     @if (isAccountDialogOpen)
     {
-        <WorkspaceCardDialog @key="accountDialogKey" OnClose="CloseAccountDialog" IsSaving="isSaving"
-                             LabelledBy="bank-card-heading"
-                             ReturnFocusSelector="@(editingBank is null ? "#new-bank-action" : "#edit-bank-action")"
-                             ReturnFocusFallbackSelector="#new-bank-action">
-            <div class="workspace-card-top">
-                <button class="workspace-card-back" type="button" aria-label="Close bank account card"
-                        disabled="@isSaving" @onclick="CloseAccountDialog">←</button>
-                <span>@(editingBank is null ? "New bank account" : "Edit bank account")</span>
-            </div>
-            <h2 id="bank-card-heading" class="workspace-card-title">Bank Account Card</h2>
-            <EditForm Model="@input" OnValidSubmit="SaveAsync" FormName="bank-account-card">
-                <DataAnnotationsValidator />
-                <div class="workspace-card-commands">
-                    <span>Home</span>
-                    <button type="submit" disabled="@isSaving">@(isSaving ? "Saving..." : "Save")</button>
-                    <button type="button" disabled="@isSaving" @onclick="CloseAccountDialog">Cancel</button>
-                </div>
-                <div class="workspace-card-body">
-                    @if (!string.IsNullOrWhiteSpace(errorMessage))
-                    {
-                        <div class="alert alert-danger" role="alert">@errorMessage</div>
-                    }
-                    <p class="text-body-secondary">
+        <EntityRecordCard Model="@input" Save="SaveAsync"
+                          Module="Bank accounts" CardType="Bank Account Card" Title="@(input.Code + " - " + input.Name)"
+                          IsNew="@(editingBank is null)" OnClose="CloseAccountDialog"
+                          CanPrevious="@(BrowseTarget(-1).HasValue)" CanNext="@(BrowseTarget(1).HasValue)" OnBrowse="BrowseAsync"
+                          ReturnFocusSelector="@(RecordId.HasValue ? $"a[href='/financial/banks/{RecordId}/edit']" : "#new-bank-action")"
+                          ReturnFocusFallbackSelector="#new-bank-action">
+                                <p class="text-body-secondary">
                         Use a dedicated, unblocked, directly-postable Asset G/L account. Currency is the company base currency;
                         online banking credentials and foreign exchange are not supported.
                     </p>
-                    <ValidationSummary />
-                    <h3 class="workspace-card-section">General</h3>
-                    <fieldset disabled="@isSaving">
+                    <fieldset>
                         <div class="row g-3">
                             <div class="col-md-4">
                                 <label class="form-label" for="bank-code">Code</label>
-                                <InputText id="bank-code" class="form-control" maxlength="32" @bind-Value="input.Code" />
+                                <CardInputText id="bank-code" class="form-control" maxlength="32" @bind-Value="input.Code" />
                                 <ValidationMessage For="@(() => input.Code)" />
                             </div>
                             <div class="col-md-8">
                                 <label class="form-label" for="bank-name">Name</label>
-                                <InputText id="bank-name" class="form-control" maxlength="160" @bind-Value="input.Name" />
+                                <CardInputText id="bank-name" class="form-control" maxlength="160" @bind-Value="input.Name" />
                                 <ValidationMessage For="@(() => input.Name)" />
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label" for="bank-identifier">Account identifier (no credentials)</label>
-                                <InputText id="bank-identifier" class="form-control" maxlength="100" @bind-Value="input.AccountIdentifier" />
+                                <CardInputText id="bank-identifier" class="form-control" maxlength="100" @bind-Value="input.AccountIdentifier" />
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label" for="bank-gl">Dedicated bank/cash G/L account</label>
@@ -202,13 +183,35 @@ else
                             </div>
                         </div>
                     </fieldset>
-                </div>
-            </EditForm>
-        </WorkspaceCardDialog>
+        </EntityRecordCard>
     }
 }
 
 @code {
+    protected override void OnInitialized() => Navigation.LocationChanged += OnLocationChanged;
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        if (new Uri(args.Location).AbsolutePath.TrimEnd('/').Equals("/financial/banks/new", StringComparison.OrdinalIgnoreCase))
+            OpenNewAccount();
+        else if (new Uri(args.Location).AbsolutePath.TrimEnd('/').Equals("/financial/banks", StringComparison.OrdinalIgnoreCase))
+            isAccountDialogOpen = false;
+        _ = InvokeAsync(StateHasChanged);
+    }
+    public void Dispose() => Navigation.LocationChanged -= OnLocationChanged;
+
+    [Parameter] public Guid? RecordId { get; set; }
+    private void EnsureSelection() => selectedBankId = RecordSelection.Reconcile(FilteredBanks.Select(record => record.Id), selectedBankId);
+    private Guid? BrowseTarget(int offset) => editingBank?.Id is { } id
+        ? RecordSelection.Adjacent(FilteredBanks.Select(record => record.Id), id, offset) : null;
+    private Task BrowseAsync(int offset)
+    {
+        if (BrowseTarget(offset) is { } id)
+            Navigation.NavigateTo($"/financial/banks/{id}/edit");
+        else
+            CloseAccountDialog();
+        return Task.CompletedTask;
+    }
+
     private IReadOnlyList<BankAccountDetail> banks = [];
     private IReadOnlyList<GeneralLedgerAccountListItem> accounts = [];
     private BankAccountInput input = new();
@@ -216,7 +219,6 @@ else
     private Guid? selectedBankId;
     private string searchTerm = string.Empty;
     private string statusFilter = "all";
-    private int accountDialogKey;
     private string? errorMessage;
     private string? statusMessage;
     private bool isLoading = true;
@@ -241,11 +243,26 @@ else
         account.AllowsDirectPosting &&
         (!account.IsBlocked || account.Id == input.GeneralLedgerAccountId));
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnParametersSetAsync()
     {
+        isAccountDialogOpen = false;
+        errorMessage = null;
         try
         {
-            await LoadAsync();
+            if (isLoading) await LoadAsync();
+            if (RecordId is { } id)
+            {
+                selectedBankId = id;
+                if (banks.Any(record => record.Id == id))
+                    EditSelectedAccount();
+                else
+                    errorMessage = "The record is not available in the active company.";
+            }
+            else if (new Uri(Navigation.Uri).AbsolutePath.TrimEnd('/').EndsWith("/new", StringComparison.OrdinalIgnoreCase))
+                OpenNewAccount();
+            else
+                isAccountDialogOpen = false;
+            EnsureSelection();
         }
         catch (UnauthorizedAccessException exception)
         {
@@ -264,32 +281,33 @@ else
         var loadedAccounts = await AccountService.GetAllAsync(user);
         banks = loadedBanks;
         accounts = loadedAccounts;
+        EnsureSelection();
     }
 
     private Task HandleSearchChanged(string value)
     {
         searchTerm = value;
-        selectedBankId = null;
+        EnsureSelection();
         return Task.CompletedTask;
     }
 
     private void HandleStatusFilterChanged(ChangeEventArgs args)
     {
         statusFilter = args.Value?.ToString() ?? "all";
-        selectedBankId = null;
+        EnsureSelection();
     }
 
     private void HandleWorkspaceStatusFilterChanged(string value)
     {
         statusFilter = value;
-        selectedBankId = null;
+        EnsureSelection();
     }
 
     private void ClearFilters()
     {
         searchTerm = string.Empty;
         statusFilter = "all";
-        selectedBankId = null;
+        EnsureSelection();
     }
 
     private void SelectBank(Guid bankId) => selectedBankId = bankId;
@@ -298,7 +316,6 @@ else
     {
         editingBank = null;
         input = new BankAccountInput();
-        accountDialogKey++;
         isAccountDialogOpen = true;
         errorMessage = null;
         statusMessage = null;
@@ -306,7 +323,7 @@ else
 
     private void EditSelectedAccount()
     {
-        if (SelectedBank is not { } bank)
+        if (banks.SingleOrDefault(record => record.Id == RecordId) is not { } bank)
         {
             return;
         }
@@ -325,7 +342,6 @@ else
             GeneralLedgerAccountId = bank.GeneralLedgerAccountId,
             IsBlocked = bank.IsBlocked
         };
-        accountDialogKey++;
         isAccountDialogOpen = true;
         errorMessage = null;
         statusMessage = null;
@@ -334,48 +350,24 @@ else
     private void CloseAccountDialog()
     {
         isAccountDialogOpen = false;
-        editingBank = null;
-        input = new BankAccountInput();
+        Navigation.NavigateTo("/financial/banks");
     }
 
-    private async Task SaveAsync()
+    private async Task SaveAsync(BankAccountInput snapshot)
     {
-        if (isSaving)
+        var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+        if (editingBank is { } bank)
         {
-            return;
-        }
-
-        isSaving = true;
-        errorMessage = null;
-        try
-        {
-            var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
-            if (editingBank is null)
-            {
-                await BankService.CreateAccountAsync(user, input);
-                statusMessage = "Bank account created.";
-            }
-            else
-            {
-                await BankService.UpdateAccountAsync(user, editingBank.Id, editingBank.Revision, input);
-                statusMessage = "Bank account saved.";
-            }
-
-            CloseAccountDialog();
+            var revision = await BankService.UpdateAccountAsync(user, bank.Id, bank.Revision, snapshot);
+            editingBank = bank with { Revision = revision };
             await LoadAsync();
         }
-        catch (ValidationException exception)
+        else
         {
-            errorMessage = exception.Message;
+            await BankService.CreateAccountAsync(user, snapshot);
+            await LoadAsync();
         }
-        catch (UnauthorizedAccessException exception)
-        {
-            errorMessage = exception.Message;
-        }
-        finally
-        {
-            isSaving = false;
-        }
+        await InvokeAsync(StateHasChanged);
     }
 
     private void RequestStatusChange()
