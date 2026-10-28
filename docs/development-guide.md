@@ -177,9 +177,23 @@ purchasing checks; reactivate a vendor before continuing those operations. Vendo
 require an unblocked, directly-postable Liability payables account separate from the company's GRNI
 account. Changes are audited; no schema migration is required.
 
-`/financial/purchasing` configures the company's GRNI liability account,
-creates purchase orders for inventory items, and creates separate full-quantity receipt and vendor
-invoice journal drafts. Review and post each draft through General journals. Receipt posting increases
+Purchasing now has separate compact workspaces at `/financial/purchasing/orders`,
+`/financial/purchasing/fulfillment`, and `/financial/purchasing/payables`. Each supports search,
+selection, List/Tall tiles/Tiles views, and independent Filters/Details panes. Purchase Orders' **+ New**
+opens `/financial/purchasing/orders/new` with editable header/line fields and explicit Save/Cancel.
+Existing order cards are read-only and link to receipt/invoice journals. Processing cards accept posting
+setup only for Open/Received orders and protect unsaved changes; payables cards show posted invoices
+read-only. The Vendors workspace is unchanged.
+
+The **Purchasing setup** action opens `/financial/purchasing/setup` for the company's GRNI liability
+account, using the existing account eligibility and post-order immutability rules. `/financial/purchasing`
+is an alias for the orders workspace; legacy `#purchase-order-heading`, `#receipt-invoice-heading`,
+`#payables-heading`, and `#purchasing-setup-heading` links open their corresponding card/workspace
+after the interactive app connects. All new navigation and Home shortcuts use the dedicated routes.
+No EF model changes or migrations are required.
+
+The existing service creates separate full-quantity receipt and vendor invoice journal drafts.
+Review and post each draft through General journals. Receipt posting increases
 inventory at the purchase-order cost and credits GRNI; invoice posting clears GRNI, debits recoverable
 tax where configured, and credits vendor payables. The open-payables inquiry lists posted invoices at
 their full unpaid balance. Partial receipts, purchase-price variances, vendor payments/application,

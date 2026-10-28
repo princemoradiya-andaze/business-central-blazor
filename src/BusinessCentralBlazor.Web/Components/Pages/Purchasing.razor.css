@@ -1,0 +1,22 @@
+.purchase-document-card { height: 100%; display: flex; flex-direction: column; padding: 1.4rem 4rem 0; }
+.purchase-card-top { display: flex; align-items: center; gap: .75rem; color: #64748b; font-size: .8rem; }
+.purchase-back { border: 0; border-radius: 50%; width: 2.2rem; height: 2.2rem; background: #d8eff1; color: #45616a; }
+.purchase-card-title { font-size: 2rem; font-weight: 300; margin: 1rem 0; }
+.purchase-card-commands { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; min-height: 2.5rem; border-block: 1px solid #d5dce1; font-size: .85rem; }
+.purchase-card-body { flex: 1; overflow: auto; padding: 1.25rem 0; }
+.purchase-section { font-size: 1.1rem; border-bottom: 1px solid #64748b; padding-bottom: .35rem; margin: 1.5rem 0 1rem; }
+.purchase-card-fields, .purchase-readonly-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.1rem 2rem; }
+.purchase-card-fields label, .purchase-readonly-fields dt { font-size: .85rem; font-weight: 400; color: #526775; margin-bottom: .35rem; }
+.purchase-readonly-fields dd { border: 1px solid #d5dce1; background: #f5f6f7; padding: .35rem .5rem; margin: 0; }
+.purchase-new-lines ::deep input { min-width: 6rem; }
+.purchase-new-lines ::deep select { min-width: 10rem; }
+.purchase-new-lines th, .purchase-new-lines td { white-space: nowrap; }
+.purchase-new-lines ::deep .validation-message { white-space: normal; }
+.purchase-card-footer { border-top: 1px solid #d5dce1; padding: .8rem 0; color: #64748b; font-size: .75rem; }
+.purchase-card-arrows { position: absolute; inset: 50% .6rem auto; display: flex; justify-content: space-between; pointer-events: none; }
+.purchase-card-arrows button { pointer-events: auto; border: 0; border-radius: 50%; width: 2rem; height: 2rem; background: #536174; color: white; }
+.purchase-card-arrows button:disabled { opacity: .4; }
+@media (max-width: 900px) {
+    .purchase-card-fields, .purchase-readonly-fields { grid-template-columns: 1fr; }
+    .purchase-document-card { padding: 1rem 2.7rem 0; }
+}

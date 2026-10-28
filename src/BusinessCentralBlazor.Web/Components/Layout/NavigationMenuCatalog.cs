@@ -24,9 +24,9 @@ internal static class NavigationMenuCatalog
         new("purchasing", "Purchasing",
         [
             new("Vendors", "/financial/purchasing/vendors"),
-            new("Create purchase order", "/financial/purchasing#purchase-order-heading"),
-            new("Receive and invoice orders", "/financial/purchasing#receipt-invoice-heading"),
-            new("Open vendor payables", "/financial/purchasing#payables-heading")
+            new("Purchase orders", "/financial/purchasing/orders"),
+            new("Receive and invoice orders", "/financial/purchasing/fulfillment"),
+            new("Open vendor payables", "/financial/purchasing/payables")
         ],
         ["/financial/purchasing"]),
         new("cash", "Cash management",

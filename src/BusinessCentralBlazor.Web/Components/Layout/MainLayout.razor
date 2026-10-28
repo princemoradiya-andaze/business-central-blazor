@@ -92,7 +92,14 @@
                    path.Equals("/financial/sales/create-order", StringComparison.OrdinalIgnoreCase) ||
                    path.Equals("/financial/sales/fulfillment", StringComparison.OrdinalIgnoreCase) ||
                    path.StartsWith("/financial/sales/fulfillment/", StringComparison.OrdinalIgnoreCase) ||
-                   path.Equals("/financial/sales/receivables", StringComparison.OrdinalIgnoreCase);
+                   path.Equals("/financial/sales/receivables", StringComparison.OrdinalIgnoreCase) ||
+                   path.Equals("/financial/purchasing", StringComparison.OrdinalIgnoreCase) ||
+                   path.Equals("/financial/purchasing/orders", StringComparison.OrdinalIgnoreCase) ||
+                   path.StartsWith("/financial/purchasing/orders/", StringComparison.OrdinalIgnoreCase) ||
+                   path.Equals("/financial/purchasing/fulfillment", StringComparison.OrdinalIgnoreCase) ||
+                   path.StartsWith("/financial/purchasing/fulfillment/", StringComparison.OrdinalIgnoreCase) ||
+                   path.Equals("/financial/purchasing/payables", StringComparison.OrdinalIgnoreCase) ||
+                   path.Equals("/financial/purchasing/setup", StringComparison.OrdinalIgnoreCase);
         }
     }
 
