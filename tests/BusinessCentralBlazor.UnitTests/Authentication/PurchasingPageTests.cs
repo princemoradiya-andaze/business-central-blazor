@@ -40,15 +40,148 @@ public sealed class PurchasingPageTests(AuthenticationWebApplicationFactory fact
         using var response = await client.GetAsync("/financial/purchasing");
         var html = await response.Content.ReadAsStringAsync();
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Contains("Purchasing and payables", html, StringComparison.Ordinal);
-        Assert.Contains("Goods received not invoiced (GRNI) account", html, StringComparison.Ordinal);
-        Assert.Contains("Create purchase order", html, StringComparison.Ordinal);
-        Assert.Contains("Receive and invoice orders", html, StringComparison.Ordinal);
-        Assert.Contains("Open vendor payables", html, StringComparison.Ordinal);
+        Assert.Contains("Purchase orders", html, StringComparison.Ordinal);
+        Assert.Contains("href=\"/financial/purchasing/orders/new\"", html, StringComparison.Ordinal);
+        Assert.Contains("href=\"/financial/purchasing/fulfillment\"", html, StringComparison.Ordinal);
+        Assert.Contains("href=\"/financial/purchasing/payables\"", html, StringComparison.Ordinal);
+        Assert.Contains("href=\"/financial/purchasing/setup?from=orders\"", html, StringComparison.Ordinal);
         Assert.Contains("href=\"/financial/purchasing/vendors\"", html, StringComparison.Ordinal);
         Assert.DoesNotContain("FormName=\"purchase-vendor\"", html, StringComparison.Ordinal);
         Assert.DoesNotContain("id=\"purchase-vendor-number\"", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("id=\"purchasing-grni\"", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("id=\"purchase-order-number\"", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("class=\"page-command-bar\"", html, StringComparison.Ordinal);
+        Assert.Contains("record-workspace-main", html, StringComparison.Ordinal);
     }
+
+    [Theory]
+    [InlineData("/financial/purchasing/orders")]
+    [InlineData("/financial/purchasing/orders/new")]
+    [InlineData("/financial/purchasing/orders/8711e20c-e555-416c-a631-dd7ff7b7799a")]
+    [InlineData("/financial/purchasing/fulfillment")]
+    [InlineData("/financial/purchasing/fulfillment/8711e20c-e555-416c-a631-dd7ff7b7799a")]
+    [InlineData("/financial/purchasing/payables?invoice=INV-1")]
+    [InlineData("/financial/purchasing/setup")]
+    public async Task PurchasingWorkflowRoutesRequireSignIn(string route)
+    {
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        using var response = await client.GetAsync(route);
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.StartsWith("/account/login", response.Headers.Location?.AbsolutePath);
+    }
+
+    [Fact]
+    public async Task PurchasingWorkspacesSelectRecordsAndExposeCompanyScopedCardsAndSetup()
+    {
+        var email = $"purchasing-workspace-{Guid.NewGuid():N}@example.invalid";
+        await factory.CreateTestUserAsync(email, Password);
+        var membership = await factory.AddCompanyMembershipAsync(email, "PURCHUI", "Purchasing UI");
+        var foreign = await factory.AddCompanyMembershipAsync(email, "FOREIGNP", "Foreign Purchasing UI");
+        var vendorId = Guid.NewGuid();
+        var itemId = Guid.NewGuid();
+        var accountId = Guid.NewGuid();
+        var grniId = Guid.NewGuid();
+        var openId = Guid.NewGuid();
+        var receivedId = Guid.NewGuid();
+        var invoicedId = Guid.NewGuid();
+        var foreignId = Guid.NewGuid();
+        var journalId = Guid.NewGuid();
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ErpDbContext>();
+            db.Add(new GeneralLedgerAccount { Id = accountId, CompanyId = membership.CompanyId, Number = "2100", Name = "Payables", Category = AccountCategory.Liability, Type = AccountType.Posting, AllowsDirectPosting = true });
+            db.Add(new GeneralLedgerAccount { Id = grniId, CompanyId = membership.CompanyId, Number = "2200", Name = "GRNI", Category = AccountCategory.Liability, Type = AccountType.Posting, AllowsDirectPosting = true });
+            db.Add(new Vendor { Id = vendorId, CompanyId = membership.CompanyId, Number = "V100", Name = "Workspace vendor", PayablesAccountId = accountId });
+            db.Add(new Item { Id = itemId, CompanyId = membership.CompanyId, Number = "ITEM100", Description = "Workspace item", BaseUnitOfMeasure = "EA", Type = ItemType.Inventory });
+            db.Add(new AccountingPeriod { Id = Guid.NewGuid(), CompanyId = membership.CompanyId, Name = "October 2026", StartsOn = new(2026, 10, 1), EndsOn = new(2026, 10, 31) });
+            foreach (var (id, number, status) in new[]
+            {
+                (openId, "PO-100", PurchaseOrderStatus.Open),
+                (Guid.NewGuid(), "PO-150", PurchaseOrderStatus.ReceiptDraft),
+                (receivedId, "PO-200", PurchaseOrderStatus.Received),
+                (Guid.NewGuid(), "PO-250", PurchaseOrderStatus.InvoiceDraft),
+                (invoicedId, "PO-300", PurchaseOrderStatus.Invoiced)
+            })
+            {
+                db.Add(new PurchaseOrder { Id = id, CompanyId = membership.CompanyId, VendorId = vendorId, OrderNumber = number, Description = "Workspace order", OrderDate = new(2026, 10, 20), Status = status, ReceiptJournalBatchId = status == PurchaseOrderStatus.Open ? null : journalId });
+                db.Add(new PurchaseOrderLine { Id = Guid.NewGuid(), CompanyId = membership.CompanyId, PurchaseOrderId = id, LineNumber = 10000, ItemId = itemId, Description = "Workspace line", Quantity = 2m, UnitCost = 25m });
+            }
+            db.Add(new PurchaseInvoice { Id = Guid.NewGuid(), CompanyId = membership.CompanyId, PurchaseOrderId = invoicedId, VendorId = vendorId, JournalBatchId = journalId, InvoiceNumber = "INV-100 & A", PostingDate = new(2026, 10, 20), NetAmount = 50, TaxAmount = 5, TotalAmount = 55, PostedAtUtc = DateTimeOffset.UtcNow });
+            var foreignVendor = Guid.NewGuid();
+            var foreignAccount = Guid.NewGuid();
+            db.Add(new GeneralLedgerAccount { Id = foreignAccount, CompanyId = foreign.CompanyId, Number = "2100", Name = "Foreign payables", Category = AccountCategory.Liability, Type = AccountType.Posting, AllowsDirectPosting = true });
+            db.Add(new Vendor { Id = foreignVendor, CompanyId = foreign.CompanyId, Number = "V-FOREIGN", Name = "Foreign vendor", PayablesAccountId = foreignAccount });
+            db.Add(new PurchaseOrder { Id = foreignId, CompanyId = foreign.CompanyId, VendorId = foreignVendor, OrderNumber = "FOREIGN-ORDER", Description = "Foreign order", OrderDate = new(2026, 10, 20), Status = PurchaseOrderStatus.Open });
+            await db.SaveChangesAsync();
+        }
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        await SignInAsync(client, email);
+        await SelectCompanyAsync(client, membership.CompanyId);
+        var list = await client.GetStringAsync("/financial/purchasing/orders");
+        Assert.Matches($"<tr[^>]*class=\"record-row-selected\"[^>]*>\\s*<th[^>]*>\\s*<a[^>]*href=\"/financial/purchasing/orders/{openId}\"", list);
+        Assert.DoesNotContain("FOREIGN-ORDER", list);
+        Assert.DoesNotContain("class=\"page-command-bar\"", list);
+        Assert.DoesNotContain("href=\"/financial/purchasing#purchase-order-heading\"", list);
+        Assert.Contains("value=\"ReceiptDraft\"", list);
+        Assert.Contains("value=\"InvoiceDraft\"", list);
+        Assert.Contains("href=\"/financial/purchasing/orders/new\"", list);
+        var all = list.IndexOf("id=\"purchase-orders-status\"", StringComparison.Ordinal);
+        var search = list.IndexOf("id=\"purchase-orders-search\"", StringComparison.Ordinal);
+        var newAction = list.IndexOf("id=\"new-purchase-order-action\"", StringComparison.Ordinal);
+        Assert.True(all >= 0 && search > all && newAction > search);
+
+        var create = Dialog(await client.GetStringAsync("/financial/purchasing/orders/new"));
+        Assert.Contains("New Purchase Order Card", create);
+        Assert.Contains("purchase-order-vendor", create);
+        Assert.Contains("purchase-line-cost-0", create);
+        Assert.Contains("purchase-line-tax-0", create);
+        Assert.Contains(">Save</button>", create);
+        Assert.Contains(">Cancel</button>", create);
+        Assert.DoesNotContain("Next record", create);
+        Assert.Contains("Select and save a GRNI account", create);
+        var orderCard = Dialog(await client.GetStringAsync($"/financial/purchasing/orders/{openId}"));
+        Assert.Contains("Read-only", orderCard);
+        Assert.Contains("Workspace line", orderCard);
+        Assert.Contains("ITEM100", orderCard);
+        Assert.DoesNotContain("<form", orderCard);
+        Assert.Matches("aria-label=\"Previous record\"[^>]*disabled", orderCard);
+        Assert.DoesNotMatch("aria-label=\"Next record\"[^>]*disabled", orderCard);
+        var lastCard = Dialog(await client.GetStringAsync($"/financial/purchasing/orders/{invoicedId}"));
+        Assert.Matches("aria-label=\"Next record\"[^>]*disabled", lastCard);
+        Assert.Contains($"/financial/journals/{journalId}", lastCard);
+
+        var processing = await client.GetStringAsync("/financial/purchasing/fulfillment");
+        Assert.Contains($"/financial/purchasing/fulfillment/{openId}", processing);
+        Assert.Contains($"/financial/purchasing/fulfillment/{receivedId}", processing);
+        foreach (var excluded in new[] { "PO-150", "PO-250", "PO-300", "FOREIGN-ORDER" }) Assert.DoesNotContain(excluded, processing);
+        var receipt = Dialog(await client.GetStringAsync($"/financial/purchasing/fulfillment/{openId}"));
+        Assert.Contains("Create receipt journal", receipt);
+        Assert.DoesNotContain("vendor-invoice-number", receipt);
+        var invoice = Dialog(await client.GetStringAsync($"/financial/purchasing/fulfillment/{receivedId}"));
+        Assert.Contains("Create invoice journal", invoice);
+        Assert.Contains("vendor-invoice-number", invoice);
+        Assert.Contains("Posting creates the receipt or invoice", invoice);
+        var payables = await client.GetStringAsync("/financial/purchasing/payables");
+        Assert.Contains("INV-100%20%26%20A", payables);
+        var postedCard = Dialog(await client.GetStringAsync("/financial/purchasing/payables?invoice=INV-100%20%26%20A"));
+        Assert.Contains("Posted Vendor Invoice", postedCard);
+        Assert.Contains("55.00", postedCard);
+        Assert.Contains("Read-only", postedCard);
+        Assert.DoesNotContain("<form", postedCard);
+        var setupCard = Dialog(await client.GetStringAsync("/financial/purchasing/setup?from=fulfillment"));
+        Assert.Contains("Save GRNI account", setupCard);
+        Assert.Contains("purchasing-grni", setupCard);
+        Assert.Contains("2200 - GRNI", setupCard);
+        Assert.DoesNotContain("Previous record", setupCard);
+        foreach (var route in new[] { $"/financial/purchasing/orders/{foreignId}", $"/financial/purchasing/fulfillment/{invoicedId}", "/financial/purchasing/payables?invoice=MISSING" })
+        {
+            var missing = await client.GetStringAsync(route);
+            Assert.Contains("not available", missing);
+            Assert.DoesNotContain("id=\"entity-card-heading\"", missing);
+        }
+    }
+
+    private static string Dialog(string html) => Regex.Match(html, "<dialog\\b.*?</dialog>", RegexOptions.Singleline).Value;
 
     [Theory]
     [InlineData("/financial/purchasing/vendors")]
