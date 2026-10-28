@@ -86,7 +86,13 @@
                    path.Equals("/financial/journals", StringComparison.OrdinalIgnoreCase) ||
                    path.Equals("/financial/dimensions", StringComparison.OrdinalIgnoreCase) ||
                    path.Equals("/financial/accounting-periods", StringComparison.OrdinalIgnoreCase) ||
-                   path.Equals("/financial/tax-setup", StringComparison.OrdinalIgnoreCase);
+                   path.Equals("/financial/tax-setup", StringComparison.OrdinalIgnoreCase) ||
+                   path.Equals("/financial/sales/orders", StringComparison.OrdinalIgnoreCase) ||
+                   path.StartsWith("/financial/sales/orders/", StringComparison.OrdinalIgnoreCase) ||
+                   path.Equals("/financial/sales/create-order", StringComparison.OrdinalIgnoreCase) ||
+                   path.Equals("/financial/sales/fulfillment", StringComparison.OrdinalIgnoreCase) ||
+                   path.StartsWith("/financial/sales/fulfillment/", StringComparison.OrdinalIgnoreCase) ||
+                   path.Equals("/financial/sales/receivables", StringComparison.OrdinalIgnoreCase);
         }
     }
 

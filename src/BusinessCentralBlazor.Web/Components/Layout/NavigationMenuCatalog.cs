@@ -16,7 +16,6 @@ internal static class NavigationMenuCatalog
         new("sales", "Sales",
         [
             new("Customers", "/financial/sales/customers"),
-            new("Create sales order", "/financial/sales/create-order"),
             new("Sales orders", "/financial/sales/orders"),
             new("Ship and invoice orders", "/financial/sales/fulfillment"),
             new("Open receivables", "/financial/sales/receivables")
