@@ -67,7 +67,15 @@ public sealed class BankPageTests(AuthenticationWebApplicationFactory factory) :
             Assert.Equal(HttpStatusCode.OK, page.StatusCode);
             var html = await page.Content.ReadAsStringAsync();
             Assert.Contains(expected, html);
-            Assert.Contains("Bank accounts and reconciliation", html);
+            Assert.Contains("Bank accounts", html);
+            if (route == "/financial/banks")
+            {
+                Assert.Contains("Choose view", html);
+                Assert.Contains("Filters", html);
+                Assert.Contains("Details", html);
+                Assert.Contains("id=\"new-bank-action\"", html);
+                Assert.Contains("id=\"bank-status-quick\"", html);
+            }
         }
         using var foreignBank = await client.GetAsync($"/financial/banks/{Guid.NewGuid()}");
         Assert.Contains("Bank account not found in the active company.", await foreignBank.Content.ReadAsStringAsync());

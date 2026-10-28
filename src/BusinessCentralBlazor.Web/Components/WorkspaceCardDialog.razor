@@ -1,0 +1,52 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+<dialog class="workspace-card-dialog" aria-labelledby="@LabelledBy" aria-describedby="@DescribedBy" @ref="dialog">
+    @ChildContent
+</dialog>
+
+@code {
+    [Parameter, EditorRequired] public RenderFragment ChildContent { get; set; } = default!;
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public bool IsSaving { get; set; }
+    [Parameter] public string LabelledBy { get; set; } = "workspace-card-heading";
+    [Parameter] public string? DescribedBy { get; set; }
+    [Parameter] public string ReturnFocusSelector { get; set; } = "button";
+    [Parameter] public string? ReturnFocusFallbackSelector { get; set; }
+
+    private ElementReference dialog;
+    private IJSObjectReference? module;
+    private DotNetObjectReference<WorkspaceCardDialog>? reference;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        module = await JS.InvokeAsync<IJSObjectReference>("import", "./js/workspaceCardDialog.js");
+        reference = DotNetObjectReference.Create(this);
+        await module.InvokeVoidAsync("open", dialog, reference);
+    }
+
+    [JSInvokable]
+    public Task RequestClose() => IsSaving ? Task.CompletedTask : OnClose.InvokeAsync();
+
+    public async ValueTask DisposeAsync()
+    {
+        if (module is not null)
+        {
+            try
+            {
+                await module.InvokeVoidAsync("cleanup", dialog, ReturnFocusSelector, ReturnFocusFallbackSelector);
+                await module.DisposeAsync();
+            }
+            catch (JSDisconnectedException)
+            {
+            }
+        }
+
+        reference?.Dispose();
+    }
+}

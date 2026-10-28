@@ -2,19 +2,13 @@
 @attribute [Authorize(Policy = CompanyAuthorizationPolicies.ActiveCompany)]
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject IInventoryService InventoryService
-@inject NavigationManager Navigation
 
 <PageTitle>Inventory</PageTitle>
-<h1>Inventory</h1>
-<p class="text-body-secondary">
-    Manage company-wide inventory items and weighted-average stock movements. Warehouses and bins are not included.
-</p>
-
 @if (!string.IsNullOrWhiteSpace(statusMessage))
 {
     <div class="alert alert-success" role="status">@statusMessage</div>
 }
-@if (!string.IsNullOrWhiteSpace(errorMessage))
+@if (!string.IsNullOrWhiteSpace(errorMessage) && !isItemDialogOpen && !isStatusDialogOpen)
 {
     <div class="alert alert-danger" role="alert">@errorMessage</div>
 }
@@ -24,271 +18,244 @@
 }
 else
 {
-    <section class="card mb-4" aria-labelledby="items-heading">
-        <div class="card-body">
-            <h2 id="items-heading" class="h4">Inventory items</h2>
-            @if (items.Count == 0)
-            {
-                <p>No inventory items have been configured for this company.</p>
-            }
-            else
-            {
-                <div class="table-responsive">
-                    <table class="table table-striped align-middle">
-                        <caption class="visually-hidden">Inventory items and company-wide stock balances</caption>
-                        <thead>
-                            <tr>
-                                <th scope="col">Number</th>
-                                <th scope="col">Description</th>
-                                <th scope="col">Unit</th>
-                                <th scope="col" class="text-end">On hand</th>
-                                <th scope="col" class="text-end">Average cost</th>
-                                <th scope="col" class="text-end">Inventory value</th>
-                                <th scope="col">Status</th>
-                                <th scope="col">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var item in items)
-                            {
-                                <tr>
-                                    <th scope="row">@item.Number</th>
-                                    <td>@item.Description</td>
-                                    <td>@item.BaseUnitOfMeasure</td>
-                                    <td class="text-end">@item.QuantityOnHand.ToString("N4")</td>
-                                    <td class="text-end">@item.UnitCost.ToString("N4")</td>
-                                    <td class="text-end">@item.InventoryValue.ToString("N4")</td>
-                                    <td>@(item.IsBlocked ? "Blocked" : "Active")</td>
-                                    <td>
-                                        <button class="btn btn-sm btn-outline-secondary" type="button"
-                                                disabled="@isSaving" @onclick="() => EditItem(item)">
-                                            Edit
-                                        </button>
-                                    </td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
-                </div>
-            }
-
-            <h3 class="h5 mt-4">@(editingItemId is null ? "New inventory item" : "Edit inventory item")</h3>
-            @if (!EligibleAccounts.Any(account => account.Category == AccountCategory.Asset) ||
-                 !EligibleAccounts.Any(account => account.Category == AccountCategory.Expense))
-            {
-                <div class="alert alert-info" role="status">
-                    Create eligible Asset and Expense posting accounts in Chart of Accounts before setting up inventory.
-                </div>
-            }
-            <EditForm Model="@itemInput" OnValidSubmit="SaveItemAsync" FormName="inventory-item">
-                <DataAnnotationsValidator />
-                <ValidationSummary />
-                <fieldset disabled="@isSaving">
-                    <div class="row g-3">
-                        <div class="col-md-3">
-                            <label class="form-label" for="item-number">Item number</label>
-                            <InputText id="item-number" class="form-control" @bind-Value="itemInput.Number" />
-                            <ValidationMessage For="@(() => itemInput.Number)" />
-                        </div>
-                        <div class="col-md-5">
-                            <label class="form-label" for="item-description">Description</label>
-                            <InputText id="item-description" class="form-control" @bind-Value="itemInput.Description" />
-                            <ValidationMessage For="@(() => itemInput.Description)" />
-                        </div>
-                        <div class="col-md-2">
-                            <label class="form-label" for="item-unit">Base unit</label>
-                            <InputText id="item-unit" class="form-control" @bind-Value="itemInput.BaseUnitOfMeasure" />
-                            <ValidationMessage For="@(() => itemInput.BaseUnitOfMeasure)" />
-                        </div>
-                        <div class="col-md-2 d-flex align-items-end">
-                            <div class="form-check mb-2">
-                                <InputCheckbox id="item-blocked" class="form-check-input" @bind-Value="itemInput.IsBlocked" />
-                                <label class="form-check-label" for="item-blocked">Blocked</label>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label" for="inventory-account">Inventory Asset account</label>
-                            <InputSelect id="inventory-account" class="form-select" @bind-Value="itemInput.InventoryAccountId">
-                                <option value="@Guid.Empty">Select Asset posting account</option>
-                                @foreach (var account in EligibleAccounts.Where(account => account.Category == AccountCategory.Asset))
-                                {
-                                    <option value="@account.Id">@account.Number - @account.Name</option>
-                                }
-                            </InputSelect>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label" for="increase-account">Opening/increase offset account</label>
-                            <InputSelect id="increase-account" class="form-select" @bind-Value="itemInput.IncreaseOffsetAccountId">
-                                <option value="@Guid.Empty">Select posting account</option>
-                                @foreach (var account in EligibleAccounts)
-                                {
-                                    <option value="@account.Id">@account.Number - @account.Name</option>
-                                }
-                            </InputSelect>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label" for="issue-account">Inventory issue expense account</label>
-                            <InputSelect id="issue-account" class="form-select" @bind-Value="itemInput.IssueExpenseAccountId">
-                                <option value="@Guid.Empty">Select Expense posting account</option>
-                                @foreach (var account in EligibleAccounts.Where(account => account.Category == AccountCategory.Expense))
-                                {
-                                    <option value="@account.Id">@account.Number - @account.Name</option>
-                                }
-                            </InputSelect>
-                        </div>
-                    </div>
-                    <button class="btn btn-primary mt-3" type="submit">
-                        @(isSaving ? "Saving..." : editingItemId is null ? "Create item" : "Save item")
-                    </button>
-                    @if (editingItemId is not null)
-                    {
-                        <button class="btn btn-outline-secondary mt-3" type="button" @onclick="CancelEdit">Cancel</button>
-                    }
-                </fieldset>
-            </EditForm>
-        </div>
-    </section>
-
-    <section class="card mb-4" aria-labelledby="movement-heading">
-        <div class="card-body">
-            <h2 id="movement-heading" class="h4">Create stock movement draft</h2>
-            <p class="text-body-secondary">
-                Positive receipts/opening adjustments add stock at the entered unit cost. Issues use the current weighted-average
-                cost and cannot exceed stock on hand. Open the linked journal and post it to update stock.
-            </p>
-            @if (items.All(item => item.IsBlocked) || items.Count == 0)
-            {
-                <div class="alert alert-info" role="status">Create or unblock an inventory item before entering movements.</div>
-            }
-            else if (periods.Count == 0)
-            {
-                <div class="alert alert-info" role="status">
-                    Create an open, unlocked accounting period before entering movements.
-                    <a href="/financial/accounting-periods">Accounting periods</a>
-                </div>
-            }
-            else
-            {
-                <EditForm Model="@movementInput" OnValidSubmit="CreateMovementAsync" FormName="inventory-movement">
-                    <DataAnnotationsValidator />
-                    <ValidationSummary />
-                    <fieldset disabled="@isSaving">
-                        <div class="row g-3">
-                            <div class="col-md-4">
-                                <label class="form-label" for="movement-item">Item</label>
-                                <InputSelect id="movement-item" class="form-select" @bind-Value="movementInput.ItemId">
-                                    <option value="@Guid.Empty">Select item</option>
-                                    @foreach (var item in items.Where(item => !item.IsBlocked))
-                                    {
-                                        <option value="@item.Id">@item.Number - @item.Description</option>
-                                    }
-                                </InputSelect>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label" for="movement-period">Accounting period</label>
-                                <InputSelect id="movement-period" class="form-select" @bind-Value="movementInput.AccountingPeriodId">
-                                    <option value="@Guid.Empty">Select period</option>
-                                    @foreach (var period in periods)
-                                    {
-                                        <option value="@period.Id">@period.Name (@period.StartsOn - @period.EndsOn)</option>
-                                    }
-                                </InputSelect>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label" for="movement-date">Posting date</label>
-                                <InputDate id="movement-date" class="form-control" TValue="DateOnly" @bind-Value="movementInput.PostingDate" />
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label" for="movement-number">Unique document number</label>
-                                <InputText id="movement-number" class="form-control" @bind-Value="movementInput.DocumentNumber" />
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label" for="movement-description">Description</label>
-                                <InputText id="movement-description" class="form-control" @bind-Value="movementInput.Description" />
-                            </div>
-                            <div class="col-md-2">
-                                <label class="form-label" for="movement-kind">Movement</label>
-                                <InputSelect id="movement-kind" class="form-select" @bind-Value="movementInput.IsReceipt">
-                                    <option value="true">Receipt / increase</option>
-                                    <option value="false">Issue / decrease</option>
-                                </InputSelect>
-                            </div>
-                            <div class="col-md-2">
-                                <label class="form-label" for="movement-quantity">Quantity</label>
-                                <InputNumber id="movement-quantity" class="form-control" step="0.0001" @bind-Value="movementInput.Quantity" />
-                            </div>
-                            @if (movementInput.IsReceipt)
-                            {
-                                <div class="col-md-3">
-                                    <label class="form-label" for="movement-unit-cost">Receipt unit cost</label>
-                                    <InputNumber id="movement-unit-cost" class="form-control" step="0.0001" @bind-Value="movementInput.UnitCost" />
-                                </div>
-                            }
-                        </div>
-                        <button class="btn btn-primary mt-3" type="submit">Create draft journal</button>
-                    </fieldset>
-                </EditForm>
-            }
-        </div>
-    </section>
-
-    <section aria-labelledby="movements-heading">
-        <h2 id="movements-heading" class="h4">Inventory movement history</h2>
-        @if (movements.Count == 0)
-        {
-            <p>No inventory movements have been entered for this company.</p>
-        }
-        else
-        {
+    <RecordWorkspace Title="Items"
+                     IdPrefix="items"
+                     StatusControlId="item-status-quick"
+                     StatusFilter="@itemStatusFilter"
+                     StatusFilterChanged="HandleWorkspaceStatusFilterChanged"
+                     AllStatusLabel="All items"
+                     SearchPlaceholder="Search items"
+                     SearchTerm="@itemSearchTerm"
+                     SearchTermChanged="HandleItemSearchChanged"
+                     HasRecords="@FilteredItems.Any()"
+                     EmptyMessage="@(items.Count == 0 ? "No inventory items have been configured for this company." : "No items match the current search and status filter.")">
+        <HeaderActions>
+            <button id="new-item-action" class="record-workspace-action" type="button" disabled="@isSaving"
+                    @onclick="OpenNewItem">+ New item</button>
+            <span class="record-workspace-separator" aria-hidden="true"></span>
+            <button id="edit-item-action" class="record-workspace-action" type="button"
+                    disabled="@(SelectedItem is null || isSaving)" @onclick="EditSelectedItem">Edit</button>
+            <span class="record-workspace-separator" aria-hidden="true"></span>
+            <button id="item-status-action" class="record-workspace-action" type="button"
+                    disabled="@(SelectedItem is null || isSaving)" @onclick="RequestStatusChange">
+                @(SelectedItem?.IsBlocked == true ? "Reactivate" : "Block")
+            </button>
+        </HeaderActions>
+        <FilterContent>
+            <label for="item-filter-status">Status</label>
+            <select id="item-filter-status" class="form-select" value="@itemStatusFilter"
+                    @onchange="HandleItemStatusFilterChanged">
+                <option value="all">All items</option>
+                <option value="active">Active</option>
+                <option value="blocked">Blocked</option>
+            </select>
+            <button class="btn btn-link btn-sm mt-2 px-0" type="button" @onclick="ClearItemFilters">Clear filters</button>
+        </FilterContent>
+        <ListContent>
             <div class="table-responsive">
                 <table class="table table-striped align-middle">
-                    <caption>Inventory movement drafts and posted movements</caption>
+                    <caption class="visually-hidden">Inventory items and company-wide stock balances</caption>
                     <thead>
                         <tr>
-                            <th scope="col">Date</th>
-                            <th scope="col">Document</th>
-                            <th scope="col">Item</th>
+                            <th scope="col">Number</th>
                             <th scope="col">Description</th>
-                            <th scope="col" class="text-end">Quantity</th>
-                            <th scope="col" class="text-end">Unit cost</th>
-                            <th scope="col" class="text-end">Value</th>
+                            <th scope="col">Unit</th>
+                            <th scope="col" class="text-end">On hand</th>
+                            <th scope="col" class="text-end">Average cost</th>
+                            <th scope="col" class="text-end">Inventory value</th>
                             <th scope="col">Status</th>
-                            <th scope="col">Journal</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var movement in movements)
+                        @foreach (var item in FilteredItems)
                         {
-                            <tr>
-                                <td>@movement.PostingDate.ToString("yyyy-MM-dd")</td>
-                                <td>@movement.DocumentNumber</td>
-                                <td>@movement.ItemNumber</td>
-                                <td>@movement.Description</td>
-                                <td class="text-end">@movement.Quantity.ToString("N4")</td>
-                                <td class="text-end">@movement.UnitCost.ToString("N4")</td>
-                                <td class="text-end">@movement.InventoryValue.ToString("N4")</td>
-                                <td>@(movement.IsPosted ? "Posted" : "Draft")</td>
-                                <td><a href="@($"/financial/journals/{movement.JournalBatchId}")">Open journal</a></td>
+                            <tr class="@(selectedItemId == item.Id ? "record-row-selected" : null)"
+                                @onclick="() => SelectItem(item.Id)" @key="item.Id">
+                                <th scope="row">
+                                    <button class="record-select" type="button" aria-pressed="@(selectedItemId == item.Id)"
+                                            @onclick="() => SelectItem(item.Id)" @onclick:stopPropagation="true">@item.Number</button>
+                                </th>
+                                <td>@item.Description</td>
+                                <td>@item.BaseUnitOfMeasure</td>
+                                <td class="text-end">@item.QuantityOnHand.ToString("N4")</td>
+                                <td class="text-end">@item.UnitCost.ToString("N4")</td>
+                                <td class="text-end">@item.InventoryValue.ToString("N4")</td>
+                                <td>@ItemStatus(item)</td>
                             </tr>
                         }
                     </tbody>
                 </table>
             </div>
-        }
-    </section>
+        </ListContent>
+        <TallTilesContent>
+            <div class="record-tile-grid">
+                @foreach (var item in FilteredItems)
+                {
+                    <button class="record-tile tall @(selectedItemId == item.Id ? "selected" : null)" type="button"
+                            aria-pressed="@(selectedItemId == item.Id)" @onclick="() => SelectItem(item.Id)" @key="item.Id">
+                        <span class="record-tile-title">@item.Number — @item.Description</span>
+                        <span class="record-tile-meta">Unit: @item.BaseUnitOfMeasure</span>
+                        <span class="record-tile-meta">On hand: @item.QuantityOnHand.ToString("N4")</span>
+                        <span class="record-tile-meta">Average cost: @item.UnitCost.ToString("N4")</span>
+                        <span class="record-tile-meta">Inventory value: @item.InventoryValue.ToString("N4")</span>
+                        <span class="record-tile-meta">Status: @ItemStatus(item)</span>
+                    </button>
+                }
+            </div>
+        </TallTilesContent>
+        <TilesContent>
+            <div class="record-tile-grid">
+                @foreach (var item in FilteredItems)
+                {
+                    <button class="record-tile @(selectedItemId == item.Id ? "selected" : null)" type="button"
+                            aria-pressed="@(selectedItemId == item.Id)" @onclick="() => SelectItem(item.Id)" @key="item.Id">
+                        <span class="record-tile-title">@item.Number — @item.Description</span>
+                        <span class="record-tile-meta">On hand: @item.QuantityOnHand.ToString("N4") @item.BaseUnitOfMeasure</span>
+                        <span class="record-tile-meta">Status: @ItemStatus(item)</span>
+                    </button>
+                }
+            </div>
+        </TilesContent>
+        <DetailsContent>
+            @if (SelectedItem is { } details)
+            {
+                <h3>@details.Number — @details.Description</h3>
+                <dl>
+                    <div><dt>Base unit</dt><dd>@details.BaseUnitOfMeasure</dd></div>
+                    <div><dt>Quantity on hand</dt><dd>@details.QuantityOnHand.ToString("N4")</dd></div>
+                    <div><dt>Weighted-average unit cost</dt><dd>@details.UnitCost.ToString("N4")</dd></div>
+                    <div><dt>Inventory value</dt><dd>@details.InventoryValue.ToString("N4")</dd></div>
+                    <div><dt>Inventory Asset account</dt><dd>@AccountLabel(details.InventoryAccountId)</dd></div>
+                    <div><dt>Increase offset account</dt><dd>@AccountLabel(details.IncreaseOffsetAccountId)</dd></div>
+                    <div><dt>Issue expense account</dt><dd>@AccountLabel(details.IssueExpenseAccountId)</dd></div>
+                    <div><dt>Status</dt><dd>@ItemStatus(details)</dd></div>
+                </dl>
+                <a class="btn btn-sm btn-outline-primary mt-3" href="/financial/inventory/movements#movement-heading">Create stock movement</a>
+            }
+            else
+            {
+                <p class="text-body-secondary">Select an item to see its stock and posting details.</p>
+            }
+        </DetailsContent>
+    </RecordWorkspace>
+
+    @if (isStatusDialogOpen && SelectedItem is { } pendingItem)
+    {
+        <WorkspaceStatusConfirmation IdPrefix="item" RecordLabel="@($"{pendingItem.Number} - {pendingItem.Description}")"
+                                     IsBlocked="@pendingItem.IsBlocked" IsSaving="@isSaving" ErrorMessage="@errorMessage"
+                                     ReturnFocusFallbackSelector="#new-item-action"
+                                     OnClose="() => isStatusDialogOpen = false" OnConfirm="ToggleItemStatusAsync" />
+    }
+
+    @if (isItemDialogOpen)
+    {
+        <WorkspaceCardDialog @key="itemDialogKey" OnClose="CloseItemDialog" IsSaving="isSaving"
+                             LabelledBy="item-card-heading"
+                             ReturnFocusSelector="@(editingItemId.HasValue ? "#edit-item-action" : "#new-item-action")"
+                             ReturnFocusFallbackSelector="#new-item-action">
+            <div class="workspace-card-top">
+                <button class="workspace-card-back" type="button" aria-label="Close item card"
+                        disabled="@isSaving" @onclick="CloseItemDialog">←</button>
+                <span>@(editingItemId.HasValue ? "Edit item" : "New item")</span>
+            </div>
+            <h2 id="item-card-heading" class="workspace-card-title">Inventory Item Card</h2>
+            <EditForm Model="@itemInput" OnValidSubmit="SaveItemAsync" FormName="inventory-item-card">
+                <DataAnnotationsValidator />
+                <div class="workspace-card-commands">
+                    <span>Home</span>
+                    <button type="submit" disabled="@isSaving">@(isSaving ? "Saving..." : "Save")</button>
+                    <button type="button" disabled="@isSaving" @onclick="CloseItemDialog">Cancel</button>
+                </div>
+                <div class="workspace-card-body">
+                    @if (!string.IsNullOrWhiteSpace(errorMessage))
+                    {
+                        <div class="alert alert-danger" role="alert">@errorMessage</div>
+                    }
+                    @if (!EligibleAccounts.Any(account => account.Category == AccountCategory.Asset) ||
+                         !EligibleAccounts.Any(account => account.Category == AccountCategory.Expense))
+                    {
+                        <div class="alert alert-info" role="status">
+                            Create eligible Asset and Expense posting accounts in Chart of Accounts before setting up inventory.
+                        </div>
+                    }
+                    <ValidationSummary />
+                    <h3 class="workspace-card-section">General</h3>
+                    <fieldset disabled="@isSaving">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label" for="item-number">Item number</label>
+                                <InputText id="item-number" class="form-control" maxlength="32" @bind-Value="itemInput.Number" />
+                                <ValidationMessage For="@(() => itemInput.Number)" />
+                            </div>
+                            <div class="col-md-5">
+                                <label class="form-label" for="item-description">Description</label>
+                                <InputText id="item-description" class="form-control" maxlength="250" @bind-Value="itemInput.Description" />
+                                <ValidationMessage For="@(() => itemInput.Description)" />
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label" for="item-unit">Base unit</label>
+                                <InputText id="item-unit" class="form-control" maxlength="20" @bind-Value="itemInput.BaseUnitOfMeasure" />
+                                <ValidationMessage For="@(() => itemInput.BaseUnitOfMeasure)" />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label" for="inventory-account">Inventory Asset account</label>
+                                <InputSelect id="inventory-account" class="form-select" @bind-Value="itemInput.InventoryAccountId">
+                                    <option value="@Guid.Empty">Select Asset posting account</option>
+                                    @foreach (var account in EligibleAccounts.Where(account => account.Category == AccountCategory.Asset))
+                                    {
+                                        <option value="@account.Id">@account.Number - @account.Name</option>
+                                    }
+                                </InputSelect>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label" for="increase-account">Opening/increase offset account</label>
+                                <InputSelect id="increase-account" class="form-select" @bind-Value="itemInput.IncreaseOffsetAccountId">
+                                    <option value="@Guid.Empty">Select posting account</option>
+                                    @foreach (var account in EligibleAccounts)
+                                    {
+                                        <option value="@account.Id">@account.Number - @account.Name</option>
+                                    }
+                                </InputSelect>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label" for="issue-account">Inventory issue expense account</label>
+                                <InputSelect id="issue-account" class="form-select" @bind-Value="itemInput.IssueExpenseAccountId">
+                                    <option value="@Guid.Empty">Select Expense posting account</option>
+                                    @foreach (var account in EligibleAccounts.Where(account => account.Category == AccountCategory.Expense))
+                                    {
+                                        <option value="@account.Id">@account.Number - @account.Name</option>
+                                    }
+                                </InputSelect>
+                            </div>
+                            <div class="col-12">
+                                <div class="form-check">
+                                    <InputCheckbox id="item-blocked" class="form-check-input" @bind-Value="itemInput.IsBlocked" />
+                                    <label class="form-check-label" for="item-blocked">Blocked</label>
+                                </div>
+                            </div>
+                        </div>
+                    </fieldset>
+                </div>
+            </EditForm>
+        </WorkspaceCardDialog>
+    }
+
 }
 
 @code {
     private IReadOnlyList<InventoryAccountOption> accounts = [];
-    private IReadOnlyList<AccountingPeriodListItem> periods = [];
     private IReadOnlyList<InventoryItemListItem> items = [];
-    private IReadOnlyList<InventoryMovementListItem> movements = [];
-    private readonly InventoryItemInput itemInput = new();
-    private InventoryMovementInput movementInput = new();
+    private InventoryItemInput itemInput = new();
     private Guid? editingItemId;
+    private Guid? selectedItemId;
     private byte[] editingItemRowVersion = [];
+    private string itemSearchTerm = string.Empty;
+    private string itemStatusFilter = "all";
+    private int itemDialogKey;
     private bool isLoading = true;
     private bool isSaving;
+    private bool isItemDialogOpen;
+    private bool isStatusDialogOpen;
     private string? statusMessage;
     private string? errorMessage;
 
@@ -297,6 +264,17 @@ else
             account.Type == AccountType.Posting &&
             account.AllowsDirectPosting &&
             !account.IsBlocked);
+    private IEnumerable<InventoryItemListItem> FilteredItems => items.Where(item =>
+        (itemStatusFilter switch
+        {
+            "active" => !item.IsBlocked,
+            "blocked" => item.IsBlocked,
+            _ => true
+        }) &&
+        (string.IsNullOrWhiteSpace(itemSearchTerm) ||
+         item.Number.Contains(itemSearchTerm, StringComparison.OrdinalIgnoreCase) ||
+         item.Description.Contains(itemSearchTerm, StringComparison.OrdinalIgnoreCase)));
+    private InventoryItemListItem? SelectedItem => FilteredItems.SingleOrDefault(item => item.Id == selectedItemId);
 
     protected override async Task OnInitializedAsync()
     {
@@ -318,45 +296,81 @@ else
     {
         var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
         var loadedAccounts = await InventoryService.GetAccountsAsync(user);
-        var loadedPeriods = await InventoryService.GetOpenPeriodsAsync(user);
         var loadedItems = await InventoryService.GetItemsAsync(user);
-        var loadedMovements = await InventoryService.GetMovementsAsync(user);
         accounts = loadedAccounts;
-        periods = loadedPeriods;
         items = loadedItems;
-        movements = loadedMovements;
-        if (movementInput.AccountingPeriodId == Guid.Empty && periods.Count > 0)
-        {
-            movementInput.AccountingPeriodId = periods[0].Id;
-        }
     }
 
-    private void EditItem(InventoryItemListItem item)
+    private Task HandleItemSearchChanged(string searchTerm)
     {
-        editingItemId = item.Id;
-        editingItemRowVersion = item.RowVersion;
-        itemInput.Number = item.Number;
-        itemInput.Description = item.Description;
-        itemInput.BaseUnitOfMeasure = item.BaseUnitOfMeasure;
-        itemInput.InventoryAccountId = item.InventoryAccountId;
-        itemInput.IncreaseOffsetAccountId = item.IncreaseOffsetAccountId;
-        itemInput.IssueExpenseAccountId = item.IssueExpenseAccountId;
-        itemInput.IsBlocked = item.IsBlocked;
+        itemSearchTerm = searchTerm;
+        selectedItemId = null;
+        return Task.CompletedTask;
+    }
+
+    private void HandleItemStatusFilterChanged(ChangeEventArgs args)
+    {
+        itemStatusFilter = args.Value?.ToString() ?? "all";
+        selectedItemId = null;
+    }
+
+    private void HandleWorkspaceStatusFilterChanged(string value)
+    {
+        itemStatusFilter = value;
+        selectedItemId = null;
+    }
+
+    private void ClearItemFilters()
+    {
+        itemSearchTerm = string.Empty;
+        itemStatusFilter = "all";
+        selectedItemId = null;
+    }
+
+    private void SelectItem(Guid itemId) => selectedItemId = itemId;
+
+    private void OpenNewItem()
+    {
+        editingItemId = null;
+        editingItemRowVersion = [];
+        itemInput = new InventoryItemInput();
+        itemDialogKey++;
+        isItemDialogOpen = true;
         errorMessage = null;
         statusMessage = null;
     }
 
-    private void CancelEdit()
+    private void EditSelectedItem()
     {
+        if (SelectedItem is not { } item)
+        {
+            return;
+        }
+
+        editingItemId = item.Id;
+        editingItemRowVersion = item.RowVersion;
+        itemInput = new InventoryItemInput
+        {
+            Number = item.Number,
+            Description = item.Description,
+            BaseUnitOfMeasure = item.BaseUnitOfMeasure,
+            InventoryAccountId = item.InventoryAccountId,
+            IncreaseOffsetAccountId = item.IncreaseOffsetAccountId,
+            IssueExpenseAccountId = item.IssueExpenseAccountId,
+            IsBlocked = item.IsBlocked
+        };
+        itemDialogKey++;
+        isItemDialogOpen = true;
+        errorMessage = null;
+        statusMessage = null;
+    }
+
+    private void CloseItemDialog()
+    {
+        isItemDialogOpen = false;
         editingItemId = null;
         editingItemRowVersion = [];
-        itemInput.Number = string.Empty;
-        itemInput.Description = string.Empty;
-        itemInput.BaseUnitOfMeasure = string.Empty;
-        itemInput.InventoryAccountId = Guid.Empty;
-        itemInput.IncreaseOffsetAccountId = Guid.Empty;
-        itemInput.IssueExpenseAccountId = Guid.Empty;
-        itemInput.IsBlocked = false;
+        itemInput = new InventoryItemInput();
     }
 
     private async Task SaveItemAsync()
@@ -367,37 +381,44 @@ else
             {
                 await InventoryService.UpdateItemAsync(user, itemId, editingItemRowVersion, itemInput);
                 statusMessage = "Inventory item saved.";
-                CancelEdit();
             }
             else
             {
                 await InventoryService.CreateItemAsync(user, itemInput);
-                itemInput.Number = string.Empty;
-                itemInput.Description = string.Empty;
-                itemInput.BaseUnitOfMeasure = string.Empty;
-                itemInput.InventoryAccountId = Guid.Empty;
-                itemInput.IncreaseOffsetAccountId = Guid.Empty;
-                itemInput.IssueExpenseAccountId = Guid.Empty;
-                itemInput.IsBlocked = false;
                 statusMessage = "Inventory item created.";
             }
+
+            CloseItemDialog();
         });
     }
 
-    private async Task CreateMovementAsync()
+    private void RequestStatusChange()
     {
+        errorMessage = null;
+        isStatusDialogOpen = SelectedItem is not null;
+    }
+
+    private async Task ToggleItemStatusAsync()
+    {
+        if (!isStatusDialogOpen || SelectedItem is not { } item)
+        {
+            return;
+        }
+
         await ExecuteAsync(async user =>
         {
-            var batchId = await InventoryService.CreateMovementDraftAsync(user, movementInput);
-            statusMessage = "Inventory movement draft created. Review and post its linked journal to update stock.";
-            movementInput = new InventoryMovementInput
+            await InventoryService.UpdateItemAsync(user, item.Id, item.RowVersion, new InventoryItemInput
             {
-                PostingDate = DateOnly.FromDateTime(DateTime.Today),
-                AccountingPeriodId = periods.FirstOrDefault(period =>
-                    movementInput.PostingDate >= period.StartsOn &&
-                    movementInput.PostingDate <= period.EndsOn)?.Id ?? periods[0].Id
-            };
-            Navigation.NavigateTo($"/financial/journals/{batchId}");
+                Number = item.Number,
+                Description = item.Description,
+                BaseUnitOfMeasure = item.BaseUnitOfMeasure,
+                InventoryAccountId = item.InventoryAccountId,
+                IncreaseOffsetAccountId = item.IncreaseOffsetAccountId,
+                IssueExpenseAccountId = item.IssueExpenseAccountId,
+                IsBlocked = !item.IsBlocked
+            });
+            statusMessage = item.IsBlocked ? "Inventory item reactivated." : "Inventory item blocked.";
+            isStatusDialogOpen = false;
         });
     }
 
@@ -430,4 +451,12 @@ else
             isSaving = false;
         }
     }
+
+    private string AccountLabel(Guid accountId)
+    {
+        var account = accounts.SingleOrDefault(candidate => candidate.Id == accountId);
+        return account is null ? "Unavailable in this company" : $"{account.Number} — {account.Name}";
+    }
+
+    private static string ItemStatus(InventoryItemListItem item) => item.IsBlocked ? "Blocked" : "Active";
 }

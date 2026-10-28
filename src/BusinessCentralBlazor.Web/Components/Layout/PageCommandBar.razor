@@ -1,7 +1,11 @@
 @implements IDisposable
 @inject NavigationManager Navigation
 
-@if (!IsCustomerListPage && CurrentPath != "/financial/sales/customers/new" && CurrentPage is { } currentPage)
+@if (!IsCustomerListPage &&
+     !CurrentPath.Equals("/financial/sales/customers/new", StringComparison.OrdinalIgnoreCase) &&
+     !IsVendorsPage &&
+     !IsRecordWorkspacePage &&
+     CurrentPage is { } currentPage)
 {
     <section class="page-command-bar" aria-label="@($"{currentPage.Title} commands")">
         <div class="page-heading">
@@ -45,19 +49,9 @@
             new("New purchase order", "#purchase-order-heading"),
             new("Receive and invoice", "#receipt-invoice-heading")
         ]),
-        new("/financial/inventory", "Inventory", "Items",
-        [
-            new("New item", "#items-heading"),
-            new("New stock movement", "#movement-heading")
-        ]),
         new("/financial/journals", "Finance", "General journals",
         [
             new("New journal batch", "/financial/journals/new")
-        ]),
-        new("/financial/general-ledger/accounts", "Finance", "Chart of accounts",
-        [
-            new("New account", "/financial/general-ledger/accounts/new"),
-            new("Trial balance", "/financial/general-ledger/trial-balance")
         ]),
         new("/financial/dimensions", "Finance", "Dimensions",
         [
@@ -76,6 +70,12 @@
     private bool IsCustomerListPage =>
         CurrentPath.Equals("/financial/sales", StringComparison.OrdinalIgnoreCase) ||
         CurrentPath.Equals("/financial/sales/customers", StringComparison.OrdinalIgnoreCase);
+    private bool IsVendorsPage =>
+        CurrentPath.Equals("/financial/purchasing/vendors", StringComparison.OrdinalIgnoreCase);
+    private bool IsRecordWorkspacePage =>
+        CurrentPath.Equals("/financial/inventory", StringComparison.OrdinalIgnoreCase) ||
+        CurrentPath.Equals("/financial/banks", StringComparison.OrdinalIgnoreCase) ||
+        CurrentPath.Equals("/financial/general-ledger/accounts", StringComparison.OrdinalIgnoreCase);
 
     protected override void OnInitialized()
     {

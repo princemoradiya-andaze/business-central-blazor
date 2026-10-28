@@ -5,103 +5,432 @@
 @inject IGeneralLedgerAccountService AccountService
 
 <PageTitle>Bank accounts</PageTitle>
-<h1>Bank accounts</h1>
-<p>Use a dedicated, unblocked, directly-postable Asset G/L account for each bank/cash account.
-    Currency is the company base currency; online banking credentials and FX are not supported.</p>
-@if (error is not null)
+@if (!string.IsNullOrWhiteSpace(statusMessage))
 {
-    <div class="alert alert-danger" role="alert">@error</div>
+    <div class="alert alert-success" role="status">@statusMessage</div>
 }
-@if (loading)
+@if (!string.IsNullOrWhiteSpace(errorMessage) && !isAccountDialogOpen && !isStatusDialogOpen)
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+}
+@if (isLoading)
 {
     <p role="status">Loading bank accounts...</p>
 }
 else
 {
-    <table class="table">
-        <caption>Company bank accounts</caption>
-        <thead><tr><th>Code</th><th>Name</th><th>Currency</th><th>Status</th><th>Actions</th></tr></thead>
-        <tbody>
-            @foreach (var bank in banks)
+    <RecordWorkspace Title="Bank accounts"
+                     IdPrefix="bank-accounts"
+                     StatusControlId="bank-status-quick"
+                     StatusFilter="@statusFilter"
+                     StatusFilterChanged="HandleWorkspaceStatusFilterChanged"
+                     AllStatusLabel="All accounts"
+                     SearchPlaceholder="Search bank accounts"
+                     SearchTerm="@searchTerm"
+                     SearchTermChanged="HandleSearchChanged"
+                     HasRecords="@FilteredBanks.Any()"
+                     EmptyMessage="@(banks.Count == 0 ? "No bank accounts have been configured for this company." : "No bank accounts match the current search and status filter.")">
+        <HeaderActions>
+            <button id="new-bank-action" class="record-workspace-action" type="button" disabled="@isSaving"
+                    @onclick="OpenNewAccount">+ New bank account</button>
+            <span class="record-workspace-separator" aria-hidden="true"></span>
+            <button id="edit-bank-action" class="record-workspace-action" type="button"
+                    disabled="@(SelectedBank is null || isSaving)" @onclick="EditSelectedAccount">Edit</button>
+            <span class="record-workspace-separator" aria-hidden="true"></span>
+            <button id="bank-status-action" class="record-workspace-action" type="button"
+                    disabled="@(SelectedBank is null || isSaving)" @onclick="RequestStatusChange">
+                @(SelectedBank?.IsBlocked == true ? "Reactivate" : "Block")
+            </button>
+            @if (SelectedBank is { } selectedBank)
             {
-                <tr>
-                    <td>@bank.Code</td><td>@bank.Name</td><td>@bank.CurrencyCode</td><td>@(bank.IsBlocked ? "Blocked" : "Active")</td>
-                    <td><button class="btn btn-link" disabled="@saving" @onclick="() => Edit(bank)">Edit</button>
-                        <a href="@($"/financial/banks/{bank.Id}")">Receipts, payments and statements</a></td>
-                </tr>
+                <span class="record-workspace-separator" aria-hidden="true"></span>
+                <a class="record-workspace-action" href="@($"/financial/banks/{selectedBank.Id}")">Transactions</a>
             }
-        </tbody>
-    </table>
-    <h2>@(editing is null ? "New bank account" : "Edit bank account")</h2>
-    <EditForm Model="@input" OnValidSubmit="SaveAsync" FormName="bank-account">
-        <DataAnnotationsValidator /><ValidationSummary />
-        <fieldset disabled="@saving">
-            <label for="bank-code">Code</label><InputText id="bank-code" class="form-control" @bind-Value="input.Code" />
-            <label for="bank-name">Name</label><InputText id="bank-name" class="form-control" @bind-Value="input.Name" />
-            <label for="bank-identifier">Account identifier (no credentials)</label>
-            <InputText id="bank-identifier" class="form-control" @bind-Value="input.AccountIdentifier" />
-            <label for="bank-gl">Dedicated bank/cash G/L account</label>
-            <InputSelect id="bank-gl" class="form-select" @bind-Value="input.GeneralLedgerAccountId">
-                <option value="@Guid.Empty">Select account</option>
-                @foreach (var account in accounts.Where(account => account.Category == AccountCategory.Asset &&
-                    account.Type == AccountType.Posting && account.AllowsDirectPosting && !account.IsBlocked ||
-                    account.Id == input.GeneralLedgerAccountId))
-                {
-                    <option value="@account.Id">@account.Number - @account.Name</option>
-                }
-            </InputSelect>
-            <div class="form-check my-3">
-                <InputCheckbox id="bank-blocked" class="form-check-input" @bind-Value="input.IsBlocked" />
-                <label for="bank-blocked">Blocked</label>
+        </HeaderActions>
+        <FilterContent>
+            <label for="bank-filter-status">Status</label>
+            <select id="bank-filter-status" class="form-select" value="@statusFilter"
+                    @onchange="HandleStatusFilterChanged">
+                <option value="all">All accounts</option>
+                <option value="active">Active</option>
+                <option value="blocked">Blocked</option>
+            </select>
+            <button class="btn btn-link btn-sm mt-2 px-0" type="button" @onclick="ClearFilters">Clear filters</button>
+        </FilterContent>
+        <ListContent>
+            <div class="table-responsive">
+                <table class="table table-striped align-middle">
+                    <caption class="visually-hidden">Company bank accounts</caption>
+                    <thead>
+                        <tr><th scope="col">Code</th><th scope="col">Name</th><th scope="col">Currency</th><th scope="col">Status</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var bank in FilteredBanks)
+                        {
+                            <tr class="@(selectedBankId == bank.Id ? "record-row-selected" : null)"
+                                @onclick="() => SelectBank(bank.Id)" @key="bank.Id">
+                                <th scope="row">
+                                    <button class="record-select" type="button" aria-pressed="@(selectedBankId == bank.Id)"
+                                            @onclick="() => SelectBank(bank.Id)" @onclick:stopPropagation="true">@bank.Code</button>
+                                </th>
+                                <td>@bank.Name</td>
+                                <td>@bank.CurrencyCode</td>
+                                <td>@BankStatus(bank)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
             </div>
-            <button class="btn btn-primary" type="submit">Save bank account</button>
-            <button class="btn btn-outline-secondary" type="button" @onclick="Cancel">Cancel / new account</button>
-        </fieldset>
-    </EditForm>
+        </ListContent>
+        <TallTilesContent>
+            <div class="record-tile-grid">
+                @foreach (var bank in FilteredBanks)
+                {
+                    <button class="record-tile tall @(selectedBankId == bank.Id ? "selected" : null)" type="button"
+                            aria-pressed="@(selectedBankId == bank.Id)" @onclick="() => SelectBank(bank.Id)" @key="bank.Id">
+                        <span class="record-tile-title">@bank.Code — @bank.Name</span>
+                        <span class="record-tile-meta">Currency: @bank.CurrencyCode</span>
+                        <span class="record-tile-meta">G/L account: @AccountLabel(bank.GeneralLedgerAccountId)</span>
+                        <span class="record-tile-meta">Account identifier: @DisplayIdentifier(bank.AccountIdentifier)</span>
+                        <span class="record-tile-meta">Status: @BankStatus(bank)</span>
+                    </button>
+                }
+            </div>
+        </TallTilesContent>
+        <TilesContent>
+            <div class="record-tile-grid">
+                @foreach (var bank in FilteredBanks)
+                {
+                    <button class="record-tile @(selectedBankId == bank.Id ? "selected" : null)" type="button"
+                            aria-pressed="@(selectedBankId == bank.Id)" @onclick="() => SelectBank(bank.Id)" @key="bank.Id">
+                        <span class="record-tile-title">@bank.Code — @bank.Name</span>
+                        <span class="record-tile-meta">@bank.CurrencyCode · @BankStatus(bank)</span>
+                    </button>
+                }
+            </div>
+        </TilesContent>
+        <DetailsContent>
+            @if (SelectedBank is { } details)
+            {
+                <h3>@details.Name</h3>
+                <dl>
+                    <div><dt>Bank code</dt><dd>@details.Code</dd></div>
+                    <div><dt>Currency</dt><dd>@details.CurrencyCode</dd></div>
+                    <div><dt>Account identifier</dt><dd>@DisplayIdentifier(details.AccountIdentifier)</dd></div>
+                    <div><dt>Dedicated G/L account</dt><dd>@AccountLabel(details.GeneralLedgerAccountId)</dd></div>
+                    <div><dt>Status</dt><dd>@BankStatus(details)</dd></div>
+                </dl>
+                <a class="btn btn-sm btn-outline-primary mt-3"
+                   href="@($"/financial/banks/{details.Id}")">Receipts, payments and statements</a>
+            }
+            else
+            {
+                <p class="text-body-secondary">Select a bank account to see its posting and reconciliation details.</p>
+            }
+        </DetailsContent>
+    </RecordWorkspace>
+
+    @if (isStatusDialogOpen && SelectedBank is { } pendingBank)
+    {
+        <WorkspaceStatusConfirmation IdPrefix="bank" RecordLabel="@($"{pendingBank.Code} - {pendingBank.Name}")"
+                                     IsBlocked="@pendingBank.IsBlocked" IsSaving="@isSaving" ErrorMessage="@errorMessage"
+                                     ReturnFocusFallbackSelector="#new-bank-action"
+                                     OnClose="() => isStatusDialogOpen = false" OnConfirm="ToggleBankStatusAsync" />
+    }
+
+    @if (isAccountDialogOpen)
+    {
+        <WorkspaceCardDialog @key="accountDialogKey" OnClose="CloseAccountDialog" IsSaving="isSaving"
+                             LabelledBy="bank-card-heading"
+                             ReturnFocusSelector="@(editingBank is null ? "#new-bank-action" : "#edit-bank-action")"
+                             ReturnFocusFallbackSelector="#new-bank-action">
+            <div class="workspace-card-top">
+                <button class="workspace-card-back" type="button" aria-label="Close bank account card"
+                        disabled="@isSaving" @onclick="CloseAccountDialog">←</button>
+                <span>@(editingBank is null ? "New bank account" : "Edit bank account")</span>
+            </div>
+            <h2 id="bank-card-heading" class="workspace-card-title">Bank Account Card</h2>
+            <EditForm Model="@input" OnValidSubmit="SaveAsync" FormName="bank-account-card">
+                <DataAnnotationsValidator />
+                <div class="workspace-card-commands">
+                    <span>Home</span>
+                    <button type="submit" disabled="@isSaving">@(isSaving ? "Saving..." : "Save")</button>
+                    <button type="button" disabled="@isSaving" @onclick="CloseAccountDialog">Cancel</button>
+                </div>
+                <div class="workspace-card-body">
+                    @if (!string.IsNullOrWhiteSpace(errorMessage))
+                    {
+                        <div class="alert alert-danger" role="alert">@errorMessage</div>
+                    }
+                    <p class="text-body-secondary">
+                        Use a dedicated, unblocked, directly-postable Asset G/L account. Currency is the company base currency;
+                        online banking credentials and foreign exchange are not supported.
+                    </p>
+                    <ValidationSummary />
+                    <h3 class="workspace-card-section">General</h3>
+                    <fieldset disabled="@isSaving">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label" for="bank-code">Code</label>
+                                <InputText id="bank-code" class="form-control" maxlength="32" @bind-Value="input.Code" />
+                                <ValidationMessage For="@(() => input.Code)" />
+                            </div>
+                            <div class="col-md-8">
+                                <label class="form-label" for="bank-name">Name</label>
+                                <InputText id="bank-name" class="form-control" maxlength="160" @bind-Value="input.Name" />
+                                <ValidationMessage For="@(() => input.Name)" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="bank-identifier">Account identifier (no credentials)</label>
+                                <InputText id="bank-identifier" class="form-control" maxlength="100" @bind-Value="input.AccountIdentifier" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="bank-gl">Dedicated bank/cash G/L account</label>
+                                <InputSelect id="bank-gl" class="form-select" @bind-Value="input.GeneralLedgerAccountId">
+                                    <option value="@Guid.Empty">Select account</option>
+                                    @foreach (var account in EligibleAccounts)
+                                    {
+                                        <option value="@account.Id">@account.Number - @account.Name</option>
+                                    }
+                                </InputSelect>
+                            </div>
+                            <div class="col-12">
+                                <div class="form-check">
+                                    <InputCheckbox id="bank-blocked" class="form-check-input" @bind-Value="input.IsBlocked" />
+                                    <label class="form-check-label" for="bank-blocked">Blocked</label>
+                                </div>
+                            </div>
+                        </div>
+                    </fieldset>
+                </div>
+            </EditForm>
+        </WorkspaceCardDialog>
+    }
 }
 
 @code {
     private IReadOnlyList<BankAccountDetail> banks = [];
     private IReadOnlyList<GeneralLedgerAccountListItem> accounts = [];
     private BankAccountInput input = new();
-    private BankAccountDetail? editing;
-    private string? error;
-    private bool loading = true;
-    private bool saving;
+    private BankAccountDetail? editingBank;
+    private Guid? selectedBankId;
+    private string searchTerm = string.Empty;
+    private string statusFilter = "all";
+    private int accountDialogKey;
+    private string? errorMessage;
+    private string? statusMessage;
+    private bool isLoading = true;
+    private bool isSaving;
+    private bool isAccountDialogOpen;
+    private bool isStatusDialogOpen;
+
+    private IEnumerable<BankAccountDetail> FilteredBanks => banks.Where(bank =>
+        (statusFilter switch
+        {
+            "active" => !bank.IsBlocked,
+            "blocked" => bank.IsBlocked,
+            _ => true
+        }) &&
+        (string.IsNullOrWhiteSpace(searchTerm) ||
+         bank.Code.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+         bank.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)));
+    private BankAccountDetail? SelectedBank => FilteredBanks.SingleOrDefault(bank => bank.Id == selectedBankId);
+    private IEnumerable<GeneralLedgerAccountListItem> EligibleAccounts => accounts.Where(account =>
+        account.Category == AccountCategory.Asset &&
+        account.Type == AccountType.Posting &&
+        account.AllowsDirectPosting &&
+        (!account.IsBlocked || account.Id == input.GeneralLedgerAccountId));
+
     protected override async Task OnInitializedAsync()
     {
-        try { await LoadAsync(); }
-        catch (UnauthorizedAccessException exception) { error = exception.Message; }
-        finally { loading = false; }
+        try
+        {
+            await LoadAsync();
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            errorMessage = exception.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
     }
+
     private async Task LoadAsync()
     {
         var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
-        banks = await BankService.GetAccountsAsync(user);
-        accounts = await AccountService.GetAllAsync(user);
+        var loadedBanks = await BankService.GetAccountsAsync(user);
+        var loadedAccounts = await AccountService.GetAllAsync(user);
+        banks = loadedBanks;
+        accounts = loadedAccounts;
     }
+
+    private Task HandleSearchChanged(string value)
+    {
+        searchTerm = value;
+        selectedBankId = null;
+        return Task.CompletedTask;
+    }
+
+    private void HandleStatusFilterChanged(ChangeEventArgs args)
+    {
+        statusFilter = args.Value?.ToString() ?? "all";
+        selectedBankId = null;
+    }
+
+    private void HandleWorkspaceStatusFilterChanged(string value)
+    {
+        statusFilter = value;
+        selectedBankId = null;
+    }
+
+    private void ClearFilters()
+    {
+        searchTerm = string.Empty;
+        statusFilter = "all";
+        selectedBankId = null;
+    }
+
+    private void SelectBank(Guid bankId) => selectedBankId = bankId;
+
+    private void OpenNewAccount()
+    {
+        editingBank = null;
+        input = new BankAccountInput();
+        accountDialogKey++;
+        isAccountDialogOpen = true;
+        errorMessage = null;
+        statusMessage = null;
+    }
+
+    private void EditSelectedAccount()
+    {
+        if (SelectedBank is not { } bank)
+        {
+            return;
+        }
+
+        Edit(bank);
+    }
+
     private void Edit(BankAccountDetail bank)
     {
-        editing = bank;
-        input = new() { Code = bank.Code, Name = bank.Name, AccountIdentifier = bank.AccountIdentifier,
-            GeneralLedgerAccountId = bank.GeneralLedgerAccountId, IsBlocked = bank.IsBlocked };
+        editingBank = bank;
+        input = new BankAccountInput
+        {
+            Code = bank.Code,
+            Name = bank.Name,
+            AccountIdentifier = bank.AccountIdentifier,
+            GeneralLedgerAccountId = bank.GeneralLedgerAccountId,
+            IsBlocked = bank.IsBlocked
+        };
+        accountDialogKey++;
+        isAccountDialogOpen = true;
+        errorMessage = null;
+        statusMessage = null;
     }
-    private void Cancel() { editing = null; input = new(); }
+
+    private void CloseAccountDialog()
+    {
+        isAccountDialogOpen = false;
+        editingBank = null;
+        input = new BankAccountInput();
+    }
+
     private async Task SaveAsync()
     {
-        if (saving) return;
-        saving = true;
-        error = null;
+        if (isSaving)
+        {
+            return;
+        }
+
+        isSaving = true;
+        errorMessage = null;
         try
         {
             var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
-            if (editing is null) await BankService.CreateAccountAsync(user, input);
-            else await BankService.UpdateAccountAsync(user, editing.Id, editing.Revision, input);
-            Cancel();
+            if (editingBank is null)
+            {
+                await BankService.CreateAccountAsync(user, input);
+                statusMessage = "Bank account created.";
+            }
+            else
+            {
+                await BankService.UpdateAccountAsync(user, editingBank.Id, editingBank.Revision, input);
+                statusMessage = "Bank account saved.";
+            }
+
+            CloseAccountDialog();
             await LoadAsync();
         }
-        catch (ValidationException exception) { error = exception.Message; }
-        catch (UnauthorizedAccessException exception) { error = exception.Message; }
-        finally { saving = false; }
+        catch (ValidationException exception)
+        {
+            errorMessage = exception.Message;
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            errorMessage = exception.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
     }
+
+    private void RequestStatusChange()
+    {
+        errorMessage = null;
+        isStatusDialogOpen = SelectedBank is not null;
+    }
+
+    private async Task ToggleBankStatusAsync()
+    {
+        if (!isStatusDialogOpen || SelectedBank is not { } bank || isSaving)
+        {
+            return;
+        }
+
+        isSaving = true;
+        errorMessage = null;
+        statusMessage = null;
+        try
+        {
+            var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+            await BankService.UpdateAccountAsync(user, bank.Id, bank.Revision, new BankAccountInput
+            {
+                Code = bank.Code,
+                Name = bank.Name,
+                AccountIdentifier = bank.AccountIdentifier,
+                GeneralLedgerAccountId = bank.GeneralLedgerAccountId,
+                IsBlocked = !bank.IsBlocked
+            });
+            statusMessage = bank.IsBlocked ? "Bank account reactivated." : "Bank account blocked.";
+            isStatusDialogOpen = false;
+            await LoadAsync();
+        }
+        catch (ValidationException exception)
+        {
+            errorMessage = exception.Message;
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            errorMessage = exception.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private string AccountLabel(Guid accountId)
+    {
+        var account = accounts.SingleOrDefault(candidate => candidate.Id == accountId);
+        return account is null ? "Unavailable in this company" : $"{account.Number} — {account.Name}";
+    }
+
+    private static string DisplayIdentifier(string value) =>
+        string.IsNullOrWhiteSpace(value) ? "Not provided" : value;
+
+    private static string BankStatus(BankAccountDetail bank) => bank.IsBlocked ? "Blocked" : "Active";
 }

@@ -4,97 +4,233 @@
 @inject IGeneralLedgerAccountService AccountService
 
 <PageTitle>Chart of Accounts</PageTitle>
-
-<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
-    <div>
-        <h1>Chart of Accounts</h1>
-        <p class="text-body-secondary mb-0">Financial accounts for the active company.</p>
-    </div>
-    <a class="btn btn-primary" href="/financial/general-ledger/accounts/new">New account</a>
-</div>
-
+@if (!string.IsNullOrWhiteSpace(statusMessage))
+{
+    <div class="alert alert-success" role="status">@statusMessage</div>
+}
+@if (!string.IsNullOrWhiteSpace(errorMessage) && !isAccountDialogOpen && !isStatusDialogOpen)
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+}
 @if (isLoading)
 {
     <p role="status" aria-live="polite">Loading accounts...</p>
 }
-else if (!string.IsNullOrWhiteSpace(errorMessage))
+else if (companyContextUnavailable)
 {
     <div class="alert alert-danger" role="alert">@errorMessage</div>
-    @if (companyContextUnavailable)
-    {
-        <a href="/account/company" data-enhance-nav="false">Select an active company</a>
-    }
-}
-else if (accounts.Count == 0)
-{
-    <div class="alert alert-info" role="status">
-        No accounts have been set up for this company yet. Create an account to get started.
-    </div>
+    <a href="/account/company" data-enhance-nav="false">Select an active company</a>
 }
 else
 {
-    <div class="table-responsive">
-        <table class="table table-striped align-middle">
-            <caption class="visually-hidden">Chart of Accounts for the active company</caption>
-            <thead>
-                <tr>
-                    <th scope="col">Number</th>
-                    <th scope="col">Name</th>
-                    <th scope="col">Category</th>
-                    <th scope="col">Type</th>
-                    <th scope="col">Parent</th>
-                    <th scope="col">Posting</th>
-                    <th scope="col">Status</th>
-                    <th scope="col"><span class="visually-hidden">Actions</span></th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var account in accounts)
+    <RecordWorkspace Title="Chart of Accounts"
+                     IdPrefix="chart-of-accounts"
+                     StatusControlId="account-status-quick"
+                     StatusFilter="@statusFilter"
+                     StatusFilterChanged="HandleWorkspaceStatusFilterChanged"
+                     AllStatusLabel="All accounts"
+                     SearchPlaceholder="Search accounts"
+                     SearchTerm="@searchTerm"
+                     SearchTermChanged="HandleSearchChanged"
+                     HasRecords="@FilteredAccounts.Any()"
+                     EmptyMessage="@(accounts.Count == 0 ? "No accounts have been set up for this company yet. Create an account to get started." : "No accounts match the current search and filters.")">
+        <HeaderActions>
+            <button id="new-account-action" class="record-workspace-action" type="button" disabled="@isSaving"
+                    @onclick="OpenNewAccount">+ New account</button>
+            <span class="record-workspace-separator" aria-hidden="true"></span>
+            <button id="edit-account-action" class="record-workspace-action" type="button"
+                    disabled="@(SelectedAccount is null || isSaving)" @onclick="EditSelectedAccount">Edit</button>
+            <span class="record-workspace-separator" aria-hidden="true"></span>
+            <button id="account-status-action" class="record-workspace-action" type="button"
+                    disabled="@(SelectedAccount is null || isSaving)" @onclick="RequestStatusChange">
+                @(SelectedAccount?.IsBlocked == true ? "Reactivate" : "Block")
+            </button>
+            @if (SelectedAccount is { } selectedAccount)
+            {
+                <span class="record-workspace-separator" aria-hidden="true"></span>
+                <a class="record-workspace-action"
+                   href="@($"/financial/general-ledger/accounts/{selectedAccount.Id}/activity")">Activity</a>
+            }
+            <span class="record-workspace-separator" aria-hidden="true"></span>
+            <a class="record-workspace-action" href="/financial/general-ledger/trial-balance">Trial balance</a>
+        </HeaderActions>
+        <FilterContent>
+            <label for="account-filter-status">Status</label>
+            <select id="account-filter-status" class="form-select" value="@statusFilter"
+                    @onchange="HandleStatusFilterChanged">
+                <option value="all">All accounts</option>
+                <option value="active">Active</option>
+                <option value="blocked">Blocked</option>
+            </select>
+            <label for="account-filter-category">Category</label>
+            <select id="account-filter-category" class="form-select" value="@categoryFilter"
+                    @onchange="HandleCategoryFilterChanged">
+                <option value="all">All categories</option>
+                @foreach (var category in Enum.GetValues<AccountCategory>())
                 {
-                    <tr>
-                        <th scope="row">@account.Number</th>
-                        <td>@account.Name</td>
-                        <td>@account.Category</td>
-                        <td>@account.Type</td>
-                        <td>@(account.ParentAccountNumber ?? "—")</td>
-                        <td>@(account.AllowsDirectPosting ? "Allowed" : "Not allowed")</td>
-                        <td>
-                            @if (account.IsBlocked)
-                            {
-                                <span class="badge text-bg-secondary">Blocked</span>
-                            }
-                            else
-                            {
-                                <span class="badge text-bg-success">Active</span>
-                            }
-                        </td>
-                        <td>
-                            <a class="btn btn-sm btn-outline-secondary me-1"
-                               href="@($"/financial/general-ledger/accounts/{account.Id}/activity")"
-                               aria-label="@($"View activity: {account.Number} {account.Name}")">Activity</a>
-                            <a class="btn btn-sm btn-outline-primary"
-                               href="@($"/financial/general-ledger/accounts/{account.Id}/edit")"
-                               aria-label="@($"Edit account: {account.Number} {account.Name}")">Edit</a>
-                        </td>
-                    </tr>
+                    <option value="@category">@category</option>
                 }
-            </tbody>
-        </table>
-    </div>
+            </select>
+            <button class="btn btn-link btn-sm mt-2 px-0" type="button" @onclick="ClearFilters">Clear filters</button>
+        </FilterContent>
+        <ListContent>
+            <div class="table-responsive">
+                <table class="table table-striped align-middle">
+                    <caption class="visually-hidden">Chart of Accounts hierarchy for the active company</caption>
+                    <thead>
+                        <tr>
+                            <th scope="col">Number</th>
+                            <th scope="col">Name</th>
+                            <th scope="col">Category</th>
+                            <th scope="col">Type</th>
+                            <th scope="col">Parent</th>
+                            <th scope="col">Posting</th>
+                            <th scope="col">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var account in FilteredAccounts)
+                        {
+                            <tr class="@(selectedAccountId == account.Id ? "record-row-selected" : null)"
+                                @onclick="() => SelectAccount(account.Id)" @key="account.Id">
+                                <th scope="row">
+                                    <button class="record-select" style="@($"margin-left:{Math.Min(AccountDepth(account), 6) * 1.1}rem")"
+                                            type="button" aria-pressed="@(selectedAccountId == account.Id)"
+                                            @onclick="() => SelectAccount(account.Id)" @onclick:stopPropagation="true">@account.Number</button>
+                                </th>
+                                <td>@account.Name</td>
+                                <td>@account.Category</td>
+                                <td>@account.Type</td>
+                                <td>@(account.ParentAccountNumber ?? "—")</td>
+                                <td>@(account.AllowsDirectPosting ? "Allowed" : "Not allowed")</td>
+                                <td>@AccountStatus(account)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </ListContent>
+        <TallTilesContent>
+            <div class="record-tile-grid">
+                @foreach (var account in FilteredAccounts)
+                {
+                    <button class="record-tile tall @(selectedAccountId == account.Id ? "selected" : null)" type="button"
+                            aria-pressed="@(selectedAccountId == account.Id)" @onclick="() => SelectAccount(account.Id)" @key="account.Id">
+                        <span class="record-tile-title">@account.Number — @account.Name</span>
+                        <span class="record-tile-meta">@account.Category · @account.Type</span>
+                        <span class="record-tile-meta">Parent: @(account.ParentAccountNumber ?? "None")</span>
+                        <span class="record-tile-meta">Direct posting: @(account.AllowsDirectPosting ? "Allowed" : "Not allowed")</span>
+                        <span class="record-tile-meta">Status: @AccountStatus(account)</span>
+                    </button>
+                }
+            </div>
+        </TallTilesContent>
+        <TilesContent>
+            <div class="record-tile-grid">
+                @foreach (var account in FilteredAccounts)
+                {
+                    <button class="record-tile @(selectedAccountId == account.Id ? "selected" : null)" type="button"
+                            aria-pressed="@(selectedAccountId == account.Id)" @onclick="() => SelectAccount(account.Id)" @key="account.Id">
+                        <span class="record-tile-title">@account.Number — @account.Name</span>
+                        <span class="record-tile-meta">@account.Category · @account.Type · @AccountStatus(account)</span>
+                    </button>
+                }
+            </div>
+        </TilesContent>
+        <DetailsContent>
+            @if (SelectedAccount is { } details)
+            {
+                <h3>@details.Number — @details.Name</h3>
+                <dl>
+                    <div><dt>Category</dt><dd>@details.Category</dd></div>
+                    <div><dt>Type</dt><dd>@details.Type</dd></div>
+                    <div><dt>Parent account</dt><dd>@(details.ParentAccountNumber ?? "None")</dd></div>
+                    <div><dt>Direct posting</dt><dd>@(details.AllowsDirectPosting ? "Allowed" : "Not allowed")</dd></div>
+                    <div><dt>Status</dt><dd>@AccountStatus(details)</dd></div>
+                </dl>
+                <a class="btn btn-sm btn-outline-primary mt-3"
+                   href="@($"/financial/general-ledger/accounts/{details.Id}/activity")">Account activity</a>
+            }
+            else
+            {
+                <p class="text-body-secondary">Select an account to see its hierarchy and posting setup.</p>
+            }
+        </DetailsContent>
+    </RecordWorkspace>
+
+    @if (isStatusDialogOpen && SelectedAccount is { } pendingAccount)
+    {
+        <WorkspaceStatusConfirmation IdPrefix="account" RecordLabel="@($"{pendingAccount.Number} - {pendingAccount.Name}")"
+                                     IsBlocked="@pendingAccount.IsBlocked" IsSaving="@isSaving" ErrorMessage="@errorMessage"
+                                     ReturnFocusFallbackSelector="#new-account-action"
+                                     OnClose="() => isStatusDialogOpen = false" OnConfirm="ToggleAccountStatusAsync" />
+    }
+
+    @if (isAccountDialogOpen)
+    {
+        <WorkspaceCardDialog @key="accountDialogKey" OnClose="CloseAccountDialog" IsSaving="isSaving"
+                             LabelledBy="account-card-heading"
+                             ReturnFocusSelector="@(editingAccountId.HasValue ? "#edit-account-action" : "#new-account-action")"
+                             ReturnFocusFallbackSelector="#new-account-action">
+            <div class="workspace-card-top">
+                <button class="workspace-card-back" type="button" aria-label="Close account card"
+                        disabled="@isSaving" @onclick="CloseAccountDialog">←</button>
+                <span>@(editingAccountId.HasValue ? "Edit account" : "New account")</span>
+            </div>
+            <h2 id="account-card-heading" class="workspace-card-title">General Ledger Account Card</h2>
+            <div class="workspace-card-body">
+                <GeneralLedgerAccountForm Model="@accountInput"
+                                          ParentAccounts="@ParentAccounts"
+                                          SubmitText="@(editingAccountId.HasValue ? "Save changes" : "Create account")"
+                                          IsSaving="@isSaving"
+                                          ErrorMessage="@errorMessage"
+                                          IsDialog="true"
+                                          OnCancel="CloseAccountDialog"
+                                          OnValidSubmit="SaveAccountAsync" />
+            </div>
+        </WorkspaceCardDialog>
+    }
 }
 
 @code {
     private IReadOnlyList<GeneralLedgerAccountListItem> accounts = [];
+    private IReadOnlyDictionary<Guid, GeneralLedgerAccountListItem> accountsById = new Dictionary<Guid, GeneralLedgerAccountListItem>();
+    private GeneralLedgerAccountInput accountInput = new();
+    private Guid? selectedAccountId;
+    private Guid? editingAccountId;
+    private string searchTerm = string.Empty;
+    private string statusFilter = "all";
+    private string categoryFilter = "all";
+    private int accountDialogKey;
     private bool isLoading = true;
+    private bool isSaving;
+    private bool isAccountDialogOpen;
+    private bool isStatusDialogOpen;
     private bool companyContextUnavailable;
     private string? errorMessage;
+    private string? statusMessage;
+
+    private IEnumerable<GeneralLedgerAccountListItem> FilteredAccounts => accounts.Where(account =>
+        (statusFilter switch
+        {
+            "active" => !account.IsBlocked,
+            "blocked" => account.IsBlocked,
+            _ => true
+        }) &&
+        (categoryFilter == "all" || account.Category.ToString() == categoryFilter) &&
+        (string.IsNullOrWhiteSpace(searchTerm) ||
+         account.Number.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+         account.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)));
+    private GeneralLedgerAccountListItem? SelectedAccount =>
+        FilteredAccounts.SingleOrDefault(account => account.Id == selectedAccountId);
+    private IReadOnlyList<GeneralLedgerAccountListItem> ParentAccounts =>
+        accounts.Where(account => account.Id != editingAccountId).ToArray();
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
-            accounts = await AccountService.GetAllAsync(user);
+            await LoadAsync();
         }
         catch (UnauthorizedAccessException)
         {
@@ -106,4 +242,204 @@ else
             isLoading = false;
         }
     }
+
+    private async Task LoadAsync()
+    {
+        var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+        accounts = await AccountService.GetAllAsync(user);
+        accountsById = accounts.ToDictionary(account => account.Id);
+    }
+
+    private Task HandleSearchChanged(string value)
+    {
+        searchTerm = value;
+        selectedAccountId = null;
+        return Task.CompletedTask;
+    }
+
+    private void HandleStatusFilterChanged(ChangeEventArgs args)
+    {
+        statusFilter = args.Value?.ToString() ?? "all";
+        selectedAccountId = null;
+    }
+
+    private void HandleWorkspaceStatusFilterChanged(string value)
+    {
+        statusFilter = value;
+        selectedAccountId = null;
+    }
+
+    private void HandleCategoryFilterChanged(ChangeEventArgs args)
+    {
+        categoryFilter = args.Value?.ToString() ?? "all";
+        selectedAccountId = null;
+    }
+
+    private void ClearFilters()
+    {
+        searchTerm = string.Empty;
+        statusFilter = "all";
+        categoryFilter = "all";
+        selectedAccountId = null;
+    }
+
+    private void SelectAccount(Guid accountId) => selectedAccountId = accountId;
+
+    private void OpenNewAccount()
+    {
+        editingAccountId = null;
+        accountInput = new GeneralLedgerAccountInput();
+        accountDialogKey++;
+        isAccountDialogOpen = true;
+        errorMessage = null;
+        statusMessage = null;
+    }
+
+    private void EditSelectedAccount()
+    {
+        if (SelectedAccount is not { } account)
+        {
+            return;
+        }
+
+        editingAccountId = account.Id;
+        accountInput = new GeneralLedgerAccountInput
+        {
+            Number = account.Number,
+            Name = account.Name,
+            Category = account.Category,
+            Type = account.Type,
+            ParentAccountId = account.ParentAccountId,
+            AllowsDirectPosting = account.AllowsDirectPosting,
+            IsBlocked = account.IsBlocked
+        };
+        accountDialogKey++;
+        isAccountDialogOpen = true;
+        errorMessage = null;
+        statusMessage = null;
+    }
+
+    private void CloseAccountDialog()
+    {
+        isAccountDialogOpen = false;
+        editingAccountId = null;
+        accountInput = new GeneralLedgerAccountInput();
+    }
+
+    private async Task SaveAccountAsync()
+    {
+        if (isSaving)
+        {
+            return;
+        }
+
+        isSaving = true;
+        errorMessage = null;
+        try
+        {
+            var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+            if (editingAccountId is { } accountId)
+            {
+                if (!await AccountService.UpdateAsync(user, accountId, accountInput))
+                {
+                    errorMessage = "The account was not found in the active company.";
+                    return;
+                }
+
+                statusMessage = "Account saved.";
+            }
+            else
+            {
+                await AccountService.CreateAsync(user, accountInput);
+                statusMessage = "Account created.";
+            }
+
+            CloseAccountDialog();
+            await LoadAsync();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            companyContextUnavailable = true;
+            errorMessage = "Your active company is no longer available. Select an active company and try again.";
+        }
+        catch (ValidationException exception)
+        {
+            errorMessage = exception.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void RequestStatusChange()
+    {
+        errorMessage = null;
+        isStatusDialogOpen = SelectedAccount is not null;
+    }
+
+    private async Task ToggleAccountStatusAsync()
+    {
+        if (!isStatusDialogOpen || SelectedAccount is not { } account || isSaving)
+        {
+            return;
+        }
+
+        isSaving = true;
+        errorMessage = null;
+        statusMessage = null;
+        try
+        {
+            var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+            var updated = await AccountService.UpdateAsync(user, account.Id, new GeneralLedgerAccountInput
+            {
+                Number = account.Number,
+                Name = account.Name,
+                Category = account.Category,
+                Type = account.Type,
+                ParentAccountId = account.ParentAccountId,
+                AllowsDirectPosting = account.AllowsDirectPosting,
+                IsBlocked = !account.IsBlocked
+            });
+            if (!updated)
+            {
+                errorMessage = "The account was not found in the active company.";
+                return;
+            }
+
+            statusMessage = account.IsBlocked ? "Account reactivated." : "Account blocked.";
+            isStatusDialogOpen = false;
+            await LoadAsync();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            companyContextUnavailable = true;
+            errorMessage = "Your active company is no longer available. Select an active company and try again.";
+        }
+        catch (ValidationException exception)
+        {
+            errorMessage = exception.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private int AccountDepth(GeneralLedgerAccountListItem account)
+    {
+        var visited = new HashSet<Guid> { account.Id };
+        var depth = 0;
+        var parentId = account.ParentAccountId;
+        while (parentId is { } id && visited.Add(id) && accountsById.TryGetValue(id, out var parent))
+        {
+            depth++;
+            parentId = parent.ParentAccountId;
+        }
+
+        return depth;
+    }
+
+    private static string AccountStatus(GeneralLedgerAccountListItem account) =>
+        account.IsBlocked ? "Blocked" : "Active";
 }

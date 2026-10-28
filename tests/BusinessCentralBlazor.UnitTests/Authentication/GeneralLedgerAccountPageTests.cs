@@ -47,7 +47,11 @@ public sealed class GeneralLedgerAccountPageTests(AuthenticationWebApplicationFa
         Assert.Contains("Chart of Accounts", listHtml, StringComparison.Ordinal);
         Assert.Contains("1000", listHtml, StringComparison.Ordinal);
         Assert.Contains("Cash", listHtml, StringComparison.Ordinal);
-        Assert.Contains("financial/general-ledger/accounts/new", listHtml, StringComparison.Ordinal);
+        Assert.Contains("id=\"new-account-action\"", listHtml, StringComparison.Ordinal);
+        Assert.Contains("id=\"account-status-quick\"", listHtml, StringComparison.Ordinal);
+        Assert.Contains("Trial balance", listHtml, StringComparison.Ordinal);
+        Assert.Contains("Choose view", listHtml, StringComparison.Ordinal);
+        Assert.Contains("Details", listHtml, StringComparison.Ordinal);
         Assert.Contains("Company: G/L Page Company (GLPAGE)", listHtml, StringComparison.Ordinal);
 
         using var newResponse = await client.GetAsync("/financial/general-ledger/accounts/new");

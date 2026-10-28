@@ -1,0 +1,212 @@
+@page "/financial/inventory/movements"
+@attribute [Authorize(Policy = CompanyAuthorizationPolicies.ActiveCompany)]
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IInventoryService InventoryService
+@inject NavigationManager Navigation
+
+<PageTitle>Stock movements</PageTitle>
+<h1>Stock movements</h1>
+<p><a href="/financial/inventory">Items</a></p>
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+}
+@if (isLoading)
+{
+    <p role="status">Loading stock movements...</p>
+}
+else
+{
+    <section class="card mb-4" aria-labelledby="movement-heading">
+        <div class="card-body">
+            <h2 id="movement-heading" class="h4">Create stock movement draft</h2>
+            <p class="text-body-secondary">
+                Positive receipts/opening adjustments add stock at the entered unit cost. Issues use the current weighted-average
+                cost and cannot exceed stock on hand. Open the linked journal and post it to update stock.
+            </p>
+            @if (items.All(item => item.IsBlocked))
+            {
+                <div class="alert alert-info" role="status">
+                    Create or unblock an inventory item before entering movements.
+                    <a href="/financial/inventory">Items</a>
+                </div>
+            }
+            else if (periods.Count == 0)
+            {
+                <div class="alert alert-info" role="status">
+                    Create an open, unlocked accounting period before entering movements.
+                    <a href="/financial/accounting-periods">Accounting periods</a>
+                </div>
+            }
+            else
+            {
+                <EditForm Model="@movementInput" OnValidSubmit="CreateMovementAsync" FormName="inventory-movement">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+                    <fieldset disabled="@isSaving">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label" for="movement-item">Item</label>
+                                <InputSelect id="movement-item" class="form-select" @bind-Value="movementInput.ItemId">
+                                    <option value="@Guid.Empty">Select item</option>
+                                    @foreach (var item in items.Where(item => !item.IsBlocked))
+                                    {
+                                        <option value="@item.Id">@item.Number - @item.Description</option>
+                                    }
+                                </InputSelect>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label" for="movement-period">Accounting period</label>
+                                <InputSelect id="movement-period" class="form-select" @bind-Value="movementInput.AccountingPeriodId">
+                                    <option value="@Guid.Empty">Select period</option>
+                                    @foreach (var period in periods)
+                                    {
+                                        <option value="@period.Id">@period.Name (@period.StartsOn - @period.EndsOn)</option>
+                                    }
+                                </InputSelect>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label" for="movement-date">Posting date</label>
+                                <InputDate id="movement-date" class="form-control" TValue="DateOnly" @bind-Value="movementInput.PostingDate" />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label" for="movement-number">Unique document number</label>
+                                <InputText id="movement-number" class="form-control" @bind-Value="movementInput.DocumentNumber" />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label" for="movement-description">Description</label>
+                                <InputText id="movement-description" class="form-control" @bind-Value="movementInput.Description" />
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label" for="movement-kind">Movement</label>
+                                <InputSelect id="movement-kind" class="form-select" @bind-Value="movementInput.IsReceipt">
+                                    <option value="true">Receipt / increase</option>
+                                    <option value="false">Issue / decrease</option>
+                                </InputSelect>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label" for="movement-quantity">Quantity</label>
+                                <InputNumber id="movement-quantity" class="form-control" step="0.0001" @bind-Value="movementInput.Quantity" />
+                            </div>
+                            @if (movementInput.IsReceipt)
+                            {
+                                <div class="col-md-3">
+                                    <label class="form-label" for="movement-unit-cost">Receipt unit cost</label>
+                                    <InputNumber id="movement-unit-cost" class="form-control" step="0.0001" @bind-Value="movementInput.UnitCost" />
+                                </div>
+                            }
+                        </div>
+                        <button class="btn btn-primary mt-3" type="submit">Create draft journal</button>
+                    </fieldset>
+                </EditForm>
+            }
+        </div>
+    </section>
+
+    <section aria-labelledby="movements-heading">
+        <h2 id="movements-heading" class="h4">Inventory movement history</h2>
+        @if (movements.Count == 0)
+        {
+            <p>No inventory movements have been entered for this company.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-striped align-middle">
+                    <caption>Inventory movement drafts and posted movements</caption>
+                    <thead>
+                        <tr>
+                            <th scope="col">Date</th>
+                            <th scope="col">Document</th>
+                            <th scope="col">Item</th>
+                            <th scope="col">Description</th>
+                            <th scope="col" class="text-end">Quantity</th>
+                            <th scope="col" class="text-end">Unit cost</th>
+                            <th scope="col" class="text-end">Value</th>
+                            <th scope="col">Status</th>
+                            <th scope="col">Journal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var movement in movements)
+                        {
+                            <tr>
+                                <td>@movement.PostingDate.ToString("yyyy-MM-dd")</td>
+                                <td>@movement.DocumentNumber</td>
+                                <td>@movement.ItemNumber</td>
+                                <td>@movement.Description</td>
+                                <td class="text-end">@movement.Quantity.ToString("N4")</td>
+                                <td class="text-end">@movement.UnitCost.ToString("N4")</td>
+                                <td class="text-end">@movement.InventoryValue.ToString("N4")</td>
+                                <td>@(movement.IsPosted ? "Posted" : "Draft")</td>
+                                <td><a href="@($"/financial/journals/{movement.JournalBatchId}")">Open journal</a></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+}
+
+@code {
+    private IReadOnlyList<AccountingPeriodListItem> periods = [];
+    private IReadOnlyList<InventoryItemListItem> items = [];
+    private IReadOnlyList<InventoryMovementListItem> movements = [];
+    private InventoryMovementInput movementInput = new();
+    private bool isLoading = true;
+    private bool isSaving;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+            periods = await InventoryService.GetOpenPeriodsAsync(user);
+            items = await InventoryService.GetItemsAsync(user);
+            movements = await InventoryService.GetMovementsAsync(user);
+            if (periods.Count > 0)
+            {
+                movementInput.AccountingPeriodId = periods[0].Id;
+            }
+        }
+        catch (UnauthorizedAccessException)
+        {
+            errorMessage = "Your active company is no longer available. Select an active company and try again.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task CreateMovementAsync()
+    {
+        if (isSaving)
+        {
+            return;
+        }
+
+        isSaving = true;
+        errorMessage = null;
+        try
+        {
+            var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+            var batchId = await InventoryService.CreateMovementDraftAsync(user, movementInput);
+            Navigation.NavigateTo($"/financial/journals/{batchId}");
+        }
+        catch (ValidationException exception)
+        {
+            errorMessage = exception.Message;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            errorMessage = "Your active company is no longer available. Select an active company and try again.";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}

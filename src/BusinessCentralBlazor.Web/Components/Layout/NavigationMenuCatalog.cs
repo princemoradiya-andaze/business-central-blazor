@@ -32,14 +32,14 @@ internal static class NavigationMenuCatalog
         ["/financial/purchasing"]),
         new("cash", "Cash management",
         [
-            new("Bank accounts and reconciliation", "/financial/banks")
+            new("Bank accounts", "/financial/banks")
         ],
         ["/financial/banks", "/financial/bank-statements"]),
         new("inventory", "Inventory",
         [
-            new("Inventory items", "/financial/inventory#items-heading"),
-            new("Create stock movement", "/financial/inventory#movement-heading"),
-            new("Movement history", "/financial/inventory#movements-heading")
+            new("Items", "/financial/inventory"),
+            new("Create stock movement", "/financial/inventory/movements#movement-heading"),
+            new("Movement history", "/financial/inventory/movements#movements-heading")
         ],
         ["/financial/inventory"]),
         new("reports", "Reports",
