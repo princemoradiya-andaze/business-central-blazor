@@ -57,7 +57,7 @@ public sealed class GeneralLedgerAccountPageTests(AuthenticationWebApplicationFa
         using var newResponse = await client.GetAsync("/financial/general-ledger/accounts/new");
         var newHtml = await newResponse.Content.ReadAsStringAsync();
         Assert.Equal(HttpStatusCode.OK, newResponse.StatusCode);
-        Assert.Contains("New account", newHtml, StringComparison.Ordinal);
+        Assert.Contains("New G/L Account Card", newHtml, StringComparison.Ordinal);
         Assert.Contains("account-number", newHtml, StringComparison.Ordinal);
         Assert.Contains("Allow direct posting", newHtml, StringComparison.Ordinal);
         Assert.Contains("Blocked", newHtml, StringComparison.Ordinal);
@@ -65,7 +65,8 @@ public sealed class GeneralLedgerAccountPageTests(AuthenticationWebApplicationFa
         using var editResponse = await client.GetAsync($"/financial/general-ledger/accounts/{accountId}/edit");
         var editHtml = await editResponse.Content.ReadAsStringAsync();
         Assert.Equal(HttpStatusCode.OK, editResponse.StatusCode);
-        Assert.Contains("Save changes", editHtml, StringComparison.Ordinal);
+        Assert.Contains("Saved", editHtml, StringComparison.Ordinal);
+        Assert.DoesNotContain("type=\"submit\"", Regex.Match(editHtml, "<dialog\\b.*?</dialog>", RegexOptions.Singleline).Value, StringComparison.Ordinal);
         Assert.Contains("value=\"1000\"", editHtml, StringComparison.Ordinal);
     }
 
@@ -117,7 +118,7 @@ public sealed class GeneralLedgerAccountPageTests(AuthenticationWebApplicationFa
             $"/financial/general-ledger/accounts/{privateAccountId}/edit");
         var editHtml = await editResponse.Content.ReadAsStringAsync();
         Assert.Equal(HttpStatusCode.OK, editResponse.StatusCode);
-        Assert.Contains("Account not found", editHtml, StringComparison.Ordinal);
+        Assert.Contains("The record is not available in the active company.", editHtml, StringComparison.Ordinal);
         Assert.DoesNotContain("Private account name", editHtml, StringComparison.Ordinal);
     }
 

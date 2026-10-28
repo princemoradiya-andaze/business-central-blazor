@@ -5,7 +5,7 @@
         <div class="record-workspace-status-container" @onkeydown="HandleStatusKeyDown">
             <label class="visually-hidden" for="@StatusControlId">Filter @Title</label>
             <button id="@StatusControlId" class="record-workspace-status" type="button"
-                    aria-haspopup="menu" aria-expanded="@IsStatusMenuOpen"
+                    aria-haspopup="menu" aria-expanded="@(IsStatusMenuOpen ? "true" : "false")"
                     aria-controls="@($"{IdPrefix}-status-options")"
                     @onclick="() => IsStatusMenuOpen = !IsStatusMenuOpen">
                 @CurrentStatusLabel
@@ -16,7 +16,7 @@
                 @foreach (var option in StatusOptions)
                 {
                     <button class="record-workspace-status-option" type="button" role="menuitemradio"
-                            aria-checked="@(StatusFilter == option.Value)"
+                            aria-checked="@(StatusFilter == option.Value ? "true" : "false")"
                             @onclick="() => SetStatusFilter(option.Value)">
                         <span class="record-workspace-status-check" aria-hidden="true">
                             @(StatusFilter == option.Value ? "✓" : string.Empty)
@@ -27,7 +27,7 @@
             </div>
         </div>
         <button class="record-workspace-search-toggle" type="button" aria-label="@($"Search {Title}")"
-                aria-expanded="@IsSearchExpanded" aria-controls="@($"{IdPrefix}-search")"
+                aria-expanded="@(IsSearchExpanded ? "true" : "false")" aria-controls="@($"{IdPrefix}-search")"
                 title="@($"Search {Title}")" @onclick="ToggleSearchAsync">
             <span class="record-workspace-search-icon" aria-hidden="true"></span>
         </button>
@@ -49,7 +49,7 @@
         <div class="record-workspace-controls" role="group" aria-label="@($"{Title} view options")">
             <button class="record-workspace-control @(IsFilterPaneOpen ? "active" : null)"
                     type="button" aria-label="Filters" title="Filters"
-                    aria-pressed="@IsFilterPaneOpen"
+                    aria-pressed="@(IsFilterPaneOpen ? "true" : "false")"
                     aria-controls="@($"{IdPrefix}-filter-pane")"
                     @onclick="ToggleFilterPane">
                 <svg aria-hidden="true" viewBox="0 0 16 16"><path d="M2 3h12L9.2 8.4v4l-2.4 1.3V8.4z" /></svg>
@@ -57,7 +57,7 @@
             <div class="record-workspace-view-menu-container">
                 <button class="record-workspace-control @(IsViewMenuOpen ? "active" : null)"
                         type="button" aria-label="Choose view" title="Choose view"
-                        aria-haspopup="menu" aria-expanded="@IsViewMenuOpen"
+                        aria-haspopup="menu" aria-expanded="@(IsViewMenuOpen ? "true" : "false")"
                         aria-controls="@($"{IdPrefix}-view-menu")"
                         @onclick="() => IsViewMenuOpen = !IsViewMenuOpen">
                     <svg aria-hidden="true" viewBox="0 0 16 16"><path d="M2 3h12M2 8h12M2 13h12M5 2v2M5 7v2M5 12v2" /></svg>
@@ -67,7 +67,7 @@
                     @foreach (var option in ViewOptions)
                     {
                         <button class="record-workspace-view-option" type="button" role="menuitemradio"
-                                aria-checked="@(View == option.Value)"
+                                aria-checked="@(View == option.Value ? "true" : "false")"
                                 @onclick="() => SetView(option.Value)">
                             <span class="record-workspace-view-check" aria-hidden="true">
                                 @(View == option.Value ? "✓" : string.Empty)
@@ -80,7 +80,7 @@
             </div>
             <button class="record-workspace-control @(IsDetailsPaneOpen ? "active" : null)"
                     type="button" aria-label="@($"{Title} details")" title="Details"
-                    aria-pressed="@IsDetailsPaneOpen"
+                    aria-pressed="@(IsDetailsPaneOpen ? "true" : "false")"
                     aria-controls="@($"{IdPrefix}-details-pane")"
                     @onclick="ToggleDetailsPane">
                 <svg aria-hidden="true" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.5" /><path d="M8 7v4M8 4.5v.1" /></svg>

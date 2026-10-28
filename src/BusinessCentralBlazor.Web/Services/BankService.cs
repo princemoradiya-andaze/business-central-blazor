@@ -74,7 +74,7 @@ public interface IBankService
 {
     Task<IReadOnlyList<BankAccountDetail>> GetAccountsAsync(ClaimsPrincipal user);
     Task<Guid> CreateAccountAsync(ClaimsPrincipal user, BankAccountInput input);
-    Task UpdateAccountAsync(ClaimsPrincipal user, Guid bankId, int revision, BankAccountInput input);
+    Task<int> UpdateAccountAsync(ClaimsPrincipal user, Guid bankId, int revision, BankAccountInput input);
     Task<Guid> CreateJournalAsync(ClaimsPrincipal user, Guid bankId, BankJournalInput input);
     Task<IReadOnlyList<BankJournalDetail>> GetJournalsAsync(ClaimsPrincipal user, Guid bankId);
     Task<IReadOnlyList<BankStatementSummary>> GetStatementsAsync(ClaimsPrincipal user, Guid bankId);
@@ -122,7 +122,7 @@ public sealed class BankService(IDbContextFactory<ErpDbContext> factory, ICompan
         return bank.Id;
     }
 
-    public async Task UpdateAccountAsync(ClaimsPrincipal user, Guid bankId, int revision, BankAccountInput input)
+    public async Task<int> UpdateAccountAsync(ClaimsPrincipal user, Guid bankId, int revision, BankAccountInput input)
     {
         var company = await CompanyAsync(user);
         Normalize(input);
@@ -144,6 +144,7 @@ public sealed class BankService(IDbContextFactory<ErpDbContext> factory, ICompan
         bank.Revision++;
         Audit(db, user, company, "BankAccountUpdated", bank.Id);
         await SaveAsync(db, transaction);
+        return bank.Revision;
     }
 
     public async Task<Guid> CreateJournalAsync(ClaimsPrincipal user, Guid bankId, BankJournalInput input)

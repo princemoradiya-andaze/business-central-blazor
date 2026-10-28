@@ -84,7 +84,7 @@ public interface IInventoryService
     Task<IReadOnlyList<InventoryItemListItem>> GetItemsAsync(ClaimsPrincipal user);
     Task<IReadOnlyList<InventoryMovementListItem>> GetMovementsAsync(ClaimsPrincipal user);
     Task<Guid> CreateItemAsync(ClaimsPrincipal user, InventoryItemInput input);
-    Task UpdateItemAsync(ClaimsPrincipal user, Guid itemId, byte[] rowVersion, InventoryItemInput input);
+    Task<byte[]> UpdateItemAsync(ClaimsPrincipal user, Guid itemId, byte[] rowVersion, InventoryItemInput input);
     Task<Guid> CreateMovementDraftAsync(ClaimsPrincipal user, InventoryMovementInput input);
 }
 
@@ -213,7 +213,7 @@ public sealed class InventoryService(
         return item.Id;
     }
 
-    public async Task UpdateItemAsync(
+    public async Task<byte[]> UpdateItemAsync(
         ClaimsPrincipal user,
         Guid itemId,
         byte[] rowVersion,
@@ -248,6 +248,7 @@ public sealed class InventoryService(
 
         Apply(item, input);
         await SaveChangesAsync(dbContext);
+        return item.RowVersion.ToArray();
     }
 
     public async Task<Guid> CreateMovementDraftAsync(ClaimsPrincipal user, InventoryMovementInput input)

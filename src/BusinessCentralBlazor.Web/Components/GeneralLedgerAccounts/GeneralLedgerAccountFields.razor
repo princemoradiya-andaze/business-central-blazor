@@ -1,26 +1,14 @@
-@using BusinessCentralBlazor.Domain.Enums
-@using BusinessCentralBlazor.Web.Services
-
-<EditForm Model="@Model" OnValidSubmit="SubmitAsync" FormName="general-ledger-account">
-    <DataAnnotationsValidator />
-    <ValidationSummary class="alert alert-danger" />
-
-    @if (!string.IsNullOrWhiteSpace(ErrorMessage))
-    {
-        <div class="alert alert-danger" role="alert">@ErrorMessage</div>
-    }
-
-    <fieldset disabled="@IsSaving">
+    <fieldset>
         <div class="row g-3">
             <div class="col-md-4">
                 <label class="form-label" for="account-number">Account number</label>
-                <InputText id="account-number" class="form-control" maxlength="32"
+                <CardInputText id="account-number" class="form-control" maxlength="32"
                            autocomplete="off" @bind-Value="Model.Number" />
                 <ValidationMessage For="@(() => Model.Number)" />
             </div>
             <div class="col-md-8">
                 <label class="form-label" for="account-name">Name</label>
-                <InputText id="account-name" class="form-control" maxlength="160"
+                <CardInputText id="account-name" class="form-control" maxlength="160"
                            @bind-Value="Model.Name" />
                 <ValidationMessage For="@(() => Model.Name)" />
             </div>
@@ -68,46 +56,7 @@
             </div>
         </div>
     </fieldset>
-
-    <div class="d-flex gap-2 mt-4">
-        <button class="btn btn-primary" type="submit" disabled="@IsSaving">
-            @(IsSaving ? "Saving..." : SubmitText)
-        </button>
-        @if (IsDialog)
-        {
-            <button class="btn btn-outline-secondary" type="button" disabled="@IsSaving" @onclick="OnCancel">Cancel</button>
-        }
-        else
-        {
-            <a class="btn btn-outline-secondary" href="/financial/general-ledger/accounts">Cancel</a>
-        }
-    </div>
-</EditForm>
-
 @code {
-    [Parameter, EditorRequired]
-    public GeneralLedgerAccountInput Model { get; set; } = new();
-
-    [Parameter, EditorRequired]
-    public IReadOnlyList<GeneralLedgerAccountListItem> ParentAccounts { get; set; } = [];
-
-    [Parameter, EditorRequired]
-    public EventCallback OnValidSubmit { get; set; }
-
-    [Parameter]
-    public string SubmitText { get; set; } = "Save";
-
-    [Parameter]
-    public bool IsSaving { get; set; }
-
-    [Parameter]
-    public string? ErrorMessage { get; set; }
-
-    [Parameter]
-    public bool IsDialog { get; set; }
-
-    [Parameter]
-    public EventCallback OnCancel { get; set; }
-
-    private Task SubmitAsync(EditContext _) => OnValidSubmit.InvokeAsync();
+    [Parameter, EditorRequired] public GeneralLedgerAccountInput Model { get; set; } = new();
+    [Parameter] public IReadOnlyList<GeneralLedgerAccountListItem> ParentAccounts { get; set; } = [];
 }

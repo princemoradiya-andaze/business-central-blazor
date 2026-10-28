@@ -1,0 +1,178 @@
+@typeparam T where T : class
+@implements IDisposable
+@inject ILogger<EntityRecordCard<T>> Logger
+
+<WorkspaceCardDialog OnClose="CloseAsync" LabelledBy="entity-card-heading"
+                     ReturnFocusSelector="@ReturnFocusSelector" ReturnFocusFallbackSelector="@ReturnFocusFallbackSelector">
+    <NavigationLock ConfirmExternalNavigation="@session.HasChanges" OnBeforeInternalNavigation="BeforeNavigationAsync" />
+    <div class="entity-card-frame">
+        <div class="entity-card-top">
+            <button class="entity-card-icon entity-card-back" type="button" aria-label="Close record card" @onclick="CloseAsync">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5m7-7-7 7 7 7" /></svg>
+            </button>
+            <span class="entity-card-breadcrumb">@Module / @CardType</span>
+            <span class="entity-card-status" role="status" aria-live="polite">
+                @(session.IsSaving ? "Saving..." : session.Error is not null ? "Unsaved changes - error" :
+                    session.HasChanges || IsNew ? "Unsaved changes" : "Saved")
+            </span>
+        </div>
+        <h2 id="entity-card-heading" class="entity-card-title">@(IsNew ? $"New {CardType}" : Title)</h2>
+        <EditForm @key="context" EditContext="@context" OnSubmit="SubmitAsync" FormName="entity-record-card">
+            <DataAnnotationsValidator />
+            <div class="entity-card-commands">
+                <span>Home</span>
+                @if (IsNew)
+                {
+                    <button type="submit" disabled="@session.IsSaving">Save</button>
+                    <button type="button" disabled="@session.IsSaving" @onclick="DiscardAsync">Cancel</button>
+                }
+                else if (session.HasChanges || session.Error is not null)
+                {
+                    <button type="button" disabled="@session.IsSaving" @onclick="FlushAsync">Retry save</button>
+                    <button type="button" disabled="@session.IsSaving" @onclick="DiscardAsync">Discard changes and close</button>
+                }
+            </div>
+            <div class="entity-card-body" @onfocusout="AutoSaveAsync" @onchange="AutoSaveAsync">
+                @if (session.Error is not null)
+                {
+                    <div class="alert alert-danger" role="alert">@session.Error</div>
+                }
+                @if (navigationMessage is not null)
+                {
+                    <div class="alert alert-warning" role="alert">@navigationMessage</div>
+                }
+                <ValidationSummary />
+                <h3 class="entity-card-section">General</h3>
+                <fieldset disabled="@(IsNew && session.IsSaving)">
+                    @ChildContent
+                </fieldset>
+            </div>
+        </EditForm>
+        <footer class="entity-card-footer">@(IsNew ? "Save creates the record. Cancel discards the draft." :
+            "Changes save when you leave a field. Close and record navigation save pending changes first.")</footer>
+    </div>
+    @if (!IsNew)
+    {
+        <div class="entity-card-arrows">
+            <button class="entity-card-icon" type="button" aria-label="Previous record" disabled="@(!CanPrevious)"
+                    @onclick="() => BrowseAsync(-1)">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7" /></svg>
+            </button>
+            <button class="entity-card-icon" type="button" aria-label="Next record" disabled="@(!CanNext)"
+                    @onclick="() => BrowseAsync(1)">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg>
+            </button>
+        </div>
+    }
+</WorkspaceCardDialog>
+
+@code {
+    [Parameter, EditorRequired] public T Model { get; set; } = default!;
+    [Parameter, EditorRequired] public Func<T, Task> Save { get; set; } = default!;
+    [Parameter, EditorRequired] public RenderFragment ChildContent { get; set; } = default!;
+    [Parameter] public string Module { get; set; } = string.Empty;
+    [Parameter] public string CardType { get; set; } = "Record Card";
+    [Parameter] public string Title { get; set; } = string.Empty;
+    [Parameter] public bool IsNew { get; set; }
+    [Parameter] public bool CanPrevious { get; set; }
+    [Parameter] public bool CanNext { get; set; }
+    [Parameter] public EventCallback<int> OnBrowse { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public string ReturnFocusSelector { get; set; } = "a";
+    [Parameter] public string? ReturnFocusFallbackSelector { get; set; }
+    private EditContext context = default!;
+    private RecordCardSession<T> session = default!;
+    private bool leaving;
+    private bool navigating;
+    private T? activeModel;
+    private string? navigationMessage;
+
+    protected override void OnParametersSet()
+    {
+        if (ReferenceEquals(activeModel, Model)) return;
+        if (activeModel is not null)
+        {
+            context.OnFieldChanged -= FieldChanged;
+            session.Changed -= Refresh;
+        }
+        activeModel = Model;
+        navigationMessage = null;
+        leaving = false;
+        navigating = false;
+        context = new(Model);
+        session = new(Model, () => context.Validate(), Save,
+            exception => Logger.LogError(exception, "Unable to save {CardType}", CardType));
+        context.OnFieldChanged += FieldChanged;
+        session.Changed += Refresh;
+    }
+
+    private void FieldChanged(object? sender, FieldChangedEventArgs args) => StateHasChanged();
+    private void Refresh() => StateHasChanged();
+    private async Task FlushAsync() => await session.FlushAsync();
+    private Task AutoSaveAsync() => IsNew || leaving ? Task.CompletedTask : FlushAsync();
+    private async Task SubmitAsync()
+    {
+        if (session.IsSaving || leaving) return;
+        // Enter never submits an existing card; only the explicit New Save creates a record.
+        if (IsNew && await session.FlushAsync(create: true))
+        {
+            leaving = true;
+            await OnClose.InvokeAsync();
+        }
+    }
+
+    private async Task CloseAsync()
+    {
+        if (leaving || navigating) return;
+        if (IsNew)
+        {
+            await DiscardAsync();
+            return;
+        }
+        navigating = true;
+        if (await session.FlushAsync())
+        {
+            leaving = true;
+            await OnClose.InvokeAsync();
+        }
+        navigating = false;
+    }
+
+    private async Task BrowseAsync(int offset)
+    {
+        if (leaving || navigating) return;
+        navigating = true;
+        if (await session.FlushAsync())
+        {
+            leaving = true;
+            await OnBrowse.InvokeAsync(offset);
+            leaving = false;
+        }
+        navigating = false;
+    }
+
+    private async Task DiscardAsync()
+    {
+        if (leaving) return;
+        leaving = true;
+        await session.WaitAsync();
+        await OnClose.InvokeAsync();
+    }
+
+    private async Task BeforeNavigationAsync(LocationChangingContext args)
+    {
+        if (leaving) return;
+        if (IsNew ? session.HasChanges : !await session.FlushAsync())
+        {
+            if (IsNew)
+                navigationMessage = "Save the new record or Cancel to discard it before leaving.";
+            args.PreventNavigation();
+        }
+    }
+
+    public void Dispose()
+    {
+        context.OnFieldChanged -= FieldChanged;
+        session.Changed -= Refresh;
+    }
+}

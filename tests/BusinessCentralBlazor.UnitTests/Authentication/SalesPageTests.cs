@@ -40,7 +40,7 @@ public sealed class SalesPageTests(AuthenticationWebApplicationFactory factory)
         Assert.Contains("Customers", html, StringComparison.Ordinal);
         Assert.Contains("class=\"customer-action-bar\"", html, StringComparison.Ordinal);
         Assert.Contains(">+ New</a>", html, StringComparison.Ordinal);
-        Assert.Contains("Edit", html, StringComparison.Ordinal);
+        Assert.DoesNotContain(">Edit</button>", html, StringComparison.Ordinal);
         Assert.Contains("Delete", html, StringComparison.Ordinal);
         Assert.Contains("Search customers", html, StringComparison.Ordinal);
         Assert.Contains("customer-status", html, StringComparison.Ordinal);
@@ -68,7 +68,7 @@ public sealed class SalesPageTests(AuthenticationWebApplicationFactory factory)
         var routes = new Dictionary<string, (string expected, string excluded)>
         {
             ["/financial/sales/customers"] = ("aria-label=\"Customers\"", "id=\"sales-order-heading\""),
-            ["/financial/sales/customers/new"] = ("id=\"new-customer-heading\"", "class=\"page-command-bar\""),
+            ["/financial/sales/customers/new"] = ("id=\"entity-card-heading\"", "class=\"page-command-bar\""),
             ["/financial/sales/create-order"] = ("id=\"sales-order-heading\"", "id=\"receivables-heading\""),
             ["/financial/sales/orders"] = ("id=\"orders-heading\"", "id=\"new-customer-heading\""),
             ["/financial/sales/fulfillment"] = ("id=\"fulfillment-heading\"", "id=\"receivables-heading\""),
@@ -94,7 +94,7 @@ public sealed class SalesPageTests(AuthenticationWebApplicationFactory factory)
                 Assert.Contains("id=\"sales-customer-number\"", sectionHtml, StringComparison.Ordinal);
                 Assert.Contains("id=\"sales-customer-name\"", sectionHtml, StringComparison.Ordinal);
                 Assert.Contains("id=\"sales-customer-ar\"", sectionHtml, StringComparison.Ordinal);
-                Assert.Contains("Close Customer Card", sectionHtml, StringComparison.Ordinal);
+                Assert.Contains("Close record card", sectionHtml, StringComparison.Ordinal);
             }
         }
     }

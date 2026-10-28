@@ -1,0 +1,42 @@
+.entity-card-frame { display:flex; flex-direction:column; height:100%; min-height:0; padding:22px 65px 0; }
+.entity-card-top { display:flex; align-items:center; gap:12px; min-height:36px; }
+.entity-card-breadcrumb, .entity-card-status { font-size:12px; color:#526775; }
+.entity-card-status { margin-left:auto; }
+.entity-card-title { margin:15px 0 18px; font-size:30px; font-weight:300; overflow-wrap:anywhere; }
+.entity-card-frame ::deep form { display:flex; flex:1; flex-direction:column; min-height:0; }
+.entity-card-commands { display:flex; flex-wrap:wrap; align-items:center; gap:12px; min-height:43px; border-block:1px solid #d0d5da; }
+.entity-card-commands span { margin-right:auto; }
+.entity-card-commands button { border:0; padding:6px; background:transparent; color:#007c89; }
+.entity-card-body { flex:1; min-height:0; overflow:auto; padding:20px 2px 30px; }
+.entity-card-section { font-size:18px; border-bottom:1px solid #667085; padding-bottom:6px; margin-bottom:18px; }
+.entity-card-body ::deep .row { --bs-gutter-x:2rem; --bs-gutter-y:1.5rem; }
+.entity-card-body ::deep .row > [class*="col-"] { flex:0 0 50%; width:50%; }
+.entity-card-body ::deep label:not(.form-check-label) { display:flex; align-items:baseline; gap:8px; color:#526775; font-size:13px; }
+.entity-card-body ::deep label:not(.form-check-label)::after { content:""; flex:1; border-bottom:2px dotted #d7dce0; }
+.entity-card-body ::deep .form-control, .entity-card-body ::deep .form-select { border-radius:0; min-height:30px; font-size:14px; }
+.entity-card-body ::deep .customer-card-fields, .entity-card-body ::deep .vendor-card-fields { display:grid; grid-template-columns:1fr 1fr; gap:2rem; }
+.entity-card-body ::deep .customer-card-field, .entity-card-body ::deep .vendor-card-field { margin-bottom:20px; }
+.entity-card-footer { font-size:12px; color:#667085; padding:12px 0; border-top:1px solid #dfe4ea; }
+.entity-card-icon { display:grid; place-items:center; padding:0; width:34px; height:34px; flex-shrink:0; border:0; border-radius:50%; background:#536174; color:white; }
+.entity-card-icon svg { display:block; width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; }
+.entity-card-back { background:#d8eff1; color:#45616a; width:36px; height:36px; }
+.entity-card-arrows { position:absolute; top:50%; left:10px; right:10px; transform:translateY(-50%); display:flex; justify-content:space-between; pointer-events:none; }
+.entity-card-arrows button { pointer-events:auto; }
+button:disabled { opacity:.4; }
+button:focus-visible { outline:2px solid #008b98; outline-offset:2px; }
+@media(max-width:900px) {
+    .entity-card-body ::deep .row > [class*="col-"] { flex:0 0 100%; width:100%; }
+    .entity-card-body ::deep .customer-card-fields, .entity-card-body ::deep .vendor-card-fields { grid-template-columns:1fr; gap:0; }
+}
+@media(max-width:600px) {
+    .entity-card-frame { padding:14px 43px 0; }
+    .entity-card-title { font-size:24px; }
+    .entity-card-top { flex-wrap:wrap; gap:6px; }
+    .entity-card-status { margin-left:0; }
+    .entity-card-arrows { left:6px; right:6px; }
+    .entity-card-arrows button { width:28px; height:28px; }
+    .entity-card-body ::deep .customer-card-field, .entity-card-body ::deep .vendor-card-field { display:block; }
+    .entity-card-body ::deep label:not(.form-check-label) { margin-bottom:5px; }
+    .entity-card-body ::deep label:not(.form-check-label)::after { display:none; }
+    .entity-card-body ::deep .form-control, .entity-card-body ::deep .form-select { width:100%; min-width:0; }
+}

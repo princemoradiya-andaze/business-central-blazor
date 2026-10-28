@@ -18,6 +18,23 @@
     background: rgb(0 0 0 / 26%);
 }
 
+.workspace-card-dialog.entity-dialog {
+    width: min(1240px, 100vw);
+    max-width: 100vw;
+    height: calc(100dvh - 56px);
+    max-height: calc(100dvh - 56px);
+    margin: 56px auto 0;
+    overflow: hidden;
+}
+
+@media (max-width: 600px) {
+    .workspace-card-dialog.entity-dialog {
+        height: calc(100dvh - 48px);
+        max-height: calc(100dvh - 48px);
+        margin-top: 48px;
+    }
+}
+
 .workspace-card-dialog ::deep .workspace-card-top {
     display: flex;
     min-height: 3rem;

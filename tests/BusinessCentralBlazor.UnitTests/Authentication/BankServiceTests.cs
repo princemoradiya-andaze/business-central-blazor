@@ -236,7 +236,12 @@ public sealed class BankServiceTests(AuthenticationWebApplicationFactory factory
         var data = await SetupAsync();
         await using var scope = factory.Services.CreateAsyncScope();
         var bank = scope.ServiceProvider.GetRequiredService<IBankService>();
-        await bank.UpdateAccountAsync(data.User, data.Bank, 0, Account(data.Cash));
+        var savedRevision = await bank.UpdateAccountAsync(data.User, data.Bank, 0, Account(data.Cash));
+        Assert.Equal(1, savedRevision);
+        Assert.Equal(savedRevision, Assert.Single(await bank.GetAccountsAsync(data.User)).Revision);
+        var nextRevision = await bank.UpdateAccountAsync(data.User, data.Bank, savedRevision, Account(data.Cash));
+        Assert.Equal(2, nextRevision);
+        await Assert.ThrowsAsync<ValidationException>(() => bank.UpdateAccountAsync(data.User, data.Bank, savedRevision, Account(data.Cash)));
         await Assert.ThrowsAsync<ValidationException>(() => bank.UpdateAccountAsync(data.User, data.Bank, 0, Account(data.Cash)));
         var id = await bank.CreateStatementAsync(data.User, data.Bank, Statement("OCT", 100));
         await bank.AddLinesAsync(data.User, id, 0, [Line("A")]);

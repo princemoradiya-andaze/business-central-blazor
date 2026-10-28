@@ -102,7 +102,7 @@ public sealed class PurchasingPageTests(AuthenticationWebApplicationFactory fact
             "aria-label=\"Vendors\"", "id=\"vendor-search\"", "id=\"vendor-status\"",
             "id=\"vendor-filter-toggle\"", "id=\"vendor-filter-pane\"", "id=\"vendor-details-toggle\"",
             "id=\"vendor-details-pane\"", "Tall tiles", ">Tiles</span>", ">List</span>",
-            ">+ New</a>", ">Edit</button>", "Block", "V-LOCAL", "Local vendor", "2000", "Blocked",
+            ">+ New</a>", "Block", "V-LOCAL", "Local vendor", "2000", "Blocked",
             "class=\"vendor-action-bar\"", "class=\"vendor-command-separator\"",
             "class=\"vendor-search-toggle\"", "class=\"vendor-search-input \"",
             "class=\"vendor-view-filter\"", "id=\"vendor-status-options\"",
@@ -113,6 +113,7 @@ public sealed class PurchasingPageTests(AuthenticationWebApplicationFactory fact
             Assert.Contains(expected, html, StringComparison.Ordinal);
         }
         Assert.DoesNotContain("V-FOREIGN", html, StringComparison.Ordinal);
+        Assert.DoesNotContain(">Edit</button>", html, StringComparison.Ordinal);
         Assert.DoesNotContain("class=\"page-command-bar\"", html, StringComparison.Ordinal);
         Assert.DoesNotContain("id=\"purchase-order-heading\"", html, StringComparison.Ordinal);
         Assert.DoesNotContain("module-menu-toggle active", html, StringComparison.Ordinal);
@@ -127,17 +128,17 @@ public sealed class PurchasingPageTests(AuthenticationWebApplicationFactory fact
         using var newResponse = await client.GetAsync("/financial/purchasing/vendors/new");
         var newHtml = await newResponse.Content.ReadAsStringAsync();
         Assert.Equal(HttpStatusCode.OK, newResponse.StatusCode);
-        Assert.Contains("New vendor", newHtml, StringComparison.Ordinal);
+        Assert.Contains("New Vendor Card", newHtml, StringComparison.Ordinal);
         Assert.Contains("id=\"vendor-number\"", newHtml, StringComparison.Ordinal);
         Assert.Contains("id=\"vendor-name\"", newHtml, StringComparison.Ordinal);
         Assert.Contains("id=\"vendor-payables\"", newHtml, StringComparison.Ordinal);
         Assert.Contains("<dialog", newHtml, StringComparison.Ordinal);
-        Assert.Contains("aria-labelledby=\"new-vendor-heading\"", newHtml, StringComparison.Ordinal);
+        Assert.Contains("aria-labelledby=\"entity-card-heading\"", newHtml, StringComparison.Ordinal);
         Assert.Contains("Vendor Card", newHtml, StringComparison.Ordinal);
-        Assert.Contains("Close Vendor Card", newHtml, StringComparison.Ordinal);
-        Assert.Contains("class=\"vendor-card-commands\"", newHtml, StringComparison.Ordinal);
+        Assert.Contains("Close record card", newHtml, StringComparison.Ordinal);
+        Assert.Contains("class=\"entity-card-commands\"", newHtml, StringComparison.Ordinal);
         Assert.Contains("class=\"vendor-card-fields\"", newHtml, StringComparison.Ordinal);
-        Assert.Contains("class=\"vendor-card-footer\"", newHtml, StringComparison.Ordinal);
+        Assert.Contains("class=\"entity-card-footer\"", newHtml, StringComparison.Ordinal);
         Assert.Contains("aria-label=\"Vendors\"", newHtml, StringComparison.Ordinal);
         Assert.DoesNotContain("class=\"page-command-bar\"", newHtml, StringComparison.Ordinal);
         Assert.Contains("maxlength=\"32\"", newHtml, StringComparison.Ordinal);
@@ -146,22 +147,23 @@ public sealed class PurchasingPageTests(AuthenticationWebApplicationFactory fact
         using var editResponse = await client.GetAsync($"/financial/purchasing/vendors/{localId}/edit");
         var editHtml = await editResponse.Content.ReadAsStringAsync();
         Assert.Equal(HttpStatusCode.OK, editResponse.StatusCode);
-        Assert.Contains("Edit vendor", editHtml, StringComparison.Ordinal);
+        Assert.Contains("Saved", editHtml, StringComparison.Ordinal);
         Assert.Contains("value=\"V-LOCAL\"", editHtml, StringComparison.Ordinal);
         Assert.Contains("value=\"Local vendor\"", editHtml, StringComparison.Ordinal);
         Assert.Contains("class=\"vendor-action-bar\"", editHtml, StringComparison.Ordinal);
-        Assert.Contains("class=\"customer-card-dialog\"", editHtml, StringComparison.Ordinal);
-        Assert.Contains("aria-labelledby=\"edit-vendor-heading\"", editHtml, StringComparison.Ordinal);
-        Assert.Contains("id=\"edit-vendor-heading\" class=\"vendor-card-title\"", editHtml, StringComparison.Ordinal);
+        Assert.Contains("workspace-card-dialog entity-dialog", editHtml, StringComparison.Ordinal);
+        Assert.Contains("aria-labelledby=\"entity-card-heading\"", editHtml, StringComparison.Ordinal);
+        Assert.Contains("id=\"entity-card-heading\"", editHtml, StringComparison.Ordinal);
         Assert.Contains("class=\"vendor-card-fields\"", editHtml, StringComparison.Ordinal);
-        Assert.Contains("class=\"vendor-card-commands\"", editHtml, StringComparison.Ordinal);
-        Assert.Contains("class=\"vendor-card-footer\"", editHtml, StringComparison.Ordinal);
-        Assert.Contains(">Cancel</button>", editHtml, StringComparison.Ordinal);
-        Assert.Contains("type=\"submit\"", editHtml, StringComparison.Ordinal);
+        Assert.Contains("class=\"entity-card-commands\"", editHtml, StringComparison.Ordinal);
+        Assert.Contains("class=\"entity-card-footer\"", editHtml, StringComparison.Ordinal);
+        Assert.DoesNotContain("type=\"submit\"", Regex.Match(editHtml, "<dialog\\b.*?</dialog>", RegexOptions.Singleline).Value, StringComparison.Ordinal);
+        Assert.Contains("Previous record", editHtml, StringComparison.Ordinal);
+        Assert.Contains("Next record", editHtml, StringComparison.Ordinal);
         Assert.Contains("id=\"vendor-number\"", editHtml, StringComparison.Ordinal);
         Assert.Contains("id=\"vendor-name\"", editHtml, StringComparison.Ordinal);
         Assert.Contains("id=\"vendor-payables\"", editHtml, StringComparison.Ordinal);
-        Assert.Contains("Close Vendor Card", editHtml, StringComparison.Ordinal);
+        Assert.Contains("Close record card", editHtml, StringComparison.Ordinal);
         Assert.Contains("Reactivate", editHtml, StringComparison.Ordinal);
 
         foreach (var unavailableId in new[] { foreignId, Guid.NewGuid() })

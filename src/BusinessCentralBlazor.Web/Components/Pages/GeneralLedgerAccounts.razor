@@ -1,4 +1,8 @@
 @page "/financial/general-ledger/accounts"
+@page "/financial/general-ledger/accounts/new"
+@page "/financial/general-ledger/accounts/{RecordId:guid}/edit"
+@inject NavigationManager Navigation
+@implements IDisposable
 @attribute [Authorize(Policy = CompanyAuthorizationPolicies.ActiveCompany)]
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject IGeneralLedgerAccountService AccountService
@@ -36,10 +40,7 @@ else
                      EmptyMessage="@(accounts.Count == 0 ? "No accounts have been set up for this company yet. Create an account to get started." : "No accounts match the current search and filters.")">
         <HeaderActions>
             <button id="new-account-action" class="record-workspace-action" type="button" disabled="@isSaving"
-                    @onclick="OpenNewAccount">+ New account</button>
-            <span class="record-workspace-separator" aria-hidden="true"></span>
-            <button id="edit-account-action" class="record-workspace-action" type="button"
-                    disabled="@(SelectedAccount is null || isSaving)" @onclick="EditSelectedAccount">Edit</button>
+                    @onclick='() => Navigation.NavigateTo("/financial/general-ledger/accounts/new")'>+ New account</button>
             <span class="record-workspace-separator" aria-hidden="true"></span>
             <button id="account-status-action" class="record-workspace-action" type="button"
                     disabled="@(SelectedAccount is null || isSaving)" @onclick="RequestStatusChange">
@@ -94,9 +95,8 @@ else
                             <tr class="@(selectedAccountId == account.Id ? "record-row-selected" : null)"
                                 @onclick="() => SelectAccount(account.Id)" @key="account.Id">
                                 <th scope="row">
-                                    <button class="record-select" style="@($"margin-left:{Math.Min(AccountDepth(account), 6) * 1.1}rem")"
-                                            type="button" aria-pressed="@(selectedAccountId == account.Id)"
-                                            @onclick="() => SelectAccount(account.Id)" @onclick:stopPropagation="true">@account.Number</button>
+                                    <a class="record-select" style="@($"margin-left:{Math.Min(AccountDepth(account), 6) * 1.1}rem")" href="@($"/financial/general-ledger/accounts/{account.Id}/edit")"
+                                       @onclick:stopPropagation="true">@account.Number</a>
                                 </th>
                                 <td>@account.Name</td>
                                 <td>@account.Category</td>
@@ -114,14 +114,13 @@ else
             <div class="record-tile-grid">
                 @foreach (var account in FilteredAccounts)
                 {
-                    <button class="record-tile tall @(selectedAccountId == account.Id ? "selected" : null)" type="button"
-                            aria-pressed="@(selectedAccountId == account.Id)" @onclick="() => SelectAccount(account.Id)" @key="account.Id">
-                        <span class="record-tile-title">@account.Number — @account.Name</span>
+                    <div class="record-tile tall @(selectedAccountId == account.Id ? "selected" : null)" @onclick="() => SelectAccount(account.Id)" @key="account.Id" tabindex="0" role="group" @onkeydown='args => { if (args.Key is "Enter" or " ") SelectAccount(account.Id); }'>
+                        <a class="record-tile-title" href="@($"/financial/general-ledger/accounts/{account.Id}/edit")" @onclick:stopPropagation="true">@account.Number — @account.Name</a>
                         <span class="record-tile-meta">@account.Category · @account.Type</span>
                         <span class="record-tile-meta">Parent: @(account.ParentAccountNumber ?? "None")</span>
                         <span class="record-tile-meta">Direct posting: @(account.AllowsDirectPosting ? "Allowed" : "Not allowed")</span>
                         <span class="record-tile-meta">Status: @AccountStatus(account)</span>
-                    </button>
+                    </div>
                 }
             </div>
         </TallTilesContent>
@@ -129,11 +128,10 @@ else
             <div class="record-tile-grid">
                 @foreach (var account in FilteredAccounts)
                 {
-                    <button class="record-tile @(selectedAccountId == account.Id ? "selected" : null)" type="button"
-                            aria-pressed="@(selectedAccountId == account.Id)" @onclick="() => SelectAccount(account.Id)" @key="account.Id">
-                        <span class="record-tile-title">@account.Number — @account.Name</span>
+                    <div class="record-tile @(selectedAccountId == account.Id ? "selected" : null)" @onclick="() => SelectAccount(account.Id)" @key="account.Id" tabindex="0" role="group" @onkeydown='args => { if (args.Key is "Enter" or " ") SelectAccount(account.Id); }'>
+                        <a class="record-tile-title" href="@($"/financial/general-ledger/accounts/{account.Id}/edit")" @onclick:stopPropagation="true">@account.Number — @account.Name</a>
                         <span class="record-tile-meta">@account.Category · @account.Type · @AccountStatus(account)</span>
-                    </button>
+                    </div>
                 }
             </div>
         </TilesContent>
@@ -168,31 +166,42 @@ else
 
     @if (isAccountDialogOpen)
     {
-        <WorkspaceCardDialog @key="accountDialogKey" OnClose="CloseAccountDialog" IsSaving="isSaving"
-                             LabelledBy="account-card-heading"
-                             ReturnFocusSelector="@(editingAccountId.HasValue ? "#edit-account-action" : "#new-account-action")"
-                             ReturnFocusFallbackSelector="#new-account-action">
-            <div class="workspace-card-top">
-                <button class="workspace-card-back" type="button" aria-label="Close account card"
-                        disabled="@isSaving" @onclick="CloseAccountDialog">←</button>
-                <span>@(editingAccountId.HasValue ? "Edit account" : "New account")</span>
-            </div>
-            <h2 id="account-card-heading" class="workspace-card-title">General Ledger Account Card</h2>
-            <div class="workspace-card-body">
-                <GeneralLedgerAccountForm Model="@accountInput"
-                                          ParentAccounts="@ParentAccounts"
-                                          SubmitText="@(editingAccountId.HasValue ? "Save changes" : "Create account")"
-                                          IsSaving="@isSaving"
-                                          ErrorMessage="@errorMessage"
-                                          IsDialog="true"
-                                          OnCancel="CloseAccountDialog"
-                                          OnValidSubmit="SaveAccountAsync" />
-            </div>
-        </WorkspaceCardDialog>
+        <EntityRecordCard Model="@accountInput" Save="SaveAccountAsync"
+                          Module="Chart of Accounts" CardType="G/L Account Card" Title="@(accountInput.Number + " - " + accountInput.Name)"
+                          IsNew="@(!editingAccountId.HasValue)" OnClose="CloseAccountDialog"
+                          CanPrevious="@(BrowseTarget(-1).HasValue)" CanNext="@(BrowseTarget(1).HasValue)" OnBrowse="BrowseAsync"
+                          ReturnFocusSelector="@(RecordId.HasValue ? $"a[href='/financial/general-ledger/accounts/{RecordId}/edit']" : "#new-account-action")"
+                          ReturnFocusFallbackSelector="#new-account-action">
+            <GeneralLedgerAccountFields Model="@accountInput" ParentAccounts="@ParentAccounts" />
+        </EntityRecordCard>
     }
 }
 
 @code {
+    protected override void OnInitialized() => Navigation.LocationChanged += OnLocationChanged;
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        if (new Uri(args.Location).AbsolutePath.TrimEnd('/').Equals("/financial/general-ledger/accounts/new", StringComparison.OrdinalIgnoreCase))
+            OpenNewAccount();
+        else if (new Uri(args.Location).AbsolutePath.TrimEnd('/').Equals("/financial/general-ledger/accounts", StringComparison.OrdinalIgnoreCase))
+            isAccountDialogOpen = false;
+        _ = InvokeAsync(StateHasChanged);
+    }
+    public void Dispose() => Navigation.LocationChanged -= OnLocationChanged;
+
+    [Parameter] public Guid? RecordId { get; set; }
+    private void EnsureSelection() => selectedAccountId = RecordSelection.Reconcile(FilteredAccounts.Select(record => record.Id), selectedAccountId);
+    private Guid? BrowseTarget(int offset) => editingAccountId is { } id
+        ? RecordSelection.Adjacent(FilteredAccounts.Select(record => record.Id), id, offset) : null;
+    private Task BrowseAsync(int offset)
+    {
+        if (BrowseTarget(offset) is { } id)
+            Navigation.NavigateTo($"/financial/general-ledger/accounts/{id}/edit");
+        else
+            CloseAccountDialog();
+        return Task.CompletedTask;
+    }
+
     private IReadOnlyList<GeneralLedgerAccountListItem> accounts = [];
     private IReadOnlyDictionary<Guid, GeneralLedgerAccountListItem> accountsById = new Dictionary<Guid, GeneralLedgerAccountListItem>();
     private GeneralLedgerAccountInput accountInput = new();
@@ -201,7 +210,6 @@ else
     private string searchTerm = string.Empty;
     private string statusFilter = "all";
     private string categoryFilter = "all";
-    private int accountDialogKey;
     private bool isLoading = true;
     private bool isSaving;
     private bool isAccountDialogOpen;
@@ -226,11 +234,26 @@ else
     private IReadOnlyList<GeneralLedgerAccountListItem> ParentAccounts =>
         accounts.Where(account => account.Id != editingAccountId).ToArray();
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnParametersSetAsync()
     {
+        isAccountDialogOpen = false;
+        errorMessage = null;
         try
         {
-            await LoadAsync();
+            if (isLoading) await LoadAsync();
+            if (RecordId is { } id)
+            {
+                selectedAccountId = id;
+                if (accounts.Any(record => record.Id == id))
+                    EditSelectedAccount();
+                else
+                    errorMessage = "The record is not available in the active company.";
+            }
+            else if (new Uri(Navigation.Uri).AbsolutePath.TrimEnd('/').EndsWith("/new", StringComparison.OrdinalIgnoreCase))
+                OpenNewAccount();
+            else
+                isAccountDialogOpen = false;
+            EnsureSelection();
         }
         catch (UnauthorizedAccessException)
         {
@@ -248,31 +271,32 @@ else
         var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
         accounts = await AccountService.GetAllAsync(user);
         accountsById = accounts.ToDictionary(account => account.Id);
+        EnsureSelection();
     }
 
     private Task HandleSearchChanged(string value)
     {
         searchTerm = value;
-        selectedAccountId = null;
+        EnsureSelection();
         return Task.CompletedTask;
     }
 
     private void HandleStatusFilterChanged(ChangeEventArgs args)
     {
         statusFilter = args.Value?.ToString() ?? "all";
-        selectedAccountId = null;
+        EnsureSelection();
     }
 
     private void HandleWorkspaceStatusFilterChanged(string value)
     {
         statusFilter = value;
-        selectedAccountId = null;
+        EnsureSelection();
     }
 
     private void HandleCategoryFilterChanged(ChangeEventArgs args)
     {
         categoryFilter = args.Value?.ToString() ?? "all";
-        selectedAccountId = null;
+        EnsureSelection();
     }
 
     private void ClearFilters()
@@ -280,7 +304,7 @@ else
         searchTerm = string.Empty;
         statusFilter = "all";
         categoryFilter = "all";
-        selectedAccountId = null;
+        EnsureSelection();
     }
 
     private void SelectAccount(Guid accountId) => selectedAccountId = accountId;
@@ -289,7 +313,6 @@ else
     {
         editingAccountId = null;
         accountInput = new GeneralLedgerAccountInput();
-        accountDialogKey++;
         isAccountDialogOpen = true;
         errorMessage = null;
         statusMessage = null;
@@ -297,7 +320,7 @@ else
 
     private void EditSelectedAccount()
     {
-        if (SelectedAccount is not { } account)
+        if (accounts.SingleOrDefault(record => record.Id == RecordId) is not { } account)
         {
             return;
         }
@@ -313,7 +336,6 @@ else
             AllowsDirectPosting = account.AllowsDirectPosting,
             IsBlocked = account.IsBlocked
         };
-        accountDialogKey++;
         isAccountDialogOpen = true;
         errorMessage = null;
         statusMessage = null;
@@ -322,54 +344,21 @@ else
     private void CloseAccountDialog()
     {
         isAccountDialogOpen = false;
-        editingAccountId = null;
-        accountInput = new GeneralLedgerAccountInput();
+        Navigation.NavigateTo("/financial/general-ledger/accounts");
     }
 
-    private async Task SaveAccountAsync()
+    private async Task SaveAccountAsync(GeneralLedgerAccountInput snapshot)
     {
-        if (isSaving)
+        var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+        if (editingAccountId is { } id)
         {
-            return;
+            if (!await AccountService.UpdateAsync(user, id, snapshot))
+                throw new ValidationException("The account was not found in the active company.");
         }
-
-        isSaving = true;
-        errorMessage = null;
-        try
-        {
-            var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
-            if (editingAccountId is { } accountId)
-            {
-                if (!await AccountService.UpdateAsync(user, accountId, accountInput))
-                {
-                    errorMessage = "The account was not found in the active company.";
-                    return;
-                }
-
-                statusMessage = "Account saved.";
-            }
-            else
-            {
-                await AccountService.CreateAsync(user, accountInput);
-                statusMessage = "Account created.";
-            }
-
-            CloseAccountDialog();
-            await LoadAsync();
-        }
-        catch (UnauthorizedAccessException)
-        {
-            companyContextUnavailable = true;
-            errorMessage = "Your active company is no longer available. Select an active company and try again.";
-        }
-        catch (ValidationException exception)
-        {
-            errorMessage = exception.Message;
-        }
-        finally
-        {
-            isSaving = false;
-        }
+        else
+            await AccountService.CreateAsync(user, snapshot);
+        await LoadAsync();
+        await InvokeAsync(StateHasChanged);
     }
 
     private void RequestStatusChange()

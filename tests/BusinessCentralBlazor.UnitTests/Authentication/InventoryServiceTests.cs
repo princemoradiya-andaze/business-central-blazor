@@ -151,6 +151,27 @@ public sealed class InventoryServiceTests(AuthenticationWebApplicationFactory fa
     }
 
     [Fact]
+    public async Task ItemUpdateReturnsTheCommittedConcurrencyToken()
+    {
+        var data = await SetupAsync("inventory-save-token");
+        await using var scope = factory.Services.CreateAsyncScope();
+        var inventory = scope.ServiceProvider.GetRequiredService<IInventoryService>();
+        var item = Assert.Single(await inventory.GetItemsAsync(data.User));
+        var token = await inventory.UpdateItemAsync(data.User, item.Id, item.RowVersion, new InventoryItemInput
+        {
+            Number = item.Number,
+            Description = "Autosaved description",
+            BaseUnitOfMeasure = item.BaseUnitOfMeasure,
+            InventoryAccountId = data.InventoryAccount,
+            IncreaseOffsetAccountId = item.IncreaseOffsetAccountId,
+            IssueExpenseAccountId = data.IssueExpense
+        });
+        var saved = Assert.Single(await inventory.GetItemsAsync(data.User));
+        Assert.Equal("Autosaved description", saved.Description);
+        Assert.Equal(saved.RowVersion, token);
+    }
+
+    [Fact]
     public async Task ItemMappingsCannotChangeAfterMovementDraftExists()
     {
         var data = await SetupAsync("inventory-mapping-lock");

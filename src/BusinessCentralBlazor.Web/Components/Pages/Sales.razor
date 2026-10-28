@@ -6,11 +6,11 @@
 @page "/financial/sales/orders"
 @page "/financial/sales/fulfillment"
 @page "/financial/sales/receivables"
+@implements IDisposable
 @attribute [Authorize(Policy = CompanyAuthorizationPolicies.ActiveCompany)]
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject ISalesService SalesService
 @inject NavigationManager Navigation
-
 <PageTitle>@CurrentSectionTitle</PageTitle>
 
 @if (!string.IsNullOrWhiteSpace(statusMessage))
@@ -27,7 +27,7 @@
 }
 else
 {
-    @if (CurrentSection is "customers" or "new-customer")
+    @if (CurrentSection is "customers" or "new-customer" or "edit-customer")
     {
         <section class="customer-workspace" aria-label="Customers">
             <div class="customer-action-bar" aria-label="Customer actions">
@@ -38,7 +38,7 @@ else
                     <button id="customer-status" class="customer-view-filter"
                             type="button"
                             aria-haspopup="menu"
-                            aria-expanded="@isCustomerStatusMenuOpen"
+                            aria-expanded="@(isCustomerStatusMenuOpen ? "true" : "false")"
                             aria-controls="customer-status-options"
                             @onclick="ToggleCustomerStatusMenu">
                         @CustomerStatusFilterLabel
@@ -51,7 +51,7 @@ else
                         {
                             <button class="customer-view-filter-option" type="button"
                                     role="menuitemradio"
-                                    aria-checked="@(customerStatusFilter == option.Value)"
+                                    aria-checked="@(customerStatusFilter == option.Value ? "true" : "false")"
                                     @onclick="() => SetCustomerStatusFilter(option.Value)">
                                 <span class="customer-view-filter-check" aria-hidden="true">
                                     @(customerStatusFilter == option.Value ? "✓" : string.Empty)
@@ -86,12 +86,6 @@ else
                 <div class="customer-actions">
                     <a class="customer-action-button" href="/financial/sales/customers/new">+ New</a>
                     <span class="customer-command-separator" aria-hidden="true"></span>
-                    <button class="customer-action-button" type="button"
-                            disabled="@(SelectedCustomer is null)"
-                            @onclick="EditSelectedCustomer">
-                        Edit
-                    </button>
-                    <span class="customer-command-separator" aria-hidden="true"></span>
                     @if (SelectedCustomer is { IsInactive: true })
                     {
                         <button class="customer-action-button" type="button" @onclick="ReactivateSelectedCustomerAsync">
@@ -111,7 +105,7 @@ else
                 <div class="customer-view-controls" role="group" aria-label="Customer view options">
                     <button id="customer-filter-toggle" class="customer-view-control @(isCustomerFilterPaneOpen ? "active" : null)"
                             type="button" aria-label="Filters" title="Filters"
-                            aria-pressed="@isCustomerFilterPaneOpen"
+                            aria-pressed="@(isCustomerFilterPaneOpen ? "true" : "false")"
                             aria-controls="customer-filter-pane"
                             @onclick="ToggleCustomerFilterPane">
                         <svg aria-hidden="true" viewBox="0 0 16 16"><path d="M2 3h12L9.2 8.4v4l-2.4 1.3V8.4z" /></svg>
@@ -119,7 +113,7 @@ else
                     <div class="customer-view-menu-container">
                         <button id="customer-view-toggle" class="customer-view-control @(isCustomerViewMenuOpen ? "active" : null)"
                                 type="button" aria-label="Choose customer view" title="Choose view"
-                                aria-haspopup="menu" aria-expanded="@isCustomerViewMenuOpen"
+                                aria-haspopup="menu" aria-expanded="@(isCustomerViewMenuOpen ? "true" : "false")"
                                 aria-controls="customer-view-menu"
                                 @onclick="ToggleCustomerViewMenu">
                             <svg aria-hidden="true" viewBox="0 0 16 16"><path d="M2 3h12M2 8h12M2 13h12M5 2v2M5 7v2M5 12v2" /></svg>
@@ -131,7 +125,7 @@ else
                             {
                                 <button class="customer-view-option" type="button"
                                         role="menuitemradio"
-                                        aria-checked="@(customerView == option.Value)"
+                                        aria-checked="@(customerView == option.Value ? "true" : "false")"
                                         @onclick="() => SetCustomerView(option.Value)">
                                     <span class="customer-view-check" aria-hidden="true">
                                         @(customerView == option.Value ? "✓" : string.Empty)
@@ -144,7 +138,7 @@ else
                     </div>
                     <button id="customer-details-toggle" class="customer-view-control @(isCustomerDetailsPaneOpen ? "active" : null)"
                             type="button" aria-label="Customer details" title="Customer details"
-                            aria-pressed="@isCustomerDetailsPaneOpen"
+                            aria-pressed="@(isCustomerDetailsPaneOpen ? "true" : "false")"
                             aria-controls="customer-details-pane"
                             @onclick="ToggleCustomerDetailsPane">
                         <svg aria-hidden="true" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.5" /><path d="M8 7v4M8 4.5v.1" /></svg>
@@ -205,12 +199,7 @@ else
                                         <tr class="@(selectedCustomerId == customer.Id ? "customer-row-selected" : null)"
                                             @onclick="() => SelectCustomer(customer.Id)">
                                             <th scope="row">
-                                                <button class="customer-number-select" type="button"
-                                                        aria-pressed="@(selectedCustomerId == customer.Id)"
-                                                        @onclick="() => SelectCustomer(customer.Id)"
-                                                        @onclick:stopPropagation="true">
-                                                    @customer.Number
-                                                </button>
+                                                <a class="customer-number-select" href="@($"/financial/sales/customers/{customer.Id}/edit")" @onclick:stopPropagation="true">@customer.Number</a>
                                             </th>
                                             <td>@customer.Name</td>
                                             <td>@customer.ReceivablesAccountNumber</td>
@@ -226,20 +215,18 @@ else
                         <div class="customer-tile-grid @(customerView == "tiles" ? "customer-tile-grid-compact" : null)">
                             @foreach (var customer in FilteredCustomers)
                             {
-                                <button class="customer-tile @(selectedCustomerId == customer.Id ? "customer-tile-selected" : null)"
-                                        type="button"
-                                        aria-pressed="@(selectedCustomerId == customer.Id)"
-                                        @onclick="() => SelectCustomer(customer.Id)">
+                                <div class="customer-tile @(selectedCustomerId == customer.Id ? "customer-tile-selected" : null)"
+                                     @onclick="() => SelectCustomer(customer.Id)" tabindex="0" role="group" @onkeydown='args => { if (args.Key is "Enter" or " ") SelectCustomer(customer.Id); }'>
                                     <span class="customer-tile-avatar" aria-hidden="true">
                                         <svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="27" /><circle cx="32" cy="23" r="8" /><path d="M16 51c1-10 7-15 16-15s15 5 16 15" /></svg>
                                     </span>
                                     <span class="customer-tile-details">
-                                        <span class="customer-tile-number">@customer.Number</span>
+                                        <a class="customer-tile-number" href="@($"/financial/sales/customers/{customer.Id}/edit")" @onclick:stopPropagation="true">@customer.Number</a>
                                         <span class="customer-tile-name">@customer.Name</span>
                                         <span class="customer-tile-meta">Receivables account: @customer.ReceivablesAccountNumber</span>
                                         <span class="customer-tile-meta">Status: @CustomerStatus(customer)</span>
                                     </span>
-                                </button>
+                                </div>
                             }
                         </div>
                     }
@@ -269,91 +256,31 @@ else
         </section>
     }
 
-    @if (CurrentSection == "edit-customer")
+    @if (CurrentSection == "new-customer" || CurrentSection == "edit-customer" && editingCustomerAvailable)
     {
-        <section aria-labelledby="edit-customer-heading">
-            <h2 id="edit-customer-heading" class="h4">Edit customer</h2>
-            @if (!EligibleReceivablesAccounts.Any())
-            {
-                <div class="alert alert-info" role="status">
-                    Create an unblocked Asset posting account for accounts receivable before editing a customer.
-                </div>
-            }
-            <EditForm Model="@customerInput" OnValidSubmit="UpdateCustomerAsync" FormName="edit-sales-customer">
-                <DataAnnotationsValidator />
-                <ValidationSummary />
-                <fieldset disabled="@isSaving">
-                    <div class="row g-3">
-                        <div class="col-md-3">
-                            <label class="form-label" for="sales-customer-number">Customer number</label>
-                            <InputText id="sales-customer-number" class="form-control" @bind-Value="customerInput.Number" />
-                            <ValidationMessage For="@(() => customerInput.Number)" />
-                        </div>
-                        <div class="col-md-5">
-                            <label class="form-label" for="sales-customer-name">Name</label>
-                            <InputText id="sales-customer-name" class="form-control" @bind-Value="customerInput.Name" />
-                            <ValidationMessage For="@(() => customerInput.Name)" />
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label" for="sales-customer-ar">Receivables account</label>
-                            <InputSelect id="sales-customer-ar" class="form-select" @bind-Value="customerInput.ReceivablesAccountId">
-                                <option value="@Guid.Empty">Select Asset posting account</option>
-                                @foreach (var account in EligibleReceivablesAccounts)
-                                {
-                                    <option value="@account.Id">@account.Number - @account.Name</option>
-                                }
-                            </InputSelect>
-                        </div>
-                    </div>
-                    <button class="btn btn-primary mt-3" type="submit" disabled="@(!EligibleReceivablesAccounts.Any())">
-                        @(isSaving ? "Saving..." : "Save")
-                    </button>
-                    <a class="btn btn-outline-secondary mt-3" href="/financial/sales/customers">Cancel</a>
-                </fieldset>
-            </EditForm>
-        </section>
-    }
-
-    @if (CurrentSection == "new-customer")
-    {
-        <CustomerCardDialog OnClose="CloseCustomerCard" IsSaving="isSaving">
-            <div class="customer-card-top">
-                <button class="customer-card-back" type="button" aria-label="Close Customer Card"
-                        disabled="@isSaving" @onclick="CloseCustomerCard">&#8592;</button>
-                <span>New customer</span>
-            </div>
-            <h2 id="new-customer-heading" class="customer-card-title">Customer Card</h2>
-            <EditForm Model="@customerInput" OnValidSubmit="CreateCustomerAsync" FormName="sales-customer">
-                <DataAnnotationsValidator />
-                <div class="customer-card-commands">
-                    <span>Home</span>
-                    <button type="submit" disabled="@(isSaving || !EligibleReceivablesAccounts.Any())">@(isSaving ? "Saving..." : "Save")</button>
-                    <button type="button" disabled="@isSaving" @onclick="CloseCustomerCard">Cancel</button>
-                </div>
-                <div class="customer-card-body">
-                    @if (!string.IsNullOrWhiteSpace(errorMessage))
-                    {
-                        <div class="alert alert-danger" role="alert">@errorMessage</div>
-                    }
-                    @if (!EligibleReceivablesAccounts.Any())
+        <EntityRecordCard Model="@customerInput" Save="PersistCustomerAsync"
+                          Module="Customers" CardType="Customer Card" Title="@(customerInput.Number + " - " + customerInput.Name)"
+                          IsNew="@(!CustomerId.HasValue)" OnClose="CloseCustomerCard"
+                          CanPrevious="@(BrowseTarget(-1).HasValue)" CanNext="@(BrowseTarget(1).HasValue)" OnBrowse="BrowseAsync"
+                          ReturnFocusSelector="@(CustomerId.HasValue ? $"a[href='/financial/sales/customers/{CustomerId}/edit']" : ".customer-actions a")"
+                          ReturnFocusFallbackSelector=".customer-actions a">
+                                @if (!EligibleReceivablesAccounts.Any())
                     {
                         <div class="alert alert-info" role="status">
                             Create an unblocked Asset posting account for accounts receivable before adding a customer.
                         </div>
                     }
-                    <ValidationSummary />
-                    <h3 class="customer-card-section">General</h3>
-                    <fieldset disabled="@isSaving">
+                    <fieldset>
                         <div class="customer-card-fields">
                             <div class="customer-card-column">
                                 <div class="customer-card-field">
                                     <label for="sales-customer-number">No. <span aria-hidden="true">*</span></label>
-                                    <InputText id="sales-customer-number" class="form-control" aria-label="Customer number" aria-required="true" maxlength="32" autofocus @bind-Value="customerInput.Number" />
+                                    <CardInputText id="sales-customer-number" class="form-control" aria-label="Customer number" aria-required="true" maxlength="32" autofocus @bind-Value="customerInput.Number" />
                                 </div>
                                 <ValidationMessage For="@(() => customerInput.Number)" />
                                 <div class="customer-card-field">
                                     <label for="sales-customer-name">Name <span aria-hidden="true">*</span></label>
-                                    <InputText id="sales-customer-name" class="form-control" aria-required="true" maxlength="160" @bind-Value="customerInput.Name" />
+                                    <CardInputText id="sales-customer-name" class="form-control" aria-required="true" maxlength="160" @bind-Value="customerInput.Name" />
                                 </div>
                                 <ValidationMessage For="@(() => customerInput.Name)" />
                             </div>
@@ -371,13 +298,7 @@ else
                             </div>
                         </div>
                     </fieldset>
-                    <p class="customer-card-help">* Required field.</p>
-                </div>
-            </EditForm>
-            <footer class="customer-card-footer">
-                <button class="btn btn-outline-secondary" type="button" disabled="@isSaving" @onclick="CloseCustomerCard">Close</button>
-            </footer>
-        </CustomerCardDialog>
+        </EntityRecordCard>
     }
 
     @if (CurrentSection == "create-order")
@@ -644,6 +565,28 @@ else
 }
 
 @code {
+    private void EnsureSelection() => selectedCustomerId = RecordSelection.Reconcile(FilteredCustomers.Select(record => record.Id), selectedCustomerId);
+    private Guid? BrowseTarget(int offset) => CustomerId is { } id
+        ? RecordSelection.Adjacent(FilteredCustomers.Select(record => record.Id), id, offset) : null;
+    private Task BrowseAsync(int offset)
+    {
+        if (BrowseTarget(offset) is { } id)
+            Navigation.NavigateTo($"/financial/sales/customers/{id}/edit");
+        else
+            CloseCustomerCard();
+        return Task.CompletedTask;
+    }
+    private async Task PersistCustomerAsync(SalesCustomerInput snapshot)
+    {
+        var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+        if (CustomerId is { } id)
+            await SalesService.UpdateCustomerAsync(user, id, snapshot);
+        else
+            await SalesService.CreateCustomerAsync(user, snapshot);
+        await LoadAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
     private IReadOnlyList<SalesCustomerOption> customers = [];
     private IReadOnlyList<SalesItemOption> items = [];
     private IReadOnlyList<SalesAccountOption> accounts = [];
@@ -651,7 +594,8 @@ else
     private IReadOnlyList<GeneralJournalTaxCodeOption> taxCodes = [];
     private IReadOnlyList<SalesOrderDetail> orders = [];
     private IReadOnlyList<SalesReceivableDetail> receivables = [];
-    private readonly SalesCustomerInput customerInput = new();
+    private SalesCustomerInput customerInput = new();
+    private bool editingCustomerAvailable;
     private readonly SalesOrderInput orderInput = new() { Lines = [new SalesOrderLineInput()] };
     private readonly SalesDocumentPostingInput postingInput = new();
     private Guid selectedOrderId;
@@ -673,6 +617,17 @@ else
 
     [Parameter]
     public Guid? CustomerId { get; set; }
+
+    protected override void OnInitialized() => Navigation.LocationChanged += OnLocationChanged;
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        if (new Uri(args.Location).AbsolutePath.TrimEnd('/').EndsWith("/customers/new", StringComparison.OrdinalIgnoreCase))
+            customerInput = new();
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose() => Navigation.LocationChanged -= OnLocationChanged;
 
     private string CurrentSection => CurrentPath switch
     {
@@ -745,11 +700,13 @@ else
         .ToArray();
     private SalesOrderDetail? SelectedOrder => orders.SingleOrDefault(order => order.Id == selectedOrderId);
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnParametersSetAsync()
     {
         try
         {
-            await LoadAsync();
+            if (isLoading) await LoadAsync();
+            customerInput = new();
+            editingCustomerAvailable = CurrentSection == "new-customer";
             if (CurrentSection == "edit-customer" && CustomerId is { } customerId)
             {
                 var customer = customers.SingleOrDefault(candidate => candidate.Id == customerId);
@@ -759,6 +716,8 @@ else
                 }
                 else
                 {
+                    editingCustomerAvailable = true;
+                    selectedCustomerId = customer.Id;
                     customerInput.Number = customer.Number;
                     customerInput.Name = customer.Name;
                     customerInput.ReceivablesAccountId = customer.ReceivablesAccountId;
@@ -786,6 +745,7 @@ else
         var loadedOrders = await SalesService.GetOrdersAsync(user);
         var loadedReceivables = await SalesService.GetOpenReceivablesAsync(user);
         customers = loadedCustomers;
+        EnsureSelection();
         items = loadedItems;
         accounts = loadedAccounts;
         periods = loadedPeriods;
@@ -803,56 +763,25 @@ else
         }
     }
 
-    private async Task CreateCustomerAsync()
-    {
-        await ExecuteAsync(async user =>
-        {
-            await SalesService.CreateCustomerAsync(user, customerInput);
-            customerInput.Number = string.Empty;
-            customerInput.Name = string.Empty;
-            customerInput.ReceivablesAccountId = Guid.Empty;
-            statusMessage = "Customer created.";
-            Navigation.NavigateTo("/financial/sales/customers");
-        });
-    }
+
 
     private void CloseCustomerCard()
     {
-        if (!isSaving)
-        {
-            errorMessage = null;
-            customerInput.Number = string.Empty;
-            customerInput.Name = string.Empty;
-            customerInput.ReceivablesAccountId = Guid.Empty;
-            Navigation.NavigateTo("/financial/sales/customers");
-        }
+        errorMessage = null;
+        Navigation.NavigateTo("/financial/sales/customers");
     }
 
-    private async Task UpdateCustomerAsync()
-    {
-        if (CustomerId is not { } customerId)
-        {
-            errorMessage = "The customer to edit is not available.";
-            return;
-        }
 
-        await ExecuteAsync(async user =>
-        {
-            await SalesService.UpdateCustomerAsync(user, customerId, customerInput);
-            statusMessage = "Customer updated.";
-            Navigation.NavigateTo("/financial/sales/customers");
-        });
-    }
 
     private void SelectCustomer(Guid customerId)
     {
-        selectedCustomerId = selectedCustomerId == customerId ? null : customerId;
+        selectedCustomerId = customerId;
         pendingDeactivationCustomerId = null;
     }
 
     private void ClearCustomerSelection()
     {
-        selectedCustomerId = null;
+        EnsureSelection();
         pendingDeactivationCustomerId = null;
     }
 
@@ -942,13 +871,7 @@ else
         return Task.CompletedTask;
     }
 
-    private void EditSelectedCustomer()
-    {
-        if (SelectedCustomer is { } customer)
-        {
-            Navigation.NavigateTo($"/financial/sales/customers/{customer.Id}/edit");
-        }
-    }
+
 
     private void RequestCustomerDeactivation()
     {
@@ -970,7 +893,7 @@ else
         await ExecuteAsync(async user =>
         {
             await SalesService.SetCustomerInactiveAsync(user, customer.Id, true);
-            selectedCustomerId = null;
+            EnsureSelection();
             pendingDeactivationCustomerId = null;
             statusMessage = "Customer marked inactive.";
         });
@@ -986,7 +909,7 @@ else
         await ExecuteAsync(async user =>
         {
             await SalesService.SetCustomerInactiveAsync(user, customer.Id, false);
-            selectedCustomerId = null;
+            EnsureSelection();
             customerStatusFilter = "all";
             statusMessage = "Customer reactivated.";
         });
