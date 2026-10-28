@@ -106,13 +106,44 @@ public sealed class GeneralJournalPageTests(AuthenticationWebApplicationFactory 
         var periodsHtml = await periodsResponse.Content.ReadAsStringAsync();
         Assert.Equal(HttpStatusCode.OK, periodsResponse.StatusCode);
         Assert.Contains("2026-10", periodsHtml, StringComparison.Ordinal);
-        Assert.Contains("Create period", periodsHtml, StringComparison.Ordinal);
+        Assert.Contains("/financial/accounting-periods/new", periodsHtml, StringComparison.Ordinal);
+        Assert.DoesNotContain("id=\"period-name\"", periodsHtml, StringComparison.Ordinal);
+        AssertCustomerToolbarLayout(
+            periodsHtml,
+            "period-status-quick",
+            "accounting-periods-search",
+            "new-accounting-period-action");
+        Assert.Contains("record-row-selected", periodsHtml, StringComparison.Ordinal);
+
+        using var newPeriodResponse = await client.GetAsync("/financial/accounting-periods/new");
+        var newPeriodHtml = await newPeriodResponse.Content.ReadAsStringAsync();
+        Assert.Equal(HttpStatusCode.OK, newPeriodResponse.StatusCode);
+        Assert.Contains("New Accounting Period Card", newPeriodHtml, StringComparison.Ordinal);
+        Assert.Contains("id=\"period-name\"", newPeriodHtml, StringComparison.Ordinal);
+
+        using var editPeriodResponse = await client.GetAsync($"/financial/accounting-periods/{periodId}/edit");
+        var editPeriodHtml = await editPeriodResponse.Content.ReadAsStringAsync();
+        Assert.Equal(HttpStatusCode.OK, editPeriodResponse.StatusCode);
+        Assert.Contains("2026-10", editPeriodHtml, StringComparison.Ordinal);
+        Assert.Contains("Date locked", editPeriodHtml, StringComparison.Ordinal);
 
         using var listResponse = await client.GetAsync("/financial/journals");
         var listHtml = await listResponse.Content.ReadAsStringAsync();
         Assert.Equal(HttpStatusCode.OK, listResponse.StatusCode);
         Assert.Contains("PAGE-TEST", listHtml, StringComparison.Ordinal);
-        Assert.Contains("New journal batch", listHtml, StringComparison.Ordinal);
+        Assert.Contains(">+ New</a>", listHtml, StringComparison.Ordinal);
+        AssertCustomerToolbarLayout(
+            listHtml,
+            "journal-status-quick",
+            "general-journals-search",
+            "new-journal-batch-action");
+        Assert.Contains("record-row-selected", listHtml, StringComparison.Ordinal);
+
+        using var newBatchResponse = await client.GetAsync("/financial/journals/new");
+        var newBatchHtml = await newBatchResponse.Content.ReadAsStringAsync();
+        Assert.Equal(HttpStatusCode.OK, newBatchResponse.StatusCode);
+        Assert.Contains("New Journal Batch Card", newBatchHtml, StringComparison.Ordinal);
+        Assert.Contains("id=\"batch-name\"", newBatchHtml, StringComparison.Ordinal);
 
         using var batchResponse = await client.GetAsync($"/financial/journals/{batchId}");
         var batchHtml = await batchResponse.Content.ReadAsStringAsync();
@@ -140,8 +171,19 @@ public sealed class GeneralJournalPageTests(AuthenticationWebApplicationFactory 
         var taxSetupHtml = await taxSetupResponse.Content.ReadAsStringAsync();
         Assert.Equal(HttpStatusCode.OK, taxSetupResponse.StatusCode);
         Assert.Contains("Tax setup", taxSetupHtml, StringComparison.Ordinal);
-        Assert.Contains("VAT — Value added tax", taxSetupHtml, StringComparison.Ordinal);
-        Assert.Contains("8.25", taxSetupHtml, StringComparison.Ordinal);
+        Assert.Contains("Value added tax", taxSetupHtml, StringComparison.Ordinal);
+        AssertCustomerToolbarLayout(taxSetupHtml, "tax-status-quick", "tax-setup-search", "new-tax-code-action");
+        Assert.DoesNotContain("id=\"tax-code\"", taxSetupHtml, StringComparison.Ordinal);
+        using var taxCardResponse = await client.GetAsync($"/financial/tax-setup/{taxCodeId}/edit");
+        var taxCardHtml = await taxCardResponse.Content.ReadAsStringAsync();
+        Assert.Equal(HttpStatusCode.OK, taxCardResponse.StatusCode);
+        Assert.Contains("VAT — Value added tax", taxCardHtml, StringComparison.Ordinal);
+        Assert.Contains("8.25", taxCardHtml, StringComparison.Ordinal);
+        Assert.Contains("Effective-dated rates", taxCardHtml, StringComparison.Ordinal);
+        using var newTaxResponse = await client.GetAsync("/financial/tax-setup/new");
+        var newTaxHtml = await newTaxResponse.Content.ReadAsStringAsync();
+        Assert.Equal(HttpStatusCode.OK, newTaxResponse.StatusCode);
+        Assert.Contains("New Tax Code Card", newTaxHtml, StringComparison.Ordinal);
 
         using var anonymousClient = factory.CreateClient(new WebApplicationFactoryClientOptions
         {
@@ -207,5 +249,21 @@ public sealed class GeneralJournalPageTests(AuthenticationWebApplicationFactory 
             RegexOptions.CultureInvariant);
         Assert.True(match.Success, "Expected an antiforgery token in the rendered form.");
         return HttpUtility.HtmlDecode(match.Groups[1].Value);
+    }
+
+    private static void AssertCustomerToolbarLayout(
+        string html,
+        string statusControlId,
+        string searchInputId,
+        string newActionId)
+    {
+        var statusPosition = html.IndexOf($"id=\"{statusControlId}\"", StringComparison.Ordinal);
+        var searchPosition = html.IndexOf($"id=\"{searchInputId}\"", StringComparison.Ordinal);
+        var newPosition = html.IndexOf($"id=\"{newActionId}\"", StringComparison.Ordinal);
+        Assert.True(
+            statusPosition >= 0 && searchPosition > statusPosition && newPosition > searchPosition,
+            "The toolbar order must be All, Search, then New.");
+        Assert.DoesNotContain("class=\"page-command-bar\"", html, StringComparison.Ordinal);
+        Assert.Contains("record-workspace-main", html, StringComparison.Ordinal);
     }
 }

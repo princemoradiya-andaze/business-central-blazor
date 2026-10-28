@@ -82,7 +82,11 @@
             var path = "/" + Navigation.ToBaseRelativePath(Navigation.Uri).Split('?', '#')[0];
             return path.Equals("/financial/inventory", StringComparison.OrdinalIgnoreCase) ||
                    path.Equals("/financial/banks", StringComparison.OrdinalIgnoreCase) ||
-                   path.Equals("/financial/general-ledger/accounts", StringComparison.OrdinalIgnoreCase);
+                   path.Equals("/financial/general-ledger/accounts", StringComparison.OrdinalIgnoreCase) ||
+                   path.Equals("/financial/journals", StringComparison.OrdinalIgnoreCase) ||
+                   path.Equals("/financial/dimensions", StringComparison.OrdinalIgnoreCase) ||
+                   path.Equals("/financial/accounting-periods", StringComparison.OrdinalIgnoreCase) ||
+                   path.Equals("/financial/tax-setup", StringComparison.OrdinalIgnoreCase);
         }
     }
 

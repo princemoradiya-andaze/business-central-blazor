@@ -53,6 +53,14 @@ public sealed class GeneralLedgerAccountPageTests(AuthenticationWebApplicationFa
         Assert.Contains("Choose view", listHtml, StringComparison.Ordinal);
         Assert.Contains("Details", listHtml, StringComparison.Ordinal);
         Assert.Contains("Company: G/L Page Company (GLPAGE)", listHtml, StringComparison.Ordinal);
+        var allPosition = listHtml.IndexOf("id=\"account-status-quick\"", StringComparison.Ordinal);
+        var searchPosition = listHtml.IndexOf("id=\"chart-of-accounts-search\"", StringComparison.Ordinal);
+        var newPosition = listHtml.IndexOf("id=\"new-account-action\"", StringComparison.Ordinal);
+        Assert.True(
+            allPosition >= 0 && searchPosition > allPosition && newPosition > searchPosition,
+            "The toolbar order must be All, Search, then New.");
+        Assert.DoesNotContain("class=\"page-command-bar\"", listHtml, StringComparison.Ordinal);
+        Assert.Contains("record-row-selected", listHtml, StringComparison.Ordinal);
 
         using var newResponse = await client.GetAsync("/financial/general-ledger/accounts/new");
         var newHtml = await newResponse.Content.ReadAsStringAsync();

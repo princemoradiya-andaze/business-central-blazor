@@ -1,21 +1,22 @@
 @page "/financial/journals"
+@page "/financial/journals/new"
+@page "/financial/journals/{BatchId:guid}/edit"
+@implements IDisposable
 @attribute [Authorize(Policy = CompanyAuthorizationPolicies.ActiveCompany)]
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject IGeneralJournalService GeneralJournalService
+@inject NavigationManager Navigation
 
 <PageTitle>General journals</PageTitle>
 
-<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
-    <div>
-        <h1>General journals</h1>
-        <p class="text-body-secondary mb-0">Prepare, validate, post, and reverse general journal batches.</p>
-    </div>
-    <div class="d-flex gap-2">
-        <a class="btn btn-outline-secondary" href="/financial/accounting-periods">Accounting periods</a>
-        <a class="btn btn-primary" href="/financial/journals/new">New journal batch</a>
-    </div>
-</div>
-
+@if (!string.IsNullOrWhiteSpace(statusMessage))
+{
+    <div class="alert alert-success" role="status">@statusMessage</div>
+}
+@if (!string.IsNullOrWhiteSpace(errorMessage) && !isBatchCardOpen)
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+}
 @if (isLoading)
 {
     <p role="status" aria-live="polite">Loading journal batches...</p>
@@ -25,78 +26,280 @@ else if (companyContextUnavailable)
     <div class="alert alert-danger" role="alert">@errorMessage</div>
     <a href="/account/company" data-enhance-nav="false">Select an active company</a>
 }
-else if (periods.Count == 0)
-{
-    <div class="alert alert-info" role="status">
-        Create an accounting period before preparing a journal batch.
-        <a href="/financial/accounting-periods">Set up accounting periods</a>
-    </div>
-}
-else if (batches.Count == 0)
-{
-    <div class="alert alert-info" role="status">No general journal batches have been created for this company.</div>
-}
 else
 {
-    <div class="table-responsive">
-        <table class="table table-striped align-middle">
-            <caption class="visually-hidden">General journal batches for the active company</caption>
-            <thead>
-                <tr>
-                    <th scope="col">Batch</th>
-                    <th scope="col">Description</th>
-                    <th scope="col">Default period</th>
-                    <th scope="col">Status</th>
-                    <th scope="col">Lines</th>
-                    <th scope="col">Reversal</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var batch in batches)
+    <RecordWorkspace Title="General journals"
+                     IdPrefix="general-journals"
+                     StatusControlId="journal-status-quick"
+                     StatusFilter="@statusFilter"
+                     StatusFilterChanged="HandleStatusFilterChanged"
+                     StatusOptionsOverride="@StatusOptions"
+                     AllStatusLabel="All"
+                     SearchPlaceholder="Search batches"
+                     SearchTerm="@searchTerm"
+                     SearchTermChanged="HandleSearchChanged"
+                     HasRecords="@FilteredBatches.Any()"
+                     EmptyMessage="@(periods.Count == 0 ? "No journal batches are available." : "No journal batches match the current search and filters.")">
+        <HeaderActions>
+            <a id="new-journal-batch-action" class="record-workspace-action"
+               href="/financial/journals/new">+ New</a>
+            <span class="record-workspace-separator" aria-hidden="true"></span>
+            <a class="record-workspace-action" href="/financial/accounting-periods">Accounting periods</a>
+        </HeaderActions>
+        <FilterContent>
+            <label for="journal-filter-status">Batch status</label>
+            <select id="journal-filter-status" class="form-select" value="@statusFilter"
+                    @onchange="HandleFilterStatusChanged">
+                @foreach (var option in StatusOptions)
                 {
-                    <tr>
-                        <th scope="row">
-                            <a href="@($"/financial/journals/{batch.Id}")">@batch.Name</a>
-                        </th>
-                        <td>@batch.Description</td>
-                        <td>@batch.DefaultPeriodName</td>
-                        <td>@batch.Status</td>
-                        <td>@batch.LineCount</td>
-                        <td>
-                            @if (batch.ReversalOfBatchId is { } sourceBatchId)
-                            {
-                                <a href="@($"/financial/journals/{sourceBatchId}")">Reverses original batch</a>
-                            }
-                            else if (batch.ReversedByBatchId is { } reversalBatchId)
-                            {
-                                <a href="@($"/financial/journals/{reversalBatchId}")">View reversal</a>
-                            }
-                            else
-                            {
-                                <span>—</span>
-                            }
-                        </td>
-                    </tr>
+                    <option value="@option.Value">@option.Label</option>
                 }
-            </tbody>
-        </table>
-    </div>
+            </select>
+            <button class="btn btn-link btn-sm mt-2 px-0" type="button" @onclick="ClearFilters">Clear filters</button>
+        </FilterContent>
+        <ListContent>
+            <div class="table-responsive">
+                <table class="table table-striped align-middle">
+                    <caption class="visually-hidden">General journal batches for the active company</caption>
+                    <thead>
+                        <tr>
+                            <th scope="col">Batch</th>
+                            <th scope="col">Description</th>
+                            <th scope="col">Default period</th>
+                            <th scope="col">Status</th>
+                            <th scope="col">Lines</th>
+                            <th scope="col">Reversal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var batch in FilteredBatches)
+                        {
+                            <tr class="@(selectedBatchId == batch.Id ? "record-row-selected" : null)"
+                                @onclick="() => SelectBatch(batch.Id)" @key="batch.Id">
+                                <th scope="row">
+                                    <a id="@($"journal-batch-{batch.Id}")" class="record-select"
+                                       href="@($"/financial/journals/{batch.Id}/edit")"
+                                       @onclick:stopPropagation="true">@batch.Name</a>
+                                </th>
+                                <td>@batch.Description</td>
+                                <td>@batch.DefaultPeriodName</td>
+                                <td>@batch.Status</td>
+                                <td>@batch.LineCount</td>
+                                <td>
+                                    @if (batch.ReversalOfBatchId is { } sourceBatchId)
+                                    {
+                                        <a href="@($"/financial/journals/{sourceBatchId}")">Reverses original batch</a>
+                                    }
+                                    else if (batch.ReversedByBatchId is { } reversalBatchId)
+                                    {
+                                        <a href="@($"/financial/journals/{reversalBatchId}")">View reversal</a>
+                                    }
+                                    else
+                                    {
+                                        <span>—</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </ListContent>
+        <TallTilesContent>
+            <div class="record-tile-grid">
+                @foreach (var batch in FilteredBatches)
+                {
+                    <div class="record-tile tall @(selectedBatchId == batch.Id ? "selected" : null)"
+                         @onclick="() => SelectBatch(batch.Id)" @key="batch.Id"
+                         tabindex="0" role="group"
+                         @onkeydown='args => { if (args.Key is "Enter" or " ") SelectBatch(batch.Id); }'>
+                        <a class="record-tile-title" href="@($"/financial/journals/{batch.Id}/edit")"
+                           @onclick:stopPropagation="true">@batch.Name — @batch.Description</a>
+                        <span class="record-tile-meta">Period: @batch.DefaultPeriodName</span>
+                        <span class="record-tile-meta">Status: @batch.Status · Lines: @batch.LineCount</span>
+                    </div>
+                }
+            </div>
+        </TallTilesContent>
+        <TilesContent>
+            <div class="record-tile-grid">
+                @foreach (var batch in FilteredBatches)
+                {
+                    <div class="record-tile @(selectedBatchId == batch.Id ? "selected" : null)"
+                         @onclick="() => SelectBatch(batch.Id)" @key="batch.Id"
+                         tabindex="0" role="group"
+                         @onkeydown='args => { if (args.Key is "Enter" or " ") SelectBatch(batch.Id); }'>
+                        <a class="record-tile-title" href="@($"/financial/journals/{batch.Id}/edit")"
+                           @onclick:stopPropagation="true">@batch.Name</a>
+                        <span class="record-tile-meta">@batch.Description · @batch.Status</span>
+                    </div>
+                }
+            </div>
+        </TilesContent>
+        <DetailsContent>
+            @if (SelectedBatch is { } details)
+            {
+                <h3>@details.Name</h3>
+                <dl>
+                    <div><dt>Description</dt><dd>@(string.IsNullOrWhiteSpace(details.Description) ? "—" : details.Description)</dd></div>
+                    <div><dt>Default period</dt><dd>@details.DefaultPeriodName</dd></div>
+                    <div><dt>Status</dt><dd>@details.Status</dd></div>
+                    <div><dt>Journal lines</dt><dd>@details.LineCount</dd></div>
+                </dl>
+                <a class="btn btn-sm btn-outline-primary mt-3"
+                   href="@($"/financial/journals/{details.Id}")">Open journal lines</a>
+            }
+            else
+            {
+                <p class="text-body-secondary">Select a batch to see its period and journal-line summary.</p>
+            }
+        </DetailsContent>
+    </RecordWorkspace>
+
+    @if (periods.Count == 0)
+    {
+        <div class="alert alert-info mt-3" role="status">
+            Create an accounting period before preparing a journal batch.
+            <a href="/financial/accounting-periods">Set up accounting periods</a>
+        </div>
+    }
+
+    @if (isBatchCardOpen)
+    {
+        <EntityRecordCard Model="@batchInput" Save="SaveBatchAsync"
+                          Module="Finance" CardType="Journal Batch Card"
+                          Title="@batchInput.Name"
+                          IsNew="@(!editingBatchId.HasValue)"
+                          OnClose="CloseBatchCard"
+                          CanPrevious="@(BrowseTarget(-1).HasValue)"
+                          CanNext="@(BrowseTarget(1).HasValue)"
+                          OnBrowse="BrowseAsync"
+                          ReturnFocusSelector="@(editingBatchId is { } id ? $"a[href='/financial/journals/{id}/edit']" : "#new-journal-batch-action")"
+                          ReturnFocusFallbackSelector="#new-journal-batch-action">
+            @if (isBatchReadOnly)
+            {
+                <p class="text-body-secondary">Posted batches are read-only.</p>
+            }
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label" for="batch-name">Batch name</label>
+                    <InputText id="batch-name" class="form-control" maxlength="32"
+                               disabled="@isBatchReadOnly" @bind-Value="batchInput.Name" />
+                    <ValidationMessage For="@(() => batchInput.Name)" />
+                </div>
+                <div class="col-md-8">
+                    <label class="form-label" for="batch-description">Description</label>
+                    <InputText id="batch-description" class="form-control" maxlength="100"
+                               disabled="@isBatchReadOnly" @bind-Value="batchInput.Description" />
+                    <ValidationMessage For="@(() => batchInput.Description)" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="batch-period">Default accounting period</label>
+                    @if (isBatchReadOnly)
+                    {
+                        <input id="batch-period" class="form-control" value="@BatchPeriodName" disabled />
+                    }
+                    else
+                    {
+                        <InputSelect id="batch-period" class="form-select"
+                                     @bind-Value="batchInput.DefaultAccountingPeriodId">
+                            @foreach (var period in OpenPeriods)
+                            {
+                                <option value="@period.Id">@period.Name (@period.StartsOn:yyyy-MM-dd — @period.EndsOn:yyyy-MM-dd)</option>
+                            }
+                        </InputSelect>
+                    }
+                </div>
+            </div>
+        </EntityRecordCard>
+    }
 }
 
 @code {
+    private static readonly (string Value, string Label)[] StatusOptions =
+    [
+        ("all", "All"),
+        ("open", "Open"),
+        ("posted", "Posted")
+    ];
+
+    [Parameter] public Guid? BatchId { get; set; }
+
     private IReadOnlyList<GeneralJournalBatchListItem> batches = [];
     private IReadOnlyList<AccountingPeriodListItem> periods = [];
+    private GeneralJournalBatchInput batchInput = new();
+    private Guid? selectedBatchId;
+    private Guid? editingBatchId;
+    private string searchTerm = string.Empty;
+    private string statusFilter = "all";
     private bool isLoading = true;
+    private bool isBatchCardOpen;
+    private bool isBatchReadOnly;
     private bool companyContextUnavailable;
     private string? errorMessage;
+    private string? statusMessage;
 
-    protected override async Task OnInitializedAsync()
+    private IReadOnlyList<AccountingPeriodListItem> OpenPeriods =>
+        periods.Where(period => !period.IsClosed && !period.DateLocked).ToArray();
+
+    private IEnumerable<GeneralJournalBatchListItem> FilteredBatches => batches.Where(batch =>
+        (statusFilter switch
+        {
+            "open" => batch.Status == JournalBatchStatus.Open,
+            "posted" => batch.Status == JournalBatchStatus.Posted,
+            _ => true
+        }) &&
+        (string.IsNullOrWhiteSpace(searchTerm) ||
+         batch.Name.Contains(searchTerm.Trim(), StringComparison.OrdinalIgnoreCase) ||
+         batch.Description.Contains(searchTerm.Trim(), StringComparison.OrdinalIgnoreCase) ||
+         batch.DefaultPeriodName.Contains(searchTerm.Trim(), StringComparison.OrdinalIgnoreCase)));
+
+    private GeneralJournalBatchListItem? SelectedBatch =>
+        FilteredBatches.SingleOrDefault(batch => batch.Id == selectedBatchId);
+    private string BatchPeriodName =>
+        periods.SingleOrDefault(period => period.Id == batchInput.DefaultAccountingPeriodId)?.Name ?? "Unavailable";
+
+    protected override void OnInitialized() => Navigation.LocationChanged += OnLocationChanged;
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
     {
+        var path = new Uri(args.Location).AbsolutePath.TrimEnd('/');
+        if (path.Equals("/financial/journals/new", StringComparison.OrdinalIgnoreCase))
+        {
+            OpenNewBatch();
+        }
+        else if (path.Equals("/financial/journals", StringComparison.OrdinalIgnoreCase))
+        {
+            isBatchCardOpen = false;
+        }
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose() => Navigation.LocationChanged -= OnLocationChanged;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        errorMessage = null;
+        isBatchCardOpen = false;
         try
         {
-            var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
-            periods = await GeneralJournalService.GetPeriodsAsync(user);
-            batches = await GeneralJournalService.GetBatchesAsync(user);
+            if (isLoading)
+            {
+                await LoadAsync();
+            }
+            if (BatchId is { } id)
+            {
+                await OpenExistingBatchAsync(id);
+            }
+            else if (new Uri(Navigation.Uri).AbsolutePath.TrimEnd('/')
+                         .Equals("/financial/journals/new", StringComparison.OrdinalIgnoreCase))
+            {
+                OpenNewBatch();
+            }
+            else
+            {
+                EnsureSelection();
+            }
         }
         catch (UnauthorizedAccessException)
         {
@@ -107,5 +310,135 @@ else
         {
             isLoading = false;
         }
+    }
+
+    private async Task LoadAsync()
+    {
+        var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+        periods = await GeneralJournalService.GetPeriodsAsync(user);
+        batches = await GeneralJournalService.GetBatchesAsync(user);
+        EnsureSelection();
+    }
+
+    private void EnsureSelection() =>
+        selectedBatchId = RecordSelection.Reconcile(FilteredBatches.Select(batch => batch.Id), selectedBatchId);
+
+    private Guid? BrowseTarget(int offset) => editingBatchId is { } id
+        ? RecordSelection.Adjacent(FilteredBatches.Select(batch => batch.Id), id, offset)
+        : null;
+
+    private Task BrowseAsync(int offset)
+    {
+        if (BrowseTarget(offset) is { } id)
+        {
+            Navigation.NavigateTo($"/financial/journals/{id}/edit");
+        }
+        else
+        {
+            CloseBatchCard();
+        }
+        return Task.CompletedTask;
+    }
+
+    private void SelectBatch(Guid id) => selectedBatchId = id;
+
+    private async Task OpenExistingBatchAsync(Guid id)
+    {
+        statusMessage = null;
+        selectedBatchId = id;
+        var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+        var batch = await GeneralJournalService.GetBatchAsync(user, id);
+        if (batch is null)
+        {
+            errorMessage = "The journal batch is not available in the active company.";
+            return;
+        }
+        isBatchReadOnly = batch.Status != JournalBatchStatus.Open;
+        if (!isBatchReadOnly && OpenPeriods.Count == 0)
+        {
+            errorMessage = "An open, unlocked accounting period is required to edit a journal batch.";
+            return;
+        }
+
+        editingBatchId = id;
+        batchInput = new GeneralJournalBatchInput
+        {
+            Name = batch.Name,
+            Description = batch.Description,
+            DefaultAccountingPeriodId = batch.DefaultAccountingPeriodId
+        };
+        if (!isBatchReadOnly && !OpenPeriods.Any(period => period.Id == batchInput.DefaultAccountingPeriodId))
+        {
+            batchInput.DefaultAccountingPeriodId = OpenPeriods[0].Id;
+        }
+        isBatchCardOpen = true;
+    }
+
+    private void OpenNewBatch()
+    {
+        errorMessage = null;
+        statusMessage = null;
+        editingBatchId = null;
+        isBatchReadOnly = false;
+        batchInput = new GeneralJournalBatchInput
+        {
+            DefaultAccountingPeriodId = OpenPeriods.FirstOrDefault()?.Id ?? Guid.Empty
+        };
+        if (OpenPeriods.Count == 0)
+        {
+            errorMessage = "An open, unlocked accounting period is required to create a journal batch.";
+            isBatchCardOpen = false;
+            return;
+        }
+        isBatchCardOpen = true;
+    }
+
+    private void CloseBatchCard()
+    {
+        isBatchCardOpen = false;
+        Navigation.NavigateTo("/financial/journals");
+    }
+
+    private async Task SaveBatchAsync(GeneralJournalBatchInput snapshot)
+    {
+        var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+        if (editingBatchId is { } id)
+        {
+            if (!await GeneralJournalService.UpdateBatchAsync(user, id, snapshot))
+            {
+                throw new ValidationException("The journal batch was not found in the active company.");
+            }
+            statusMessage = "Journal batch changes saved.";
+        }
+        else
+        {
+            var createdId = await GeneralJournalService.CreateBatchAsync(user, snapshot);
+            selectedBatchId = createdId;
+            statusMessage = "Journal batch created.";
+        }
+        await LoadAsync();
+    }
+
+    private Task HandleSearchChanged(string value)
+    {
+        searchTerm = value;
+        EnsureSelection();
+        return Task.CompletedTask;
+    }
+
+    private void HandleStatusFilterChanged(string value)
+    {
+        statusFilter = value;
+        EnsureSelection();
+    }
+
+    private void HandleFilterStatusChanged(ChangeEventArgs args) =>
+        HandleStatusFilterChanged(args.Value?.ToString() ?? "all");
+
+    private void ClearFilters()
+    {
+        searchTerm = string.Empty;
+        statusFilter = "all";
+        EnsureSelection();
     }
 }

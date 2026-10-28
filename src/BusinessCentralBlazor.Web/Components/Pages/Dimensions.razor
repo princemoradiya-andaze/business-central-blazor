@@ -1,81 +1,250 @@
 @page "/financial/dimensions"
+@page "/financial/dimensions/new"
+@page "/financial/dimensions/{DimensionId:guid}/edit"
+@implements IDisposable
 @attribute [Authorize(Policy = CompanyAuthorizationPolicies.ActiveCompany)]
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject IDimensionService DimensionService
+@inject NavigationManager Navigation
 
 <PageTitle>Dimensions</PageTitle>
 
-<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
-    <div>
-        <h1>Dimensions</h1>
-        <p class="text-body-secondary mb-0">Organize financial analysis for the active company.</p>
-    </div>
-    <a class="btn btn-primary" href="/financial/dimensions/new">New dimension</a>
-</div>
-
+@if (!string.IsNullOrWhiteSpace(statusMessage))
+{
+    <div class="alert alert-success" role="status">@statusMessage</div>
+}
+@if (!string.IsNullOrWhiteSpace(errorMessage) && !isDimensionCardOpen)
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+}
 @if (isLoading)
 {
     <p role="status" aria-live="polite">Loading dimensions...</p>
 }
-else if (!string.IsNullOrWhiteSpace(errorMessage))
+else if (companyContextUnavailable)
 {
     <div class="alert alert-danger" role="alert">@errorMessage</div>
-    @if (companyContextUnavailable)
-    {
-        <a href="/account/company" data-enhance-nav="false">Select an active company</a>
-    }
-}
-else if (dimensions.Count == 0)
-{
-    <div class="alert alert-info" role="status">
-        No dimensions have been set up for this company yet.
-    </div>
+    <a href="/account/company" data-enhance-nav="false">Select an active company</a>
 }
 else
 {
-    <div class="table-responsive">
-        <table class="table table-striped align-middle">
-            <caption class="visually-hidden">Dimensions for the active company</caption>
-            <thead>
-                <tr>
-                    <th scope="col">Code</th>
-                    <th scope="col">Name</th>
-                    <th scope="col">Values</th>
-                    <th scope="col"><span class="visually-hidden">Actions</span></th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var dimension in dimensions)
+    <RecordWorkspace Title="Dimensions"
+                     IdPrefix="dimensions"
+                     StatusControlId="dimension-status-quick"
+                     StatusFilter="@statusFilter"
+                     StatusFilterChanged="HandleStatusFilterChanged"
+                     StatusOptionsOverride="@StatusOptions"
+                     AllStatusLabel="All"
+                     SearchPlaceholder="Search dimensions"
+                     SearchTerm="@searchTerm"
+                     SearchTermChanged="HandleSearchChanged"
+                     HasRecords="@FilteredDimensions.Any()"
+                     EmptyMessage="@(dimensions.Count == 0 ? "No dimensions have been set up for this company yet." : "No dimensions match the current search and filters.")">
+        <HeaderActions>
+            <a id="new-dimension-action" class="record-workspace-action"
+               href="/financial/dimensions/new">+ New</a>
+        </HeaderActions>
+        <FilterContent>
+            <label for="dimension-filter-status">Values</label>
+            <select id="dimension-filter-status" class="form-select" value="@statusFilter"
+                    @onchange="HandleFilterStatusChanged">
+                @foreach (var option in StatusOptions)
                 {
-                    <tr>
-                        <th scope="row">@dimension.Code</th>
-                        <td>@dimension.Name</td>
-                        <td>@dimension.ValueCount</td>
-                        <td>
-                            <a class="btn btn-sm btn-outline-primary"
-                               href="@($"/financial/dimensions/{dimension.Id}")">Manage values</a>
-                            <a class="btn btn-sm btn-outline-secondary ms-1"
-                               href="@($"/financial/dimensions/{dimension.Id}/edit")">Edit</a>
-                        </td>
-                    </tr>
+                    <option value="@option.Value">@option.Label</option>
                 }
-            </tbody>
-        </table>
-    </div>
+            </select>
+            <button class="btn btn-link btn-sm mt-2 px-0" type="button" @onclick="ClearFilters">Clear filters</button>
+        </FilterContent>
+        <ListContent>
+            <div class="table-responsive">
+                <table class="table table-striped align-middle">
+                    <caption class="visually-hidden">Dimensions for the active company</caption>
+                    <thead>
+                        <tr>
+                            <th scope="col">Code</th>
+                            <th scope="col">Name</th>
+                            <th scope="col">Values</th>
+                            <th scope="col"><span class="visually-hidden">Actions</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var dimension in FilteredDimensions)
+                        {
+                            <tr class="@(selectedDimensionId == dimension.Id ? "record-row-selected" : null)"
+                                @onclick="() => SelectDimension(dimension.Id)" @key="dimension.Id">
+                                <th scope="row">
+                                    <a id="@($"dimension-record-{dimension.Id}")" class="record-select"
+                                       href="@($"/financial/dimensions/{dimension.Id}/edit")"
+                                       @onclick:stopPropagation="true">@dimension.Code</a>
+                                </th>
+                                <td>@dimension.Name</td>
+                                <td>@dimension.ValueCount</td>
+                                <td>
+                                    <a class="btn btn-sm btn-outline-primary"
+                                       href="@($"/financial/dimensions/{dimension.Id}")">Manage values</a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </ListContent>
+        <TallTilesContent>
+            <div class="record-tile-grid">
+                @foreach (var dimension in FilteredDimensions)
+                {
+                    <div class="record-tile tall @(selectedDimensionId == dimension.Id ? "selected" : null)"
+                         @onclick="() => SelectDimension(dimension.Id)" @key="dimension.Id"
+                         tabindex="0" role="group"
+                         @onkeydown='args => { if (args.Key is "Enter" or " ") SelectDimension(dimension.Id); }'>
+                        <a class="record-tile-title" href="@($"/financial/dimensions/{dimension.Id}/edit")"
+                           @onclick:stopPropagation="true">@dimension.Code — @dimension.Name</a>
+                        <span class="record-tile-meta">Values: @dimension.ValueCount</span>
+                    </div>
+                }
+            </div>
+        </TallTilesContent>
+        <TilesContent>
+            <div class="record-tile-grid">
+                @foreach (var dimension in FilteredDimensions)
+                {
+                    <div class="record-tile @(selectedDimensionId == dimension.Id ? "selected" : null)"
+                         @onclick="() => SelectDimension(dimension.Id)" @key="dimension.Id"
+                         tabindex="0" role="group"
+                         @onkeydown='args => { if (args.Key is "Enter" or " ") SelectDimension(dimension.Id); }'>
+                        <a class="record-tile-title" href="@($"/financial/dimensions/{dimension.Id}/edit")"
+                           @onclick:stopPropagation="true">@dimension.Code</a>
+                        <span class="record-tile-meta">@dimension.Name · @dimension.ValueCount values</span>
+                    </div>
+                }
+            </div>
+        </TilesContent>
+        <DetailsContent>
+            @if (SelectedDimension is { } details)
+            {
+                <h3>@details.Code — @details.Name</h3>
+                <dl>
+                    <div><dt>Code</dt><dd>@details.Code</dd></div>
+                    <div><dt>Name</dt><dd>@details.Name</dd></div>
+                    <div><dt>Dimension values</dt><dd>@details.ValueCount</dd></div>
+                </dl>
+                <a class="btn btn-sm btn-outline-primary mt-3"
+                   href="@($"/financial/dimensions/{details.Id}")">Manage values</a>
+            }
+            else
+            {
+                <p class="text-body-secondary">Select a dimension to see its value count and manage its values.</p>
+            }
+        </DetailsContent>
+    </RecordWorkspace>
+
+    @if (isDimensionCardOpen)
+    {
+        <EntityRecordCard Model="@dimensionInput" Save="SaveDimensionAsync"
+                          Module="Finance" CardType="Dimension Card"
+                          Title="@($"{dimensionInput.Code} — {dimensionInput.Name}")"
+                          IsNew="@(!editingDimensionId.HasValue)"
+                          OnClose="CloseDimensionCard"
+                          CanPrevious="@(BrowseTarget(-1).HasValue)"
+                          CanNext="@(BrowseTarget(1).HasValue)"
+                          OnBrowse="BrowseAsync"
+                          ReturnFocusSelector="@(editingDimensionId is { } id ? $"a[href='/financial/dimensions/{id}/edit']" : "#new-dimension-action")"
+                          ReturnFocusFallbackSelector="#new-dimension-action">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label" for="dimension-code">Code</label>
+                    <InputText id="dimension-code" class="form-control" maxlength="32"
+                               @bind-Value="dimensionInput.Code" />
+                    <ValidationMessage For="@(() => dimensionInput.Code)" />
+                </div>
+                <div class="col-md-8">
+                    <label class="form-label" for="dimension-name">Name</label>
+                    <InputText id="dimension-name" class="form-control" maxlength="120"
+                               @bind-Value="dimensionInput.Name" />
+                    <ValidationMessage For="@(() => dimensionInput.Name)" />
+                </div>
+            </div>
+        </EntityRecordCard>
+    }
 }
 
 @code {
+    private static readonly (string Value, string Label)[] StatusOptions =
+    [
+        ("all", "All"),
+        ("with-values", "With values"),
+        ("without-values", "Without values")
+    ];
+
+    [Parameter] public Guid? DimensionId { get; set; }
+
     private IReadOnlyList<DimensionListItem> dimensions = [];
+    private DimensionInput dimensionInput = new();
+    private Guid? selectedDimensionId;
+    private Guid? editingDimensionId;
+    private string searchTerm = string.Empty;
+    private string statusFilter = "all";
     private bool isLoading = true;
+    private bool isDimensionCardOpen;
     private bool companyContextUnavailable;
     private string? errorMessage;
+    private string? statusMessage;
 
-    protected override async Task OnInitializedAsync()
+    private IEnumerable<DimensionListItem> FilteredDimensions => dimensions.Where(dimension =>
+        (statusFilter switch
+        {
+            "with-values" => dimension.ValueCount > 0,
+            "without-values" => dimension.ValueCount == 0,
+            _ => true
+        }) &&
+        (string.IsNullOrWhiteSpace(searchTerm) ||
+         dimension.Code.Contains(searchTerm.Trim(), StringComparison.OrdinalIgnoreCase) ||
+         dimension.Name.Contains(searchTerm.Trim(), StringComparison.OrdinalIgnoreCase)));
+
+    private DimensionListItem? SelectedDimension =>
+        FilteredDimensions.SingleOrDefault(dimension => dimension.Id == selectedDimensionId);
+
+    protected override void OnInitialized() => Navigation.LocationChanged += OnLocationChanged;
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
     {
+        var path = new Uri(args.Location).AbsolutePath.TrimEnd('/');
+        if (path.Equals("/financial/dimensions/new", StringComparison.OrdinalIgnoreCase))
+        {
+            OpenNewDimension();
+        }
+        else if (path.Equals("/financial/dimensions", StringComparison.OrdinalIgnoreCase))
+        {
+            isDimensionCardOpen = false;
+        }
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose() => Navigation.LocationChanged -= OnLocationChanged;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        errorMessage = null;
+        isDimensionCardOpen = false;
         try
         {
-            var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
-            dimensions = await DimensionService.GetAllAsync(user);
+            if (isLoading)
+            {
+                await LoadAsync();
+            }
+            if (DimensionId is { } id)
+            {
+                await OpenExistingDimensionAsync(id);
+            }
+            else if (new Uri(Navigation.Uri).AbsolutePath.TrimEnd('/')
+                         .Equals("/financial/dimensions/new", StringComparison.OrdinalIgnoreCase))
+            {
+                OpenNewDimension();
+            }
+            else
+            {
+                EnsureSelection();
+            }
         }
         catch (UnauthorizedAccessException)
         {
@@ -86,5 +255,108 @@ else
         {
             isLoading = false;
         }
+    }
+
+    private async Task LoadAsync()
+    {
+        var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+        dimensions = await DimensionService.GetAllAsync(user);
+        EnsureSelection();
+    }
+
+    private void EnsureSelection() =>
+        selectedDimensionId = RecordSelection.Reconcile(FilteredDimensions.Select(dimension => dimension.Id), selectedDimensionId);
+
+    private Guid? BrowseTarget(int offset) => editingDimensionId is { } id
+        ? RecordSelection.Adjacent(FilteredDimensions.Select(dimension => dimension.Id), id, offset)
+        : null;
+
+    private Task BrowseAsync(int offset)
+    {
+        if (BrowseTarget(offset) is { } id)
+        {
+            Navigation.NavigateTo($"/financial/dimensions/{id}/edit");
+        }
+        else
+        {
+            CloseDimensionCard();
+        }
+        return Task.CompletedTask;
+    }
+
+    private void SelectDimension(Guid id) => selectedDimensionId = id;
+
+    private async Task OpenExistingDimensionAsync(Guid id)
+    {
+        statusMessage = null;
+        selectedDimensionId = id;
+        var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+        var dimension = await DimensionService.GetAsync(user, id);
+        if (dimension is null)
+        {
+            errorMessage = "The dimension is not available in the active company.";
+            return;
+        }
+
+        editingDimensionId = id;
+        dimensionInput = new DimensionInput { Code = dimension.Code, Name = dimension.Name };
+        isDimensionCardOpen = true;
+    }
+
+    private void OpenNewDimension()
+    {
+        errorMessage = null;
+        statusMessage = null;
+        editingDimensionId = null;
+        dimensionInput = new DimensionInput();
+        isDimensionCardOpen = true;
+    }
+
+    private void CloseDimensionCard()
+    {
+        isDimensionCardOpen = false;
+        Navigation.NavigateTo("/financial/dimensions");
+    }
+
+    private async Task SaveDimensionAsync(DimensionInput snapshot)
+    {
+        var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+        if (editingDimensionId is { } id)
+        {
+            if (!await DimensionService.UpdateAsync(user, id, snapshot))
+            {
+                throw new ValidationException("The dimension was not found in the active company.");
+            }
+            statusMessage = "Dimension changes saved.";
+        }
+        else
+        {
+            selectedDimensionId = await DimensionService.CreateAsync(user, snapshot);
+            statusMessage = "Dimension created.";
+        }
+        await LoadAsync();
+    }
+
+    private Task HandleSearchChanged(string value)
+    {
+        searchTerm = value;
+        EnsureSelection();
+        return Task.CompletedTask;
+    }
+
+    private void HandleStatusFilterChanged(string value)
+    {
+        statusFilter = value;
+        EnsureSelection();
+    }
+
+    private void HandleFilterStatusChanged(ChangeEventArgs args) =>
+        HandleStatusFilterChanged(args.Value?.ToString() ?? "all");
+
+    private void ClearFilters()
+    {
+        searchTerm = string.Empty;
+        statusFilter = "all";
+        EnsureSelection();
     }
 }

@@ -1,18 +1,22 @@
 @page "/financial/accounting-periods"
+@page "/financial/accounting-periods/new"
+@page "/financial/accounting-periods/{PeriodId:guid}/edit"
+@implements IDisposable
 @attribute [Authorize(Policy = CompanyAuthorizationPolicies.ActiveCompany)]
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject IGeneralJournalService GeneralJournalService
+@inject NavigationManager Navigation
 
 <PageTitle>Accounting periods</PageTitle>
 
-<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
-    <div>
-        <h1>Accounting periods</h1>
-        <p class="text-body-secondary mb-0">Create company accounting periods and control posting availability.</p>
-    </div>
-    <a class="btn btn-outline-secondary" href="/financial/journals">Back to journals</a>
-</div>
-
+@if (!string.IsNullOrWhiteSpace(statusMessage))
+{
+    <div class="alert alert-success" role="status">@statusMessage</div>
+}
+@if (!string.IsNullOrWhiteSpace(errorMessage) && !isPeriodCardOpen)
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+}
 @if (isLoading)
 {
     <p role="status" aria-live="polite">Loading accounting periods...</p>
@@ -24,120 +28,251 @@ else if (companyContextUnavailable)
 }
 else
 {
-    <section class="card mb-4" aria-labelledby="new-period-heading">
-        <div class="card-body">
-            <h2 id="new-period-heading" class="h4">New accounting period</h2>
-            <EditForm Model="@newPeriod" OnValidSubmit="CreatePeriodAsync" FormName="new-accounting-period">
-                <DataAnnotationsValidator />
-                <ValidationSummary class="alert alert-danger" />
-                @if (!string.IsNullOrWhiteSpace(errorMessage))
+    <RecordWorkspace Title="Accounting periods"
+                     IdPrefix="accounting-periods"
+                     StatusControlId="period-status-quick"
+                     StatusFilter="@statusFilter"
+                     StatusFilterChanged="HandleStatusFilterChanged"
+                     StatusOptionsOverride="@StatusOptions"
+                     AllStatusLabel="All"
+                     SearchPlaceholder="Search accounting periods"
+                     SearchTerm="@searchTerm"
+                     SearchTermChanged="HandleSearchChanged"
+                     HasRecords="@FilteredPeriods.Any()"
+                     EmptyMessage="@(periods.Count == 0 ? "No accounting periods have been created for this company." : "No accounting periods match the current search and filters.")">
+        <HeaderActions>
+            <a id="new-accounting-period-action" class="record-workspace-action"
+               href="/financial/accounting-periods/new">+ New</a>
+            <span class="record-workspace-separator" aria-hidden="true"></span>
+            <a class="record-workspace-action" href="/financial/journals">General journals</a>
+        </HeaderActions>
+        <FilterContent>
+            <label for="period-filter-status">Period status</label>
+            <select id="period-filter-status" class="form-select" value="@statusFilter"
+                    @onchange="HandleFilterStatusChanged">
+                @foreach (var option in StatusOptions)
                 {
-                    <div class="alert alert-danger" role="alert">@errorMessage</div>
+                    <option value="@option.Value">@option.Label</option>
                 }
-                <fieldset disabled="@isSaving">
-                    <div class="row g-3">
-                        <div class="col-md-4">
-                            <label class="form-label" for="period-name">Name</label>
-                            <InputText id="period-name" class="form-control" maxlength="32" @bind-Value="newPeriod.Name" />
-                            <ValidationMessage For="@(() => newPeriod.Name)" />
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label" for="period-start">Starts on</label>
-                            <InputDate id="period-start" class="form-control" TValue="DateOnly" @bind-Value="newPeriod.StartsOn" />
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label" for="period-end">Ends on</label>
-                            <InputDate id="period-end" class="form-control" TValue="DateOnly" @bind-Value="newPeriod.EndsOn" />
+            </select>
+            <button class="btn btn-link btn-sm mt-2 px-0" type="button" @onclick="ClearFilters">Clear filters</button>
+        </FilterContent>
+        <ListContent>
+            <div class="table-responsive">
+                <table class="table table-striped align-middle">
+                    <caption class="visually-hidden">Accounting periods for the active company</caption>
+                    <thead>
+                        <tr>
+                            <th scope="col">Name</th>
+                            <th scope="col">Starts on</th>
+                            <th scope="col">Ends on</th>
+                            <th scope="col">Closed</th>
+                            <th scope="col">Date locked</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var period in FilteredPeriods)
+                        {
+                            <tr class="@(selectedPeriodId == period.Id ? "record-row-selected" : null)"
+                                @onclick="() => SelectPeriod(period.Id)" @key="period.Id">
+                                <th scope="row">
+                                    <a id="@($"accounting-period-{period.Id}")" class="record-select"
+                                       href="@($"/financial/accounting-periods/{period.Id}/edit")"
+                                       @onclick:stopPropagation="true">@period.Name</a>
+                                </th>
+                                <td>@period.StartsOn.ToString("yyyy-MM-dd")</td>
+                                <td>@period.EndsOn.ToString("yyyy-MM-dd")</td>
+                                <td>@(period.IsClosed ? "Yes" : "No")</td>
+                                <td>@(period.DateLocked ? "Yes" : "No")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </ListContent>
+        <TallTilesContent>
+            <div class="record-tile-grid">
+                @foreach (var period in FilteredPeriods)
+                {
+                    <div class="record-tile tall @(selectedPeriodId == period.Id ? "selected" : null)"
+                         @onclick="() => SelectPeriod(period.Id)" @key="period.Id"
+                         tabindex="0" role="group"
+                         @onkeydown='args => { if (args.Key is "Enter" or " ") SelectPeriod(period.Id); }'>
+                        <a class="record-tile-title" href="@($"/financial/accounting-periods/{period.Id}/edit")"
+                           @onclick:stopPropagation="true">@period.Name</a>
+                        <span class="record-tile-meta">@period.StartsOn:yyyy-MM-dd – @period.EndsOn:yyyy-MM-dd</span>
+                        <span class="record-tile-meta">@(period.IsClosed ? "Closed" : "Open") · @(period.DateLocked ? "Date locked" : "Dates open")</span>
+                    </div>
+                }
+            </div>
+        </TallTilesContent>
+        <TilesContent>
+            <div class="record-tile-grid">
+                @foreach (var period in FilteredPeriods)
+                {
+                    <div class="record-tile @(selectedPeriodId == period.Id ? "selected" : null)"
+                         @onclick="() => SelectPeriod(period.Id)" @key="period.Id"
+                         tabindex="0" role="group"
+                         @onkeydown='args => { if (args.Key is "Enter" or " ") SelectPeriod(period.Id); }'>
+                        <a class="record-tile-title" href="@($"/financial/accounting-periods/{period.Id}/edit")"
+                           @onclick:stopPropagation="true">@period.Name</a>
+                        <span class="record-tile-meta">@(period.IsClosed ? "Closed" : "Open") · @(period.DateLocked ? "Date locked" : "Dates open")</span>
+                    </div>
+                }
+            </div>
+        </TilesContent>
+        <DetailsContent>
+            @if (SelectedPeriod is { } details)
+            {
+                <h3>@details.Name</h3>
+                <dl>
+                    <div><dt>Starts on</dt><dd>@details.StartsOn.ToString("yyyy-MM-dd")</dd></div>
+                    <div><dt>Ends on</dt><dd>@details.EndsOn.ToString("yyyy-MM-dd")</dd></div>
+                    <div><dt>Closed</dt><dd>@(details.IsClosed ? "Yes" : "No")</dd></div>
+                    <div><dt>Date locked</dt><dd>@(details.DateLocked ? "Yes" : "No")</dd></div>
+                </dl>
+            }
+            else
+            {
+                <p class="text-body-secondary">Select an accounting period to see its date range and posting status.</p>
+            }
+        </DetailsContent>
+    </RecordWorkspace>
+
+    @if (isPeriodCardOpen)
+    {
+        <EntityRecordCard Model="@periodInput" Save="SavePeriodAsync"
+                          Module="Finance" CardType="Accounting Period Card"
+                          Title="@periodInput.Name"
+                          IsNew="@(!editingPeriodId.HasValue)"
+                          OnClose="ClosePeriodCard"
+                          CanPrevious="@(BrowseTarget(-1).HasValue)"
+                          CanNext="@(BrowseTarget(1).HasValue)"
+                          OnBrowse="BrowseAsync"
+                          ReturnFocusSelector="@(editingPeriodId is { } id ? $"a[href='/financial/accounting-periods/{id}/edit']" : "#new-accounting-period-action")"
+                          ReturnFocusFallbackSelector="#new-accounting-period-action">
+            @if (!string.IsNullOrWhiteSpace(errorMessage))
+            {
+                <div class="alert alert-danger" role="alert">@errorMessage</div>
+            }
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label" for="period-name">Name</label>
+                    <InputText id="period-name" class="form-control" maxlength="32"
+                               disabled="@IsEditingPeriod" @bind-Value="periodInput.Name" />
+                    <ValidationMessage For="@(() => periodInput.Name)" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="period-start">Starts on</label>
+                    <InputDate id="period-start" class="form-control" TValue="DateOnly"
+                               disabled="@IsEditingPeriod" @bind-Value="periodInput.StartsOn" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="period-end">Ends on</label>
+                    <InputDate id="period-end" class="form-control" TValue="DateOnly"
+                               disabled="@IsEditingPeriod" @bind-Value="periodInput.EndsOn" />
+                </div>
+                @if (IsEditingPeriod)
+                {
+                    <div class="col-md-6">
+                        <div class="form-check">
+                            <InputCheckbox id="period-closed" class="form-check-input"
+                                           @bind-Value="periodInput.IsClosed" />
+                            <label class="form-check-label" for="period-closed">Closed</label>
                         </div>
                     </div>
-                </fieldset>
-                <button class="btn btn-primary mt-3" type="submit" disabled="@isSaving">
-                    @(isSaving ? "Creating..." : "Create period")
-                </button>
-            </EditForm>
-        </div>
-    </section>
-
-    @if (periods.Count == 0)
-    {
-        <div class="alert alert-info" role="status">No accounting periods have been created for this company.</div>
-    }
-    else
-    {
-        <div class="table-responsive">
-            <table class="table table-striped align-middle">
-                <caption class="visually-hidden">Accounting periods for the active company</caption>
-                <thead>
-                    <tr>
-                        <th scope="col">Name</th>
-                        <th scope="col">Date range</th>
-                        <th scope="col">Closed</th>
-                        <th scope="col">Date locked</th>
-                        <th scope="col"><span class="visually-hidden">Actions</span></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var period in periods)
-                    {
-                        var status = statusForms[period.Id];
-                        <tr>
-                            <th scope="row">@period.Name</th>
-                            <td>@period.StartsOn.ToString("yyyy-MM-dd") — @period.EndsOn.ToString("yyyy-MM-dd")</td>
-                            <td>
-                                <InputCheckbox class="form-check-input" aria-label="@($"Closed: {period.Name}")"
-                                               @bind-Value="status.IsClosed" />
-                            </td>
-                            <td>
-                                <InputCheckbox class="form-check-input" aria-label="@($"Date locked: {period.Name}")"
-                                               @bind-Value="status.DateLocked" />
-                            </td>
-                            <td>
-                                <button class="btn btn-sm btn-outline-primary" type="button"
-                                        disabled="@isSaving" @onclick="() => SaveStatusAsync(period.Id)">
-                                    Save status
-                                </button>
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
-        @if (!string.IsNullOrWhiteSpace(statusMessage))
-        {
-            <p class="alert alert-info" role="status">@statusMessage</p>
-        }
+                    <div class="col-md-6">
+                        <div class="form-check">
+                            <InputCheckbox id="period-date-locked" class="form-check-input"
+                                           @bind-Value="periodInput.DateLocked" />
+                            <label class="form-check-label" for="period-date-locked">Date locked</label>
+                        </div>
+                    </div>
+                }
+            </div>
+        </EntityRecordCard>
     }
 }
 
 @code {
-    private readonly Dictionary<Guid, PeriodStatusForm> statusForms = [];
-    private readonly AccountingPeriodInput newPeriod = CreateDefaultPeriod();
+    private static readonly (string Value, string Label)[] StatusOptions =
+    [
+        ("all", "All"),
+        ("open", "Open"),
+        ("closed", "Closed"),
+        ("locked", "Date locked")
+    ];
+
+    [Parameter] public Guid? PeriodId { get; set; }
+
     private IReadOnlyList<AccountingPeriodListItem> periods = [];
+    private PeriodRecordInput periodInput = CreateDefaultPeriod();
+    private Guid? selectedPeriodId;
+    private Guid? editingPeriodId;
+    private string searchTerm = string.Empty;
+    private string statusFilter = "all";
     private bool isLoading = true;
-    private bool isSaving;
+    private bool isPeriodCardOpen;
     private bool companyContextUnavailable;
     private string? errorMessage;
     private string? statusMessage;
 
-    protected override async Task OnInitializedAsync()
+    private bool IsEditingPeriod => editingPeriodId.HasValue;
+
+    private IEnumerable<AccountingPeriodListItem> FilteredPeriods => periods.Where(period =>
+        (statusFilter switch
+        {
+            "open" => !period.IsClosed,
+            "closed" => period.IsClosed,
+            "locked" => period.DateLocked,
+            _ => true
+        }) &&
+        (string.IsNullOrWhiteSpace(searchTerm) ||
+         period.Name.Contains(searchTerm.Trim(), StringComparison.OrdinalIgnoreCase)));
+
+    private AccountingPeriodListItem? SelectedPeriod =>
+        FilteredPeriods.SingleOrDefault(period => period.Id == selectedPeriodId);
+
+    protected override void OnInitialized() => Navigation.LocationChanged += OnLocationChanged;
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
     {
-        await LoadPeriodsAsync();
+        var path = new Uri(args.Location).AbsolutePath.TrimEnd('/');
+        if (path.Equals("/financial/accounting-periods/new", StringComparison.OrdinalIgnoreCase))
+        {
+            OpenNewPeriod();
+        }
+        else if (path.Equals("/financial/accounting-periods", StringComparison.OrdinalIgnoreCase))
+        {
+            isPeriodCardOpen = false;
+        }
+        _ = InvokeAsync(StateHasChanged);
     }
 
-    private async Task LoadPeriodsAsync()
+    public void Dispose() => Navigation.LocationChanged -= OnLocationChanged;
+
+    protected override async Task OnParametersSetAsync()
     {
+        errorMessage = null;
+        isPeriodCardOpen = false;
         try
         {
-            var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
-            periods = await GeneralJournalService.GetPeriodsAsync(user);
-            statusForms.Clear();
-            foreach (var period in periods)
+            if (isLoading)
             {
-                statusForms.Add(period.Id, new PeriodStatusForm
-                {
-                    IsClosed = period.IsClosed,
-                    DateLocked = period.DateLocked
-                });
+                await LoadAsync();
+            }
+            if (PeriodId is { } id)
+            {
+                OpenExistingPeriod(id);
+            }
+            else if (new Uri(Navigation.Uri).AbsolutePath.TrimEnd('/')
+                         .Equals("/financial/accounting-periods/new", StringComparison.OrdinalIgnoreCase))
+            {
+                OpenNewPeriod();
+            }
+            else
+            {
+                EnsureSelection();
             }
         }
         catch (UnauthorizedAccessException)
@@ -151,72 +286,133 @@ else
         }
     }
 
-    private async Task CreatePeriodAsync()
+    private async Task LoadAsync()
     {
-        isSaving = true;
-        errorMessage = null;
-        try
-        {
-            var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
-            await GeneralJournalService.CreatePeriodAsync(user, newPeriod);
-            statusMessage = "Accounting period created.";
-            await LoadPeriodsAsync();
-        }
-        catch (UnauthorizedAccessException)
-        {
-            companyContextUnavailable = true;
-            errorMessage = "Your active company is no longer available. Select an active company and try again.";
-        }
-        catch (ValidationException exception)
-        {
-            errorMessage = exception.Message;
-        }
-        finally
-        {
-            isSaving = false;
-        }
+        var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+        periods = await GeneralJournalService.GetPeriodsAsync(user);
+        EnsureSelection();
     }
 
-    private async Task SaveStatusAsync(Guid periodId)
+    private void EnsureSelection() =>
+        selectedPeriodId = RecordSelection.Reconcile(FilteredPeriods.Select(period => period.Id), selectedPeriodId);
+
+    private Guid? BrowseTarget(int offset) => editingPeriodId is { } id
+        ? RecordSelection.Adjacent(FilteredPeriods.Select(period => period.Id), id, offset)
+        : null;
+
+    private Task BrowseAsync(int offset)
     {
-        isSaving = true;
+        if (BrowseTarget(offset) is { } id)
+        {
+            Navigation.NavigateTo($"/financial/accounting-periods/{id}/edit");
+        }
+        else
+        {
+            ClosePeriodCard();
+        }
+        return Task.CompletedTask;
+    }
+
+    private void SelectPeriod(Guid id) => selectedPeriodId = id;
+
+    private void OpenExistingPeriod(Guid id)
+    {
+        statusMessage = null;
+        var period = periods.SingleOrDefault(candidate => candidate.Id == id);
+        if (period is null)
+        {
+            errorMessage = "The accounting period is not available in the active company.";
+            return;
+        }
+
+        selectedPeriodId = id;
+        editingPeriodId = id;
+        periodInput = new PeriodRecordInput
+        {
+            Name = period.Name,
+            StartsOn = period.StartsOn,
+            EndsOn = period.EndsOn,
+            IsClosed = period.IsClosed,
+            DateLocked = period.DateLocked
+        };
+        isPeriodCardOpen = true;
+    }
+
+    private void OpenNewPeriod()
+    {
         errorMessage = null;
         statusMessage = null;
-        try
-        {
-            var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
-            if (!await GeneralJournalService.UpdatePeriodStatusAsync(
-                    user,
-                    periodId,
-                    new AccountingPeriodStatusInput
-                    {
-                        IsClosed = statusForms[periodId].IsClosed,
-                        DateLocked = statusForms[periodId].DateLocked
-                    }))
-            {
-                errorMessage = "The accounting period was not found in the active company.";
-                return;
-            }
-
-            statusMessage = "Accounting period status saved.";
-            await LoadPeriodsAsync();
-        }
-        catch (UnauthorizedAccessException)
-        {
-            companyContextUnavailable = true;
-            errorMessage = "Your active company is no longer available. Select an active company and try again.";
-        }
-        finally
-        {
-            isSaving = false;
-        }
+        editingPeriodId = null;
+        periodInput = CreateDefaultPeriod();
+        isPeriodCardOpen = true;
     }
 
-    private static AccountingPeriodInput CreateDefaultPeriod()
+    private void ClosePeriodCard()
+    {
+        isPeriodCardOpen = false;
+        Navigation.NavigateTo("/financial/accounting-periods");
+    }
+
+    private async Task SavePeriodAsync(PeriodRecordInput snapshot)
+    {
+        var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+        if (editingPeriodId is { } id)
+        {
+            if (!await GeneralJournalService.UpdatePeriodStatusAsync(
+                    user,
+                    id,
+                    new AccountingPeriodStatusInput
+                    {
+                        IsClosed = snapshot.IsClosed,
+                        DateLocked = snapshot.DateLocked
+                    }))
+            {
+                throw new ValidationException("The accounting period was not found in the active company.");
+            }
+            statusMessage = "Accounting period status saved.";
+        }
+        else
+        {
+            var createdId = await GeneralJournalService.CreatePeriodAsync(user, new AccountingPeriodInput
+            {
+                Name = snapshot.Name,
+                StartsOn = snapshot.StartsOn,
+                EndsOn = snapshot.EndsOn
+            });
+            selectedPeriodId = createdId;
+            statusMessage = "Accounting period created.";
+        }
+        await LoadAsync();
+    }
+
+    private Task HandleSearchChanged(string value)
+    {
+        searchTerm = value;
+        EnsureSelection();
+        return Task.CompletedTask;
+    }
+
+    private void HandleStatusFilterChanged(string value)
+    {
+        statusFilter = value;
+        EnsureSelection();
+    }
+
+    private void HandleFilterStatusChanged(ChangeEventArgs args) =>
+        HandleStatusFilterChanged(args.Value?.ToString() ?? "all");
+
+    private void ClearFilters()
+    {
+        searchTerm = string.Empty;
+        statusFilter = "all";
+        EnsureSelection();
+    }
+
+    private static PeriodRecordInput CreateDefaultPeriod()
     {
         var today = DateOnly.FromDateTime(DateTime.Today);
         var startsOn = new DateOnly(today.Year, today.Month, 1);
-        return new AccountingPeriodInput
+        return new PeriodRecordInput
         {
             Name = startsOn.ToString("yyyy-MM"),
             StartsOn = startsOn,
@@ -224,8 +420,14 @@ else
         };
     }
 
-    private sealed class PeriodStatusForm
+    private sealed class PeriodRecordInput
     {
+        [Required]
+        [StringLength(32)]
+        public string Name { get; set; } = string.Empty;
+
+        public DateOnly StartsOn { get; set; }
+        public DateOnly EndsOn { get; set; }
         public bool IsClosed { get; set; }
         public bool DateLocked { get; set; }
     }

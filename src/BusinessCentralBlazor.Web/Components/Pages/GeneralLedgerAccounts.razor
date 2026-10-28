@@ -32,7 +32,7 @@ else
                      StatusControlId="account-status-quick"
                      StatusFilter="@statusFilter"
                      StatusFilterChanged="HandleWorkspaceStatusFilterChanged"
-                     AllStatusLabel="All accounts"
+                     AllStatusLabel="All"
                      SearchPlaceholder="Search accounts"
                      SearchTerm="@searchTerm"
                      SearchTermChanged="HandleSearchChanged"
@@ -40,7 +40,7 @@ else
                      EmptyMessage="@(accounts.Count == 0 ? "No accounts have been set up for this company yet. Create an account to get started." : "No accounts match the current search and filters.")">
         <HeaderActions>
             <button id="new-account-action" class="record-workspace-action" type="button" disabled="@isSaving"
-                    @onclick='() => Navigation.NavigateTo("/financial/general-ledger/accounts/new")'>+ New account</button>
+                    @onclick='() => Navigation.NavigateTo("/financial/general-ledger/accounts/new")'>+ New</button>
             <span class="record-workspace-separator" aria-hidden="true"></span>
             <button id="account-status-action" class="record-workspace-action" type="button"
                     disabled="@(SelectedAccount is null || isSaving)" @onclick="RequestStatusChange">
