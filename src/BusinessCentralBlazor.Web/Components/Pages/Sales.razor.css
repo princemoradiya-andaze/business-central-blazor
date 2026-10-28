@@ -610,10 +610,6 @@
     --bs-table-striped-bg: #b8e8eb;
 }
 
-.sales-workflow-section {
-    margin-bottom: 1.5rem;
-}
-
 @media (max-width: 760px) {
     .customer-action-bar {
         overflow: visible;
