@@ -1,0 +1,224 @@
+<section class="record-workspace" aria-label="@Title">
+    <header class="record-workspace-toolbar" aria-label="@($"{Title} actions")">
+        <h1>@Title</h1>
+        <span class="record-workspace-separator" aria-hidden="true"></span>
+        <div class="record-workspace-status-container" @onkeydown="HandleStatusKeyDown">
+            <label class="visually-hidden" for="@StatusControlId">Filter @Title</label>
+            <button id="@StatusControlId" class="record-workspace-status" type="button"
+                    aria-haspopup="menu" aria-expanded="@IsStatusMenuOpen"
+                    aria-controls="@($"{IdPrefix}-status-options")"
+                    @onclick="() => IsStatusMenuOpen = !IsStatusMenuOpen">
+                @CurrentStatusLabel
+                <span class="record-workspace-status-chevron" aria-hidden="true"></span>
+            </button>
+            <div id="@($"{IdPrefix}-status-options")" class="record-workspace-status-menu"
+                 role="menu" aria-label="@($"{Title} status")" hidden="@(!IsStatusMenuOpen)">
+                @foreach (var option in StatusOptions)
+                {
+                    <button class="record-workspace-status-option" type="button" role="menuitemradio"
+                            aria-checked="@(StatusFilter == option.Value)"
+                            @onclick="() => SetStatusFilter(option.Value)">
+                        <span class="record-workspace-status-check" aria-hidden="true">
+                            @(StatusFilter == option.Value ? "✓" : string.Empty)
+                        </span>
+                        <span>@option.Label</span>
+                    </button>
+                }
+            </div>
+        </div>
+        <button class="record-workspace-search-toggle" type="button" aria-label="@($"Search {Title}")"
+                aria-expanded="@IsSearchExpanded" aria-controls="@($"{IdPrefix}-search")"
+                title="@($"Search {Title}")" @onclick="ToggleSearchAsync">
+            <span class="record-workspace-search-icon" aria-hidden="true"></span>
+        </button>
+        <label class="visually-hidden" for="@($"{IdPrefix}-search")">Search @Title</label>
+        <input id="@($"{IdPrefix}-search")" @ref="SearchInput"
+               class="record-workspace-search @(IsSearchExpanded ? "expanded" : null)"
+               type="search" placeholder="@SearchPlaceholder" disabled="@(!IsSearchExpanded)"
+               tabindex="@(IsSearchExpanded ? 0 : -1)"
+               aria-hidden="@(IsSearchExpanded ? "false" : "true")"
+               value="@SearchTerm" @oninput="HandleSearchChanged"
+               @onkeydown="HandleSearchKeyDown" />
+        <span class="record-workspace-separator" aria-hidden="true"></span>
+        @if (HeaderActions is not null)
+        {
+            <div class="record-workspace-actions" aria-label="@($"{Title} actions")">
+                @HeaderActions
+            </div>
+        }
+        <div class="record-workspace-controls" role="group" aria-label="@($"{Title} view options")">
+            <button class="record-workspace-control @(IsFilterPaneOpen ? "active" : null)"
+                    type="button" aria-label="Filters" title="Filters"
+                    aria-pressed="@IsFilterPaneOpen"
+                    aria-controls="@($"{IdPrefix}-filter-pane")"
+                    @onclick="ToggleFilterPane">
+                <svg aria-hidden="true" viewBox="0 0 16 16"><path d="M2 3h12L9.2 8.4v4l-2.4 1.3V8.4z" /></svg>
+            </button>
+            <div class="record-workspace-view-menu-container">
+                <button class="record-workspace-control @(IsViewMenuOpen ? "active" : null)"
+                        type="button" aria-label="Choose view" title="Choose view"
+                        aria-haspopup="menu" aria-expanded="@IsViewMenuOpen"
+                        aria-controls="@($"{IdPrefix}-view-menu")"
+                        @onclick="() => IsViewMenuOpen = !IsViewMenuOpen">
+                    <svg aria-hidden="true" viewBox="0 0 16 16"><path d="M2 3h12M2 8h12M2 13h12M5 2v2M5 7v2M5 12v2" /></svg>
+                </button>
+                <div id="@($"{IdPrefix}-view-menu")" class="record-workspace-view-menu"
+                     role="menu" aria-label="@($"{Title} view")" hidden="@(!IsViewMenuOpen)">
+                    @foreach (var option in ViewOptions)
+                    {
+                        <button class="record-workspace-view-option" type="button" role="menuitemradio"
+                                aria-checked="@(View == option.Value)"
+                                @onclick="() => SetView(option.Value)">
+                            <span class="record-workspace-view-check" aria-hidden="true">
+                                @(View == option.Value ? "✓" : string.Empty)
+                            </span>
+                            <span class="record-workspace-view-option-icon" aria-hidden="true">@option.Icon</span>
+                            <span>@option.Label</span>
+                        </button>
+                    }
+                </div>
+            </div>
+            <button class="record-workspace-control @(IsDetailsPaneOpen ? "active" : null)"
+                    type="button" aria-label="@($"{Title} details")" title="Details"
+                    aria-pressed="@IsDetailsPaneOpen"
+                    aria-controls="@($"{IdPrefix}-details-pane")"
+                    @onclick="ToggleDetailsPane">
+                <svg aria-hidden="true" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.5" /><path d="M8 7v4M8 4.5v.1" /></svg>
+            </button>
+        </div>
+    </header>
+
+    <div class="record-workspace-layout @(IsFilterPaneOpen ? "record-filter-open" : null) @(IsDetailsPaneOpen ? "record-details-open" : null)">
+        <aside id="@($"{IdPrefix}-filter-pane")" class="record-workspace-filter-pane"
+              aria-label="@($"{Title} filters")" hidden="@(!IsFilterPaneOpen)">
+            <div class="record-workspace-pane-heading">
+                <h2>Filters</h2>
+                <button class="record-workspace-pane-close" type="button" aria-label="Close filters" @onclick="ToggleFilterPane">×</button>
+            </div>
+            <label for="@($"{IdPrefix}-filter-search")">Name or number</label>
+            <input id="@($"{IdPrefix}-filter-search")" class="form-control" type="search"
+                   value="@SearchTerm" @oninput="HandleSearchChanged" />
+            @if (FilterContent is not null)
+            {
+                @FilterContent
+            }
+        </aside>
+
+        <div class="record-workspace-records @(View == "tiles" ? "record-view-tiles" : View == "tall-tiles" ? "record-view-tall-tiles" : null)">
+            @if (!HasRecords)
+            {
+                <p class="record-workspace-empty" role="status">@EmptyMessage</p>
+            }
+            else if (View == "tall-tiles")
+            {
+                @TallTilesContent
+            }
+            else if (View == "tiles")
+            {
+                @TilesContent
+            }
+            else
+            {
+                @ListContent
+            }
+        </div>
+
+        <aside id="@($"{IdPrefix}-details-pane")" class="record-workspace-details-pane"
+              aria-label="@($"{Title} details")" hidden="@(!IsDetailsPaneOpen)">
+            <div class="record-workspace-pane-heading">
+                <h2>@Title details</h2>
+                <button class="record-workspace-pane-close" type="button" aria-label="@($"Close {Title} details")" @onclick="ToggleDetailsPane">×</button>
+            </div>
+            @if (DetailsContent is not null)
+            {
+                @DetailsContent
+            }
+        </aside>
+    </div>
+</section>
+
+@code {
+    private static readonly (string Value, string Label, string Icon)[] ViewOptions =
+    [
+        ("list", "List", "☷"),
+        ("tall-tiles", "Tall tiles", "▣"),
+        ("tiles", "Tiles", "▦")
+    ];
+
+    private (string Value, string Label)[] StatusOptions =>
+    [
+        ("all", AllStatusLabel),
+        ("active", "Active"),
+        ("blocked", "Blocked")
+    ];
+
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter] public string IdPrefix { get; set; } = "record-workspace";
+    [Parameter] public string SearchPlaceholder { get; set; } = "Search";
+    [Parameter] public string SearchTerm { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> SearchTermChanged { get; set; }
+    [Parameter] public string StatusControlId { get; set; } = "record-workspace-status";
+    [Parameter] public string StatusFilter { get; set; } = "all";
+    [Parameter] public EventCallback<string> StatusFilterChanged { get; set; }
+    [Parameter] public string AllStatusLabel { get; set; } = "All";
+    [Parameter] public bool HasRecords { get; set; }
+    [Parameter] public string EmptyMessage { get; set; } = "No records match the current filters.";
+    [Parameter] public RenderFragment? HeaderActions { get; set; }
+    [Parameter] public RenderFragment? FilterContent { get; set; }
+    [Parameter] public RenderFragment? ListContent { get; set; }
+    [Parameter] public RenderFragment? TallTilesContent { get; set; }
+    [Parameter] public RenderFragment? TilesContent { get; set; }
+    [Parameter] public RenderFragment? DetailsContent { get; set; }
+
+    private string View { get; set; } = "list";
+    private bool IsFilterPaneOpen { get; set; }
+    private bool IsDetailsPaneOpen { get; set; }
+    private bool IsViewMenuOpen { get; set; }
+    private bool IsStatusMenuOpen { get; set; }
+    private bool IsSearchExpanded { get; set; }
+    private ElementReference SearchInput { get; set; }
+    private string CurrentStatusLabel =>
+        StatusOptions.Single(option => option.Value == StatusFilter).Label;
+
+    private async Task HandleSearchChanged(ChangeEventArgs args) =>
+        await SearchTermChanged.InvokeAsync(args.Value?.ToString() ?? string.Empty);
+
+    private async Task ToggleSearchAsync()
+    {
+        IsSearchExpanded = !IsSearchExpanded;
+        if (IsSearchExpanded)
+        {
+            await InvokeAsync(StateHasChanged);
+            await SearchInput.FocusAsync();
+            return;
+        }
+
+        await SearchTermChanged.InvokeAsync(string.Empty);
+    }
+
+    private Task HandleSearchKeyDown(KeyboardEventArgs args) =>
+        args.Key == "Escape" && IsSearchExpanded ? ToggleSearchAsync() : Task.CompletedTask;
+
+    private void HandleStatusKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key == "Escape")
+        {
+            IsStatusMenuOpen = false;
+        }
+    }
+
+    private async Task SetStatusFilter(string filter)
+    {
+        IsStatusMenuOpen = false;
+        await StatusFilterChanged.InvokeAsync(filter);
+    }
+
+    private void SetView(string view)
+    {
+        View = view;
+        IsViewMenuOpen = false;
+    }
+
+    private void ToggleFilterPane() => IsFilterPaneOpen = !IsFilterPaneOpen;
+    private void ToggleDetailsPane() => IsDetailsPaneOpen = !IsDetailsPaneOpen;
+}

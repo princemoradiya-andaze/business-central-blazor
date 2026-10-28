@@ -1,0 +1,527 @@
+.record-workspace {
+    min-width: 0;
+}
+
+.record-workspace-toolbar {
+    display: flex;
+    min-height: 2rem;
+    align-items: center;
+    gap: 0;
+    overflow: visible;
+    border-bottom: 1px solid #dfe4ea;
+    background: transparent;
+}
+
+.record-workspace-toolbar h1 {
+    flex: 0 0 auto;
+    margin: 0;
+    color: #17212b;
+    font-size: 1rem;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.record-workspace ::deep .record-workspace-separator {
+    width: 1px;
+    height: 1.5rem;
+    flex: 0 0 1px;
+    margin: 0 0.35rem;
+    background: #cbd2d9;
+}
+
+.record-workspace-status-container,
+.record-workspace-view-menu-container {
+    position: relative;
+}
+
+.record-workspace-status-container {
+    z-index: 1;
+    flex: 0 0 auto;
+}
+
+.record-workspace-status,
+.record-workspace-status-option,
+.record-workspace-view-option,
+.record-workspace-actions ::deep .record-workspace-action,
+.record-workspace-search-toggle,
+.record-workspace-control {
+    border: 0;
+    color: #005b85;
+    background: transparent;
+    font: inherit;
+}
+
+.record-workspace-status {
+    display: inline-flex;
+    min-height: 2rem;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.25rem 0.4rem;
+    font-size: 0.875rem;
+    white-space: nowrap;
+}
+
+.record-workspace-status:hover,
+.record-workspace-status:focus-visible,
+.record-workspace-search-toggle:hover,
+.record-workspace-search-toggle:focus-visible,
+.record-workspace-control:hover,
+.record-workspace-control:focus-visible,
+.record-workspace-control.active {
+    color: #004d70;
+    background: #d8f3f3;
+    outline: none;
+}
+
+.record-workspace-status-chevron {
+    width: 0.42rem;
+    height: 0.42rem;
+    margin: -0.2rem 0 0 0.1rem;
+    border-right: 1px solid currentColor;
+    border-bottom: 1px solid currentColor;
+    transform: rotate(45deg);
+}
+
+.record-workspace-status-menu,
+.record-workspace-view-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 12;
+    min-width: 100%;
+    padding: 0.2rem 0;
+    border: 1px solid #cbd2d9;
+    background: #fff;
+    box-shadow: 0 3px 8px rgb(20 40 60 / 18%);
+}
+
+.record-workspace-status-menu[hidden],
+.record-workspace-view-menu[hidden] {
+    display: none;
+}
+
+.record-workspace-status-option,
+.record-workspace-view-option {
+    display: flex;
+    width: 100%;
+    min-height: 2.25rem;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.35rem 0.55rem;
+    color: #005b85;
+    font-size: 0.82rem;
+    text-align: left;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.record-workspace-status-option:hover,
+.record-workspace-status-option:focus-visible,
+.record-workspace-view-option:hover,
+.record-workspace-view-option:focus-visible,
+.record-workspace-view-option[aria-checked="true"] {
+    background: #d8f3f3;
+    outline: none;
+}
+
+.record-workspace-status-check,
+.record-workspace-view-check {
+    width: 0.85rem;
+    flex: 0 0 0.85rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.record-workspace-search-toggle {
+    display: grid;
+    width: 2rem;
+    height: 2rem;
+    flex: 0 0 2rem;
+    place-items: center;
+    padding: 0;
+    cursor: pointer;
+}
+
+.record-workspace-search-icon {
+    position: relative;
+    display: block;
+    width: 0.9rem;
+    height: 0.9rem;
+    border: 1.5px solid currentColor;
+    border-radius: 50%;
+}
+
+.record-workspace-search-icon::after {
+    position: absolute;
+    right: -0.35rem;
+    bottom: -0.15rem;
+    width: 0.45rem;
+    height: 1.5px;
+    background: currentColor;
+    content: "";
+    transform: rotate(45deg);
+    transform-origin: left center;
+}
+
+.record-workspace-search {
+    width: 0;
+    min-width: 0;
+    flex: 0 1 0;
+    box-sizing: border-box;
+    height: 2rem;
+    padding: 0;
+    border: 0;
+    opacity: 0;
+    pointer-events: none;
+    font: inherit;
+    transition: width 0.18s ease, opacity 0.18s ease, padding 0.18s ease;
+}
+
+.record-workspace-search.expanded {
+    width: 14rem;
+    flex-basis: 14rem;
+    padding: 0.25rem 0.6rem;
+    border: 1px solid #cbd5df;
+    border-radius: 0;
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.record-workspace-actions,
+.record-workspace-controls {
+    display: inline-flex;
+    min-width: 0;
+    align-items: center;
+    gap: 0;
+}
+
+.record-workspace-actions {
+    min-height: 2rem;
+    flex: 0 0 auto;
+}
+
+.record-workspace-actions ::deep .record-workspace-action {
+    display: inline-flex;
+    min-height: 2rem;
+    align-items: center;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.82rem;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.record-workspace-actions ::deep .record-workspace-action:hover,
+.record-workspace-actions ::deep .record-workspace-action:focus-visible {
+    color: #004d70;
+    background: #d8f3f3;
+    text-decoration: none;
+}
+
+.record-workspace-actions ::deep .record-workspace-action:disabled {
+    color: #98a2b3;
+    background: transparent;
+    cursor: not-allowed;
+}
+
+.record-workspace-controls {
+    flex: 0 0 auto;
+    margin-left: auto;
+}
+
+.record-workspace-control {
+    display: grid;
+    width: 2.15rem;
+    height: 2rem;
+    place-items: center;
+    padding: 0;
+    cursor: pointer;
+}
+
+.record-workspace-control svg {
+    width: 1rem;
+    height: 1rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.25;
+}
+
+.record-workspace-view-menu {
+    top: calc(100% + 0.3rem);
+    right: 0;
+    left: auto;
+    min-width: 10rem;
+    padding: 0.25rem 0;
+    border: 1px solid #cbd2d9;
+    box-shadow: 0 3px 8px rgb(20 40 60 / 18%);
+}
+
+.record-workspace-view-option-icon {
+    width: 1rem;
+    flex: 0 0 1rem;
+    text-align: center;
+}
+
+.record-workspace-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.9rem;
+    align-items: start;
+    margin-top: 0.75rem;
+}
+
+.record-workspace-layout.record-filter-open {
+    grid-template-columns: minmax(13rem, 16rem) minmax(0, 1fr);
+}
+
+.record-workspace-layout.record-details-open {
+    grid-template-columns: minmax(0, 1fr) minmax(15rem, 18rem);
+}
+
+.record-workspace-layout.record-filter-open.record-details-open {
+    grid-template-columns: minmax(12rem, 14rem) minmax(16rem, 1fr) minmax(14rem, 17rem);
+}
+
+.record-workspace-filter-pane,
+.record-workspace-details-pane {
+    min-width: 0;
+    padding: 0.85rem 0.9rem;
+    border: 1px solid #e0e5e9;
+    background: #fff;
+}
+
+.record-workspace-filter-pane[hidden],
+.record-workspace-details-pane[hidden] {
+    display: none;
+}
+
+.record-workspace-pane-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.8rem;
+}
+
+.record-workspace-pane-heading h2 {
+    margin: 0;
+    color: #344054;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.record-workspace-pane-close {
+    display: grid;
+    width: 1.8rem;
+    height: 1.8rem;
+    place-items: center;
+    border: 0;
+    color: #667085;
+    background: transparent;
+    font-size: 1.2rem;
+    cursor: pointer;
+}
+
+.record-workspace-pane-close:hover,
+.record-workspace-pane-close:focus-visible {
+    color: #005e6b;
+    background: #e8f6f6;
+}
+
+.record-workspace-filter-pane ::deep label {
+    display: block;
+    margin: 0.8rem 0 0.35rem;
+    color: #475467;
+    font-size: 0.78rem;
+}
+
+.record-workspace-filter-pane ::deep .form-control,
+.record-workspace-filter-pane ::deep .form-select {
+    min-height: 2.15rem;
+    border-radius: 0;
+    font-size: 0.82rem;
+}
+
+.record-workspace-records {
+    min-width: 0;
+}
+
+.record-workspace-empty {
+    margin: 0;
+    padding: 1.25rem;
+    color: #667085;
+    background: #fff;
+}
+
+.record-workspace-details-pane ::deep h3 {
+    margin: 0 0 0.8rem;
+    font-size: 1.05rem;
+}
+
+.record-workspace-details-pane ::deep dl {
+    margin: 0;
+}
+
+.record-workspace-details-pane ::deep dl > div {
+    padding: 0.55rem 0;
+    border-top: 1px solid #e3e7eb;
+}
+
+.record-workspace-details-pane ::deep dt {
+    color: #667085;
+    font-size: 0.72rem;
+    font-weight: 600;
+}
+
+.record-workspace-details-pane ::deep dd {
+    margin: 0.15rem 0 0;
+    overflow-wrap: anywhere;
+    font-size: 0.84rem;
+}
+
+.record-workspace-records ::deep .table {
+    --bs-table-bg: transparent;
+    --bs-table-striped-bg: rgb(255 255 255 / 45%);
+    --bs-table-border-color: #d5dce1;
+    min-width: 40rem;
+    margin: 0;
+    font-size: 0.82rem;
+}
+
+.record-workspace-records ::deep .table th {
+    color: #475467;
+    font-weight: 500;
+}
+
+.record-workspace-records ::deep .table th,
+.record-workspace-records ::deep .table td {
+    vertical-align: middle;
+}
+
+.record-workspace-records ::deep .table tbody tr {
+    cursor: pointer;
+}
+
+.record-workspace-records ::deep .table tbody tr:hover,
+.record-workspace-records ::deep .record-row-selected {
+    --bs-table-bg: #b8e8eb;
+    --bs-table-striped-bg: #b8e8eb;
+}
+
+.record-workspace-records ::deep .table tbody tr:focus-within {
+    outline: 2px solid #008caa;
+    outline-offset: -2px;
+}
+
+.record-workspace-records ::deep .record-select {
+    padding: 0;
+    border: 0;
+    color: #007c91;
+    background: transparent;
+    font: inherit;
+    font-weight: 600;
+    text-align: left;
+    text-decoration: underline;
+}
+
+.record-workspace-records ::deep .record-tile-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(11.5rem, 1fr));
+    gap: 0.65rem;
+}
+
+.record-workspace-records ::deep .record-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.2rem;
+    padding: 0.65rem 0.75rem;
+    border: 1px solid #dfe4ea;
+    color: #17212b;
+    background: #fff;
+    text-align: left;
+    cursor: pointer;
+}
+
+.record-workspace-records ::deep .record-tile:hover,
+.record-workspace-records ::deep .record-tile:focus-visible {
+    border-color: #82cdd1;
+    outline: 2px solid #82cdd1;
+    outline-offset: 1px;
+}
+
+.record-workspace-records ::deep .record-tile.tall {
+    min-height: 17rem;
+}
+
+.record-workspace-records.record-view-tall-tiles ::deep .record-tile-grid {
+    grid-template-columns: repeat(auto-fill, minmax(11.5rem, 1fr));
+}
+
+.record-workspace-records.record-view-tiles ::deep .record-tile-grid {
+    grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+}
+
+.record-workspace-records.record-view-tiles ::deep .record-tile {
+    min-height: 6rem;
+    flex-direction: row;
+    align-items: center;
+    padding: 0.5rem;
+}
+
+.record-workspace-records.record-view-tiles ::deep .record-tile > * {
+    min-width: 0;
+}
+
+.record-workspace-records ::deep .record-tile.selected {
+    border-color: #79cbd0;
+    background: #d8f1f2;
+}
+
+.record-workspace-records ::deep .record-tile-title {
+    color: #007c91;
+    font-size: 0.88rem;
+    font-weight: 550;
+    overflow-wrap: anywhere;
+}
+
+.record-workspace-records ::deep .record-tile-meta {
+    color: #667085;
+    font-size: 0.72rem;
+    overflow-wrap: anywhere;
+}
+
+@media (max-width: 760px) {
+    .record-workspace-toolbar {
+        overflow: visible;
+        flex-wrap: wrap;
+    }
+
+    .record-workspace-actions {
+        overflow: visible;
+        flex-wrap: wrap;
+    }
+
+    .record-workspace-controls {
+        margin-left: auto;
+    }
+
+    .record-workspace-layout,
+    .record-workspace-layout.record-filter-open,
+    .record-workspace-layout.record-details-open,
+    .record-workspace-layout.record-filter-open.record-details-open {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .record-workspace-filter-pane,
+    .record-workspace-details-pane {
+        grid-column: 1;
+    }
+
+    .record-workspace-search.expanded {
+        width: min(14rem, 30vw);
+        flex-basis: min(14rem, 30vw);
+    }
+}

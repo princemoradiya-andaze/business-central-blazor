@@ -1,0 +1,39 @@
+<WorkspaceCardDialog OnClose="OnClose" IsSaving="@IsSaving"
+                     LabelledBy="@($"{IdPrefix}-status-heading")"
+                     DescribedBy="@($"{IdPrefix}-status-explanation")"
+                     ReturnFocusSelector="@($"#{IdPrefix}-status-action")"
+                     ReturnFocusFallbackSelector="@ReturnFocusFallbackSelector">
+    <div class="workspace-card-top">
+        <button class="workspace-card-back" type="button" aria-label="Close status confirmation"
+                disabled="@IsSaving" @onclick="OnClose">&#8592;</button>
+        <span>@ActionLabel</span>
+    </div>
+    <h2 id="@($"{IdPrefix}-status-heading")" class="workspace-card-title">@ActionLabel</h2>
+    <div class="workspace-card-commands">
+        <span>Home</span>
+        <button type="button" disabled="@IsSaving" @onclick="OnConfirm">
+            @(IsSaving ? "Saving..." : $"Confirm {ActionLabel.ToLowerInvariant()}")
+        </button>
+        <button type="button" disabled="@IsSaving" autofocus @onclick="OnClose">Cancel</button>
+    </div>
+    <div class="workspace-card-body">
+        @if (!string.IsNullOrWhiteSpace(ErrorMessage))
+        {
+            <div class="alert alert-danger" role="alert">@ErrorMessage</div>
+        }
+        <p id="@($"{IdPrefix}-status-explanation")">@ActionLabel @RecordLabel? Existing records and history are retained. The module's existing posting and validation rules still apply.</p>
+    </div>
+</WorkspaceCardDialog>
+
+@code {
+    [Parameter, EditorRequired] public string IdPrefix { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string RecordLabel { get; set; } = string.Empty;
+    [Parameter] public bool IsBlocked { get; set; }
+    [Parameter] public bool IsSaving { get; set; }
+    [Parameter] public string? ErrorMessage { get; set; }
+    [Parameter] public string ReturnFocusFallbackSelector { get; set; } = "button";
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback OnConfirm { get; set; }
+
+    private string ActionLabel => IsBlocked ? "Reactivate" : "Block";
+}

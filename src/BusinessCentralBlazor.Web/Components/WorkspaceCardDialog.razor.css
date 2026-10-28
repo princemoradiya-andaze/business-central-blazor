@@ -1,0 +1,98 @@
+.workspace-card-dialog {
+    width: min(960px, calc(100vw - 48px));
+    max-height: calc(100dvh - 48px);
+    padding: 0;
+    border: 0;
+    color: #252525;
+    background: #fff;
+    box-shadow: 0 20px 60px #0003;
+    overflow: auto;
+}
+
+.workspace-card-dialog[open] {
+    display: flex;
+    flex-direction: column;
+}
+
+.workspace-card-dialog::backdrop {
+    background: rgb(0 0 0 / 26%);
+}
+
+.workspace-card-dialog ::deep .workspace-card-top {
+    display: flex;
+    min-height: 3rem;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.45rem 1rem;
+    border-bottom: 1px solid #e3e7eb;
+    color: #475467;
+    font-size: 0.82rem;
+}
+
+.workspace-card-dialog ::deep .workspace-card-back {
+    width: 2rem;
+    height: 2rem;
+    border: 0;
+    color: inherit;
+    background: transparent;
+    font-size: 1.2rem;
+}
+
+.workspace-card-dialog ::deep .workspace-card-title {
+    margin: 0;
+    padding: 0.85rem 1.25rem 0.5rem;
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.workspace-card-dialog ::deep .workspace-card-commands {
+    display: flex;
+    min-height: 2.8rem;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.4rem 1.25rem;
+    border-top: 1px solid #e3e7eb;
+    border-bottom: 1px solid #e3e7eb;
+    background: #f8f9fa;
+    font-size: 0.78rem;
+}
+
+.workspace-card-dialog ::deep .workspace-card-commands span {
+    flex: 1;
+    color: #667085;
+}
+
+.workspace-card-dialog ::deep .workspace-card-commands button {
+    padding: 0.3rem 0.75rem;
+    border: 0;
+    border-radius: 0.2rem;
+    color: #006f82;
+    background: transparent;
+    font: inherit;
+    font-weight: 600;
+}
+
+.workspace-card-dialog ::deep .workspace-card-commands button:hover,
+.workspace-card-dialog ::deep .workspace-card-commands button:focus-visible {
+    background: #e8f4f6;
+}
+
+.workspace-card-dialog ::deep .workspace-card-body {
+    padding: 1rem 1.25rem 1.25rem;
+    overflow: auto;
+}
+
+.workspace-card-dialog ::deep .workspace-card-section {
+    margin: 0 0 0.9rem;
+    padding-bottom: 0.45rem;
+    border-bottom: 1px solid #e3e7eb;
+    font-size: 0.95rem;
+    font-weight: 600;
+}
+
+@media (max-width: 700px) {
+    .workspace-card-dialog {
+        width: calc(100vw - 20px);
+        max-height: calc(100dvh - 20px);
+    }
+}

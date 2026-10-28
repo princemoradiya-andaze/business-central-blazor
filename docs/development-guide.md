@@ -60,6 +60,13 @@ The `AddWorkspaceNotes` EF migration has been applied to the documented local de
 
 ## General-ledger inquiry and trial balance
 
+The Chart of Accounts at `/financial/general-ledger/accounts` is a company-scoped workspace with
+List, Tall tiles, and Tiles views, independently toggleable Filters and Details panes, search,
+status/category filters, selection, and modal account cards for New/Edit. The details pane retains
+the account hierarchy and direct-posting setup and links to account activity; the Trial balance
+shortcut and the existing full-page account form routes remain available. Blocking and reactivating
+use the existing account update operation and do not add a delete workflow.
+
 The authenticated financial menu links to company-scoped posted entries at `/financial/general-ledger/entries`, account activity at `/financial/general-ledger/accounts/{accountId}/activity`, and the trial balance at `/financial/general-ledger/trial-balance`. Entry search supports inclusive posting-date bounds, account selection, and a document-number substring. Account activity reports opening debit/credit balances before the start date, debit/credit totals within the selected range, and the resulting closing balance. The trial balance includes posting accounts and their net debit or credit balances through the selected date, inclusive, with reconciling totals.
 
 These reports read immutable `GeneralLedgerEntries` only. Account and active-company scope is resolved server-side for every operation; posted entries cannot be edited or deleted through inquiry screens. This feature reuses the existing schema and requires no migration.
@@ -79,6 +86,11 @@ directly-postable Asset G/L account. Configure `CompanySettings.BaseCurrencyCode
 references, never online-banking credentials. Bank codes and G/L mappings are company-unique. Names,
 identifiers and blocked status can be edited; G/L remapping is rejected once journals, statements or
 posted activity exist.
+
+Bank setup uses the shared List, Tall tiles, and Tiles workspace with independent Filters and Details
+panes, search, status filtering, selection, modal New/Edit cards, and the existing block/reactivate
+status operation. The Details pane links to the existing receipt, payment, statement, and reconciliation
+workflow; it does not replace or alter those transaction screens.
 
 The bank detail page creates a balanced draft CashReceipts or Payments journal atomically with its
 bank link. A positive receipt debits the bank and credits the selected offset; a positive payment does
@@ -127,6 +139,20 @@ item balance and G/L in the same transaction. Receipts recalculate weighted-aver
 the current average and cannot create negative stock, and generic journal reversal is blocked for
 inventory-linked batches. Correct posted stock movements with a compensating inventory movement.
 The initial slice uses one company-wide balance per item and does not include warehouses or bins.
+
+The item list provides List, Tall tiles, and Tiles views, independent Filters and Details panes,
+search, active/blocked filtering, selection, and modal New/Edit cards. Blocking/reactivating uses the
+existing item update operation. The Items screen contains only the workspace and its card dialogs.
+Stock movement drafts and movement history are on `/financial/inventory/movements`, reachable from
+Inventory > Create stock movement / Movement history and from the selected item's Details pane.
+The separate workflow retains the same company authorization, validation, costing, and journal posting rules.
+
+Items, Bank accounts, and Chart of Accounts share the Vendors-style transparent command bar over the
+`#f5f6f7` workspace background. Flat commands, separators, and filter fields supplied through component
+fragments use scoped `::deep` selectors rooted in the shared workspace, so their styles apply across
+Blazor's CSS-isolation boundary (including the Trial balance command). Block/Reactivate uses a native
+confirmation dialog; Cancel, Close, and Escape do not update a record, and successful confirmation
+still calls the existing module service with its normal validation and concurrency checks.
 
 Migration `20261013035640_AddInventoryFoundation` has been applied to the local
 `BusinessCentralBlazor_Phase0` database on `.\BCDEMO`; migration history, the `InventoryMovements`
