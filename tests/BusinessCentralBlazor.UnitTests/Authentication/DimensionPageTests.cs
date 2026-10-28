@@ -46,6 +46,21 @@ public sealed class DimensionPageTests(AuthenticationWebApplicationFactory facto
         Assert.Contains("DEPT", listHtml, StringComparison.Ordinal);
         Assert.Contains("Department", listHtml, StringComparison.Ordinal);
         Assert.Contains("/financial/dimensions/new", listHtml, StringComparison.Ordinal);
+        var allPosition = listHtml.IndexOf("id=\"dimension-status-quick\"", StringComparison.Ordinal);
+        var newPosition = listHtml.IndexOf("id=\"new-dimension-action\"", StringComparison.Ordinal);
+        Assert.True(allPosition >= 0 && newPosition > allPosition, "The New action must follow All in the toolbar.");
+        Assert.Contains("record-row-selected", listHtml, StringComparison.Ordinal);
+
+        using var newDimensionResponse = await client.GetAsync("/financial/dimensions/new");
+        var newDimensionHtml = await newDimensionResponse.Content.ReadAsStringAsync();
+        Assert.Equal(HttpStatusCode.OK, newDimensionResponse.StatusCode);
+        Assert.Contains("New Dimension Card", newDimensionHtml, StringComparison.Ordinal);
+        Assert.Contains("id=\"dimension-code\"", newDimensionHtml, StringComparison.Ordinal);
+
+        using var editDimensionResponse = await client.GetAsync($"/financial/dimensions/{dimensionId}/edit");
+        var editDimensionHtml = await editDimensionResponse.Content.ReadAsStringAsync();
+        Assert.Equal(HttpStatusCode.OK, editDimensionResponse.StatusCode);
+        Assert.Contains("DEPT — Department", editDimensionHtml, StringComparison.Ordinal);
 
         using var dimensionResponse = await client.GetAsync($"/financial/dimensions/{dimensionId}");
         var dimensionHtml = await dimensionResponse.Content.ReadAsStringAsync();

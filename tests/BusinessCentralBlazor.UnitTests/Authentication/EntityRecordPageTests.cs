@@ -20,6 +20,7 @@ public sealed class EntityRecordPageTests(AuthenticationWebApplicationFactory fa
     [InlineData("/financial/inventory", "record-row-selected", "item-number", "Item Card")]
     [InlineData("/financial/banks", "record-row-selected", "bank-code", "Bank Account Card")]
     [InlineData("/financial/general-ledger/accounts", "record-row-selected", "account-number", "G/L Account Card")]
+    [InlineData("/financial/tax-setup", "record-row-selected", "tax-code", "Tax Code Card")]
     public async Task AllListsSelectFirstAndLinkToSharedEditableCards(string route, string selectedClass,
         string fieldId, string cardType)
     {
@@ -32,6 +33,12 @@ public sealed class EntityRecordPageTests(AuthenticationWebApplicationFactory fa
         {
             var db = scope.ServiceProvider.GetRequiredService<ErpDbContext>();
             var postingId = Guid.NewGuid();
+            var liabilityId = Guid.NewGuid();
+            if (route.EndsWith("tax-setup", StringComparison.Ordinal))
+            {
+                db.Add(new GeneralLedgerAccount { Id = postingId, CompanyId = company.CompanyId, Number = "9000", Name = "Tax recoverable", Category = AccountCategory.Asset, Type = AccountType.Posting, AllowsDirectPosting = true });
+                db.Add(new GeneralLedgerAccount { Id = liabilityId, CompanyId = company.CompanyId, Number = "9100", Name = "Tax payable", Category = AccountCategory.Liability, Type = AccountType.Posting, AllowsDirectPosting = true });
+            }
             if (route.EndsWith("customers", StringComparison.Ordinal) || route.EndsWith("inventory", StringComparison.Ordinal))
                 db.Add(new GeneralLedgerAccount { Id = postingId, CompanyId = company.CompanyId, Number = "9000", Name = "Posting account", Category = AccountCategory.Asset, Type = AccountType.Posting, AllowsDirectPosting = true });
             foreach (var (id, number, name) in new[] { (lastId, "2000", "Second record"), (firstId, "1000", "First record") })
@@ -44,6 +51,8 @@ public sealed class EntityRecordPageTests(AuthenticationWebApplicationFactory fa
                     db.Add(new Item { Id = id, CompanyId = company.CompanyId, Number = number, Description = name, Type = ItemType.Inventory, BaseUnitOfMeasure = "EA", InventoryAccountId = postingId, InventoryIncreaseOffsetAccountId = postingId, InventoryIssueExpenseAccountId = postingId });
                 else if (route.EndsWith("banks", StringComparison.Ordinal))
                     db.Add(new BankAccount { Id = id, CompanyId = company.CompanyId, Code = number, Name = name, CurrencyCode = "USD" });
+                else if (route.EndsWith("tax-setup", StringComparison.Ordinal))
+                    db.Add(new TaxCode { Id = id, CompanyId = company.CompanyId, Code = number, Description = name, LiabilityAccountId = liabilityId, RecoverableAccountId = postingId });
                 else
                     db.Add(new GeneralLedgerAccount { Id = id, CompanyId = company.CompanyId, Number = number, Name = name, Category = AccountCategory.Asset, Type = AccountType.Posting });
             }

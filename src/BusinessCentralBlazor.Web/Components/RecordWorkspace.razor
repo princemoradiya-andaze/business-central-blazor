@@ -146,6 +146,7 @@
     ];
 
     private (string Value, string Label)[] StatusOptions =>
+        StatusOptionsOverride?.ToArray() ??
     [
         ("all", AllStatusLabel),
         ("active", "Active"),
@@ -161,6 +162,7 @@
     [Parameter] public string StatusFilter { get; set; } = "all";
     [Parameter] public EventCallback<string> StatusFilterChanged { get; set; }
     [Parameter] public string AllStatusLabel { get; set; } = "All";
+    [Parameter] public IReadOnlyList<(string Value, string Label)>? StatusOptionsOverride { get; set; }
     [Parameter] public bool HasRecords { get; set; }
     [Parameter] public string EmptyMessage { get; set; } = "No records match the current filters.";
     [Parameter] public RenderFragment? HeaderActions { get; set; }

@@ -4,7 +4,7 @@
 
 <WorkspaceCardDialog OnClose="CloseAsync" LabelledBy="entity-card-heading"
                      ReturnFocusSelector="@ReturnFocusSelector" ReturnFocusFallbackSelector="@ReturnFocusFallbackSelector">
-    <NavigationLock ConfirmExternalNavigation="@session.HasChanges" OnBeforeInternalNavigation="BeforeNavigationAsync" />
+    <NavigationLock ConfirmExternalNavigation="@(session.HasChanges || HasPendingRelatedChanges)" OnBeforeInternalNavigation="BeforeNavigationAsync" />
     <div class="entity-card-frame">
         <div class="entity-card-top">
             <button class="entity-card-icon entity-card-back" type="button" aria-label="Close record card" @onclick="CloseAsync">
@@ -13,7 +13,7 @@
             <span class="entity-card-breadcrumb">@Module / @CardType</span>
             <span class="entity-card-status" role="status" aria-live="polite">
                 @(session.IsSaving ? "Saving..." : session.Error is not null ? "Unsaved changes - error" :
-                    session.HasChanges || IsNew ? "Unsaved changes" : "Saved")
+                    session.HasChanges || HasPendingRelatedChanges || IsNew ? "Unsaved changes" : "Saved")
             </span>
         </div>
         <h2 id="entity-card-heading" class="entity-card-title">@(IsNew ? $"New {CardType}" : Title)</h2>
@@ -26,9 +26,12 @@
                     <button type="submit" disabled="@session.IsSaving">Save</button>
                     <button type="button" disabled="@session.IsSaving" @onclick="DiscardAsync">Cancel</button>
                 }
-                else if (session.HasChanges || session.Error is not null)
+                else if (session.HasChanges || session.Error is not null || HasPendingRelatedChanges)
                 {
-                    <button type="button" disabled="@session.IsSaving" @onclick="FlushAsync">Retry save</button>
+                    @if (session.HasChanges || session.Error is not null)
+                    {
+                        <button type="button" disabled="@session.IsSaving" @onclick="FlushAsync">Retry save</button>
+                    }
                     <button type="button" disabled="@session.IsSaving" @onclick="DiscardAsync">Discard changes and close</button>
                 }
             </div>
@@ -76,6 +79,7 @@
     [Parameter] public bool IsNew { get; set; }
     [Parameter] public bool CanPrevious { get; set; }
     [Parameter] public bool CanNext { get; set; }
+    [Parameter] public bool HasPendingRelatedChanges { get; set; }
     [Parameter] public EventCallback<int> OnBrowse { get; set; }
     [Parameter] public EventCallback OnClose { get; set; }
     [Parameter] public string ReturnFocusSelector { get; set; } = "a";
@@ -86,9 +90,12 @@
     private bool navigating;
     private T? activeModel;
     private string? navigationMessage;
+    private bool hadPendingRelatedChanges;
 
     protected override void OnParametersSet()
     {
+        if (hadPendingRelatedChanges && !HasPendingRelatedChanges) navigationMessage = null;
+        hadPendingRelatedChanges = HasPendingRelatedChanges;
         if (ReferenceEquals(activeModel, Model)) return;
         if (activeModel is not null)
         {
@@ -124,6 +131,7 @@
     private async Task CloseAsync()
     {
         if (leaving || navigating) return;
+        if (BlockForRelatedChanges()) return;
         if (IsNew)
         {
             await DiscardAsync();
@@ -141,6 +149,7 @@
     private async Task BrowseAsync(int offset)
     {
         if (leaving || navigating) return;
+        if (BlockForRelatedChanges()) return;
         navigating = true;
         if (await session.FlushAsync())
         {
@@ -162,12 +171,24 @@
     private async Task BeforeNavigationAsync(LocationChangingContext args)
     {
         if (leaving) return;
+        if (BlockForRelatedChanges())
+        {
+            args.PreventNavigation();
+            return;
+        }
         if (IsNew ? session.HasChanges : !await session.FlushAsync())
         {
             if (IsNew)
                 navigationMessage = "Save the new record or Cancel to discard it before leaving.";
             args.PreventNavigation();
         }
+    }
+
+    private bool BlockForRelatedChanges()
+    {
+        if (!HasPendingRelatedChanges) return false;
+        navigationMessage = "Save or cancel the related record before leaving this card.";
+        return true;
     }
 
     public void Dispose()
