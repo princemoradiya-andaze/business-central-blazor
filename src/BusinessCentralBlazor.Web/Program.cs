@@ -48,6 +48,8 @@ builder.Services.AddScoped<ITaxSetupService, TaxSetupService>();
 builder.Services.AddScoped<IGeneralLedgerInquiryService, GeneralLedgerInquiryService>();
 builder.Services.AddScoped<IBankService, BankService>();
 builder.Services.AddScoped<ICompanySettingsService, CompanySettingsService>();
+builder.Services.AddScoped<ICompanyInformationService, CompanyInformationService>();
+builder.Services.AddScoped<CompanyProfileEvents>();
 builder.Services.AddScoped<InventoryService>();
 builder.Services.AddScoped<IInventoryService>(services => services.GetRequiredService<InventoryService>());
 builder.Services.AddScoped<IInventoryJournalPostingService>(

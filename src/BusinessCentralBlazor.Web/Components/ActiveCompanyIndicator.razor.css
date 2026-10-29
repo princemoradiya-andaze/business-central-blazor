@@ -12,6 +12,15 @@
     font-weight: 600;
     text-overflow: ellipsis;
     white-space: nowrap;
+    text-decoration: none;
+}
+
+a.company-name:hover,
+a.company-name:focus-visible {
+    color: #17212b;
+    text-decoration: underline;
+    text-decoration-color: #000;
+    text-underline-offset: 3px;
 }
 
 .company-code {

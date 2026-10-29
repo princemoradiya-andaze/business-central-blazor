@@ -1,0 +1,20 @@
+.profile-title { font-size: 40px; font-weight: 300; padding: 14px 6% 20px; margin: 0; }
+.profile-status { margin-left: auto; }
+.profile-icon { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 32px; width: 32px; height: 32px; padding: 0; border: 0; background: transparent; color: #00838f; }
+.profile-icon svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.5; }
+.profile-fieldset { border: 0; padding: 0; min-width: 0; }
+.profile-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 36px; }
+.profile-column { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.profile-column > div { display: grid; grid-template-columns: minmax(110px, .9fr) minmax(100px, 1.3fr); gap: 12px; align-items: center; }
+.profile-column label { display: flex; align-items: baseline; gap: 8px; color: #526775; font-size: 12px; }
+.profile-column label::after { content: ""; flex: 1; border-bottom: 2px dotted #d4dce1; }
+.profile-column ::deep input { width: 100%; min-width: 0; border: 1px solid #8797a2; border-radius: 0; padding: 5px 8px; min-height: 32px; font-size: 13px; }
+.profile-column ::deep input:focus { outline: 1px solid #00838f; }
+.profile-column ::deep input[type=file] { font-size: 11px; margin-top: 8px; }
+.profile-column .profile-picture { align-items: start; }
+.profile-logo { border: 1px solid #cad1d6; height: 108px; display: grid; place-items: center; color: #72858f; background: #fafcfc; overflow: hidden; }
+.profile-logo img { max-width: 100%; max-height: 106px; object-fit: contain; }
+.profile-picture button { background: transparent; border: 0; color: #007c88; font-size: 12px; margin: 6px 0; }
+.profile-help { color: #687b85; font-size: 12px; line-height: 1.7; }
+.communication-heading { margin-top: 36px; }
+@media(max-width:800px) { .profile-columns { grid-template-columns: 1fr; gap: 12px; } .profile-title { font-size: 30px; } }

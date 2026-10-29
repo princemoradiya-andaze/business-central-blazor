@@ -160,7 +160,7 @@ public sealed class SalesPageTests(AuthenticationWebApplicationFactory factory)
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains("Customers", html, StringComparison.Ordinal);
         Assert.Contains("class=\"customer-action-bar\"", html, StringComparison.Ordinal);
-        Assert.Contains(">+ New</a>", html, StringComparison.Ordinal);
+        Assert.Matches("<span class=\"workspace-new-icon\" aria-hidden=\"true\"[^>]*></span>New</a>", html);
         Assert.DoesNotContain(">Edit</button>", html, StringComparison.Ordinal);
         Assert.Contains("Delete", html, StringComparison.Ordinal);
         Assert.Contains("Search customers", html, StringComparison.Ordinal);

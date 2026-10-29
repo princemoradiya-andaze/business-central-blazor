@@ -20,6 +20,43 @@ public sealed class AuthenticationFlowTests(AuthenticationWebApplicationFactory 
     public Task DisposeAsync() => Task.CompletedTask;
 
     [Fact]
+    public async Task EmailNextAndBackAreAntiforgeryProtectedAndDoNotAuthenticate()
+    {
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        using var initial = await client.GetAsync("/account/login?ReturnUrl=%2Ffinancial%2Fcompany-settings");
+        var html = await initial.Content.ReadAsStringAsync();
+        Assert.Contains(">Next</button>", html);
+        Assert.DoesNotContain("name=\"Input.Password\"", html);
+        var match = Regex.Match(html, "name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"");
+        var token = HttpUtility.HtmlDecode(match.Groups[1].Value);
+        using var noToken = await client.PostAsync("/account/login?handler=Next",
+            new FormUrlEncodedContent(new Dictionary<string, string> { ["Input.Email"] = TestEmail }));
+        // Status-code re-execution challenges the protected not-found page.
+        Assert.Equal(HttpStatusCode.Redirect, noToken.StatusCode);
+        Assert.Contains("/account/login", noToken.Headers.Location!.ToString());
+        using var next = await client.PostAsync("/account/login?handler=Next", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = token, ["Input.Email"] = TestEmail, ["ReturnUrl"] = "/financial/company-settings"
+        }));
+        var passwordHtml = await next.Content.ReadAsStringAsync();
+        Assert.Contains("Enter password", passwordHtml);
+        Assert.Contains("Change email address", passwordHtml);
+        Assert.Contains("name=\"Input.Password\"", passwordHtml);
+        Assert.Contains("method=\"post\" action=\"/account/login\"", passwordHtml);
+        using var home = await client.GetAsync("/");
+        Assert.Equal(HttpStatusCode.Redirect, home.StatusCode);
+        using var back = await client.PostAsync("/account/login?handler=Back", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = token, ["Input.Email"] = TestEmail, ["Input.Password"] = "ShouldNotEcho",
+            ["ReturnUrl"] = "https://example.invalid"
+        }));
+        var backHtml = await back.Content.ReadAsStringAsync();
+        Assert.Contains(">Next</button>", backHtml);
+        Assert.DoesNotContain("ShouldNotEcho", backHtml);
+        Assert.DoesNotContain("https://example.invalid", backHtml);
+    }
+
+    [Fact]
     public void IdentityDefaultsRequireStrongPasswordsAndEnableLockout()
     {
         var options = new IdentityOptions();

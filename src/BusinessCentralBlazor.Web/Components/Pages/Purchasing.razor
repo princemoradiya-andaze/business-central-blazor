@@ -16,7 +16,7 @@
 <PageTitle>@Title</PageTitle>
 @if (isLoading)
 {
-    <p role="status">Loading purchasing...</p>
+    <LoadingIndicator />
 }
 else if (companyUnavailable)
 {
@@ -36,7 +36,7 @@ else
         <HeaderActions>
             @if (section == "orders")
             {
-                <a id="new-purchase-order-action" class="record-workspace-action" href="/financial/purchasing/orders/new">+ New</a>
+                <a id="new-purchase-order-action" class="record-workspace-action" href="/financial/purchasing/orders/new"><span class="workspace-new-icon" aria-hidden="true"></span>New</a>
                 <a class="record-workspace-action" href="/financial/purchasing/fulfillment">Receive and invoice</a>
             }
             else

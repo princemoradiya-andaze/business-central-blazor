@@ -34,6 +34,15 @@ See [the architecture overview](docs/architecture/overview.md), [the schema disc
 
 ## Development workflow
 
+The global **Settings > Company Information** card edits the active company's core profile
+and logo, independently of base-currency settings. **Environment: Local** opens a searchable
+Available Companies panel above the current page or card without losing its draft. The header
+remains usable above cards, background scrolling is locked, and real loading states cover the
+entire screen, including the header. Sign-in uses email/Next followed by password/Sign in;
+authentication remains the existing local ASP.NET Core Identity flow, not Microsoft SSO.
+Apply the additive `AddCompanyInformation` migration before using the profile card
+(see the development guide).
+
 **More** contains Home (unchanged) and **Company Settings**, which uses the shared financial detail
 layout. Its **New Currency** card uses the shared card dialog with Save/Cancel, General fields,
 and SVG expand/restore. Shared-catalog creation and active-company base-currency saving remain

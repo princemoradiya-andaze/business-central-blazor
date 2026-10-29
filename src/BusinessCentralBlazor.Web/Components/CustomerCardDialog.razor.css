@@ -1,4 +1,7 @@
 .customer-card-dialog {
+    position: fixed;
+    inset: 56px 0 auto;
+    margin: 0 auto;
     width: min(1240px, calc(100vw - 80px));
     height: 760px;
     max-height: calc(100dvh - 70px);
@@ -26,6 +29,6 @@
 @media (max-width: 800px) {
     .customer-card-dialog {
         width: calc(100vw - 24px);
-        max-height: calc(100dvh - 24px);
+        max-height: calc(100dvh - 70px);
     }
 }

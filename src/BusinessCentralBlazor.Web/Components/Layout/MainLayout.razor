@@ -9,34 +9,55 @@
             <span class="app-launcher" aria-hidden="true">▦</span>
             <span class="brand-name">Business Central Blazor</span>
         </a>
-        <div class="global-actions">
-            <span class="environment-label">Environment <strong>Local</strong></span>
+        <div class="global-actions" @ref="settingsMenuContainer" @onkeydown="HandleHeaderKey">
+            <button type="button" class="environment-label" id="environment-company-toggle" aria-label="Available Companies"
+                    @onclick="OpenCompaniesAsync">Environment <strong>Local</strong></button>
             <AuthorizeView>
                 <Authorized>
-                    <div class="settings-menu-container" @ref="settingsMenuContainer">
+                    <button type="button" class="header-action" id="global-search-toggle" aria-label="Search pages and reports" title="Search pages and reports" @onclick="OpenSearchAsync">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="14" cy="10" r="7" /><path d="m9 15-7 7" /></svg>
+                    </button>
+                    <button type="button" class="header-action" id="global-notifications-toggle" aria-label="Notifications" title="Notifications" @onclick="OpenNotificationsAsync">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 17h14l-2-3V8a5 5 0 0 0-10 0v6Zm5 3h4" /></svg>
+                    </button>
+                    <div class="settings-menu-container">
                         <button type="button"
-                                class="settings-toggle"
+                                class="settings-toggle header-action"
+                                id="global-settings-toggle"
                                 aria-label="Settings"
                                 title="Settings"
-                                aria-expanded="@isSettingsOpen"
+                                aria-expanded="@(isSettingsOpen ? "true" : "false")"
                                 aria-controls="global-settings-menu"
                                 @onclick="ToggleSettings">
-                            <span aria-hidden="true">⚙</span>
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M9 2h6l.5 2 1.6.9 2-.6 3 5.2-1.5 1.4v2.2l1.5 1.4-3 5.2-2-.6-1.6.9-.5 2H9l-.5-2-1.6-.9-2 .6-3-5.2 1.5-1.4v-2.2L1.9 9.5l3-5.2 2 .6L8.5 4Z" />
+                                <circle cx="12" cy="12" r="3" />
+                            </svg>
                         </button>
                         <div class="settings-menu"
                              id="global-settings-menu"
                              role="menu"
                              aria-label="Settings menu"
                              hidden="@(!isSettingsOpen)">
-                            <div class="settings-menu-header">Settings</div>
-                            <a href="/account/company" role="menuitem" @onclick="CloseSettings">Change company</a>
+                            <a href="/account/company" role="menuitem" @onclick="OpenCompaniesAsync" @onclick:preventDefault>Change company</a>
+                            <a href="/?companyInformation=1" id="company-information-link" role="menuitem" @onclick="OpenInformationAsync" @onclick:preventDefault>Company Information</a>
                             <a href="/financial/company-settings" role="menuitem" @onclick="CloseSettings">Company workspace settings</a>
                         </div>
                     </div>
-                    <form method="post" action="/account/logout">
-                        <AntiforgeryToken />
-                        <button type="submit">Sign out</button>
-                    </form>
+                    <div class="account-menu-container">
+                        <button type="button" class="header-action account-toggle" id="global-account-toggle" aria-label="Signed-in user"
+                                title="@context.User.Identity?.Name" aria-expanded="@(isAccountOpen ? "true" : "false")"
+                                aria-controls="global-account-menu" @onclick="ToggleAccount">
+                            <span class="account-avatar" aria-hidden="true">@AccountInitial(context.User)</span>
+                        </button>
+                        <div class="account-menu" id="global-account-menu" hidden="@(!isAccountOpen)">
+                            <div class="account-identity">@context.User.Identity?.Name</div>
+                            <form method="post" action="/account/logout">
+                                <AntiforgeryToken />
+                                <button type="submit">Sign out</button>
+                            </form>
+                        </div>
+                    </div>
                 </Authorized>
             </AuthorizeView>
         </div>
@@ -52,6 +73,8 @@
     </main>
 </div>
 
+<AuthorizeView><Authorized><GlobalWorkspaceOverlays @ref="overlays" /></Authorized></AuthorizeView>
+
 <div id="blazor-error-ui" data-nosnippet>
     An unhandled error has occurred.
     <a href="." class="reload">Reload</a>
@@ -60,10 +83,14 @@
 
 @code {
     private bool isSettingsOpen;
+    private bool isAccountOpen;
+    private GlobalWorkspaceOverlays? overlays;
+    private bool initialOverlayChecked;
     private ElementReference settingsMenuContainer;
     private IJSObjectReference? outsideClickModule;
     private DotNetObjectReference<MainLayout>? dotNetReference;
     private int? outsideClickListenerId;
+    private bool resetContentScroll;
     private bool IsVendorsPage => Navigation.ToBaseRelativePath(Navigation.Uri)
         .Split('?', '#')[0].Equals("financial/purchasing/vendors", StringComparison.OrdinalIgnoreCase);
     private bool IsCustomersListPage
@@ -119,6 +146,17 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (resetContentScroll)
+        {
+            resetContentScroll = false;
+            await JS.InvokeVoidAsync("globalWorkspace.resetContentScroll");
+        }
+        if (!initialOverlayChecked && overlays is not null)
+        {
+            initialOverlayChecked = true;
+            if (new Uri(Navigation.Uri).Query.Contains("companyInformation=1", StringComparison.Ordinal))
+                await overlays.OpenInformationAsync();
+        }
         if (outsideClickListenerId is not null || settingsMenuContainer.Context is null)
         {
             return;
@@ -133,29 +171,64 @@
             nameof(CloseSettingsFromOutside));
     }
 
-    private void ToggleSettings() => isSettingsOpen = !isSettingsOpen;
+    private void ToggleSettings() { isAccountOpen = false; isSettingsOpen = !isSettingsOpen; }
+    private void ToggleAccount() { isSettingsOpen = false; isAccountOpen = !isAccountOpen; }
+    private static string AccountInitial(System.Security.Claims.ClaimsPrincipal user)
+    {
+        var name = user.Identity?.Name;
+        return string.IsNullOrWhiteSpace(name) ? "U" : System.Globalization.StringInfo.GetNextTextElement(name.Trim()).ToUpperInvariant();
+    }
+    private void HandleHeaderKey(KeyboardEventArgs args)
+    {
+        if (args.Key == "Escape") { isAccountOpen = false; CloseSettings(); }
+    }
+    private async Task OpenSearchAsync()
+    {
+        isAccountOpen = false; CloseSettings();
+        if (overlays is not null) await overlays.OpenSearchAsync();
+    }
+    private async Task OpenNotificationsAsync()
+    {
+        isAccountOpen = false; CloseSettings();
+        if (overlays is not null) await overlays.OpenNotificationsAsync();
+    }
 
     private void CloseSettings() => isSettingsOpen = false;
+    private async Task OpenInformationAsync()
+    {
+        isAccountOpen = false;
+        CloseSettings();
+        if (overlays is not null) await overlays.OpenInformationAsync();
+    }
+    private async Task OpenCompaniesAsync()
+    {
+        isAccountOpen = false;
+        CloseSettings();
+        if (overlays is not null) await overlays.OpenCompaniesAsync();
+    }
 
     [JSInvokable]
     public Task CloseSettingsFromOutside()
     {
-        if (!isSettingsOpen)
+        if (!isSettingsOpen && !isAccountOpen)
         {
             return Task.CompletedTask;
         }
 
         isSettingsOpen = false;
+        isAccountOpen = false;
         return InvokeAsync(StateHasChanged);
     }
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
     {
-        if (isSettingsOpen)
+        resetContentScroll = true;
+        if (isSettingsOpen || isAccountOpen)
         {
             isSettingsOpen = false;
-            _ = InvokeAsync(StateHasChanged);
+            isAccountOpen = false;
         }
+        _ = InvokeAsync(StateHasChanged);
     }
 
     public async ValueTask DisposeAsync()

@@ -8,15 +8,21 @@
     <ResourcePreloader />
     <link rel="stylesheet" href="@Assets["lib/bootstrap/dist/css/bootstrap.min.css"]" />
     <link rel="stylesheet" href="@Assets["app.css"]" />
+    <link rel="stylesheet" href="@Assets["global-workspace.css"]" />
     <link rel="stylesheet" href="@Assets["BusinessCentralBlazor.Web.styles.css"]" />
+    <link rel="stylesheet" href="@Assets["workspace-toolbar.css"]" />
     <ImportMap />
     <link rel="icon" type="image/png" href="favicon.png" />
     <HeadOutlet />
 </head>
 
 <body>
+    <div id="workspace-transition-loader" class="app-loading" role="status" tabindex="-1">
+        <span class="app-loading-spinner" aria-hidden="true"></span><span>Getting ready...</span>
+    </div>
     <Routes @rendermode="InteractiveServer" />
     <ReconnectModal />
+    <script src="@Assets["js/globalWorkspace.js"]"></script>
     <script src="@Assets["_framework/blazor.web.js"]"></script>
 </body>
 

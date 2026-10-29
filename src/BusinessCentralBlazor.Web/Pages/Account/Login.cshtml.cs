@@ -20,6 +20,25 @@ public sealed class LoginModel(
     [BindProperty(SupportsGet = true)]
     public string? ReturnUrl { get; set; }
 
+    public bool PasswordStep { get; private set; }
+
+    public IActionResult OnPostNext()
+    {
+        ReturnUrl = GetLocalReturnUrl(ReturnUrl);
+        ModelState.Remove("Input.Password");
+        PasswordStep = ModelState.IsValid;
+        Input.Password = "";
+        return Page();
+    }
+
+    public IActionResult OnPostBack()
+    {
+        ReturnUrl = GetLocalReturnUrl(ReturnUrl);
+        Input.Password = "";
+        ModelState.Clear();
+        return Page();
+    }
+
     public IActionResult OnGet()
     {
         ReturnUrl = GetLocalReturnUrl(ReturnUrl);
@@ -30,6 +49,7 @@ public sealed class LoginModel(
 
     public async Task<IActionResult> OnPostAsync()
     {
+        PasswordStep = true;
         ReturnUrl = GetLocalReturnUrl(ReturnUrl);
         if (!ModelState.IsValid)
         {

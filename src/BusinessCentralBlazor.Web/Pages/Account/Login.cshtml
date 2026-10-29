@@ -1,54 +1,54 @@
 @page "/account/login"
 @model BusinessCentralBlazor.Web.Pages.Account.LoginModel
-@{
-    Layout = null;
-    ViewData["Title"] = "Sign in";
-}
+@{ Layout = null; }
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"] - Business Central Blazor</title>
-    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
-    <link rel="stylesheet" href="~/app.css" />
-    <link rel="stylesheet" href="~/account.css" asp-append-version="true" />
+    <title>Sign in - Business Central Blazor</title>
+    <link rel="stylesheet" href="~/global-workspace.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/signin.css" asp-append-version="true" />
 </head>
-<body class="account-body">
-    <main class="account-page">
-        <section class="account-card" aria-labelledby="page-title">
-            <a class="account-brand" href="/" aria-label="Business Central Blazor home">
-                <span class="account-brand-mark" aria-hidden="true">BC</span>
-                <span>Business Central <span class="account-brand-light">Blazor</span></span>
-            </a>
-            <div class="account-card-content">
-                <p class="account-eyebrow">Your business workspace</p>
-                <h1 id="page-title">Welcome back</h1>
-                <p class="account-description">Sign in with an account provided by your administrator.</p>
-                <form method="post">
-                    @Html.AntiForgeryToken()
-                    <input type="hidden" asp-for="ReturnUrl" />
-                    <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
-                    <div class="mb-3">
-                        <label asp-for="Input.Email" class="form-label"></label>
-                        <input asp-for="Input.Email" class="form-control form-control-lg" autocomplete="username" />
-                        <span asp-validation-for="Input.Email" class="text-danger"></span>
+<body>
+    <main class="signin-page">
+        <section class="signin-card" aria-labelledby="page-title">
+            <a class="signin-brand" href="/"><span aria-hidden="true">BC</span>Business Central Blazor</a>
+            <form method="post" action="/account/login">
+                @Html.AntiForgeryToken()
+                <input type="hidden" asp-for="ReturnUrl" />
+                <div asp-validation-summary="ModelOnly" class="signin-error" role="alert"></div>
+                @if (Model.PasswordStep)
+                {
+                    <div class="signin-identity">
+                        <button type="submit" asp-page-handler="Back" formnovalidate aria-label="Change email address">&#8592;</button>
+                        <span>@Model.Input.Email</span>
                     </div>
-                    <div class="mb-3">
-                        <label asp-for="Input.Password" class="form-label"></label>
-                        <input asp-for="Input.Password" class="form-control form-control-lg" autocomplete="current-password" />
-                        <span asp-validation-for="Input.Password" class="text-danger"></span>
-                    </div>
-                    <div class="form-check mb-4">
-                        <input asp-for="Input.RememberMe" class="form-check-input" />
-                        <label asp-for="Input.RememberMe" class="form-check-label"></label>
-                    </div>
-                    <button type="submit" class="btn btn-primary btn-lg w-100">Sign in</button>
-                </form>
-                <p class="account-help">Need access? Contact your system administrator.</p>
-            </div>
+                    <input type="hidden" asp-for="Input.Email" />
+                    <span asp-validation-for="Input.Email" class="signin-error"></span>
+                    <h1 id="page-title">Enter password</h1>
+                    <label class="sr-only" asp-for="Input.Password"></label>
+                    <input asp-for="Input.Password" class="signin-input" placeholder="Password" autocomplete="current-password" required autofocus />
+                    <span asp-validation-for="Input.Password" class="signin-error"></span>
+                    <p class="signin-help">Need access? Contact your system administrator.</p>
+                    <label class="signin-remember"><input asp-for="Input.RememberMe" /> Remember me</label>
+                    <div class="signin-actions"><button type="submit" class="signin-primary">Sign in</button></div>
+                }
+                else
+                {
+                    <h1 id="page-title">Sign in</h1>
+                    <label class="sr-only" asp-for="Input.Email"></label>
+                    <input asp-for="Input.Email" class="signin-input" placeholder="Email address" autocomplete="username" required autofocus />
+                    <span asp-validation-for="Input.Email" class="signin-error"></span>
+                    <input type="hidden" asp-for="Input.RememberMe" />
+                    <p>Use the account provided by your administrator.</p>
+                    <div class="signin-actions"><button type="submit" asp-page-handler="Next" class="signin-primary">Next</button></div>
+                }
+            </form>
         </section>
-        <p class="account-footer">Secure access to your company workspace</p>
+        <p class="signin-footer">Secure access to your company workspace</p>
     </main>
+    <div class="app-loading" id="account-loader" role="status" hidden><span class="app-loading-spinner" aria-hidden="true"></span><span>Getting ready...</span></div>
+    <script src="~/js/accountLoading.js" asp-append-version="true"></script>
 </body>
 </html>

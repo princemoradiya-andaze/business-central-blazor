@@ -7,7 +7,7 @@
 
 <PageTitle>General Ledger Entries</PageTitle>
 @if (errorMessage is not null) { <div class="alert alert-danger" role="alert">@errorMessage</div> }
-@if (loading) { <p role="status">Loading general ledger entries...</p> }
+@if (loading) { <LoadingIndicator /> }
 else if (loaded)
 {
     <div hidden="@analysisMode">
@@ -43,7 +43,7 @@ else if (loaded)
             </EditForm>
         </FilterContent>
         <ContextContent>
-            @if (busy) { <p role="status">Loading entries...</p> }
+            @if (busy) { <LoadingIndicator /> }
         </ContextContent>
         <ListContent>
             <div class="table-responsive"><table class="table table-striped align-middle">

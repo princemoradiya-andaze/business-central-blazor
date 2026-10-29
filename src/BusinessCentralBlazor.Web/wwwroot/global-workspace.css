@@ -1,0 +1,13 @@
+.workspace-scroll-locked, .workspace-scroll-locked body { overflow: hidden !important; }
+.workspace-scroll-locked .workspace-main { overflow: hidden !important; }
+.workspace-layer-shade { position: fixed; inset: 46px 0 0; background: rgb(0 0 0 / 22%); }
+.workspace-layer-shade[hidden], .app-loading[hidden] { display: none !important; }
+.app-loading { position: fixed; inset: 0; background: #fff; z-index: 10000; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 13px; font: 13px "Segoe UI", sans-serif; color: #009cac; }
+.app-loading-spinner { width: 32px; height: 32px; border: 1px solid #a9e3eb; border-top-color: #009dad; border-radius: 50%; animation: workspace-spin 1s linear infinite; }
+@keyframes workspace-spin { to { transform: rotate(360deg); } }
+@media(prefers-reduced-motion: reduce) { .app-loading-spinner { animation: none; border-width: 2px; } }
+.workspace-card-dialog { overscroll-behavior: contain; }
+.workspace-card-dialog.global-search-dialog { inset: 46px 0 auto; margin: 0 auto; width: min(900px, calc(100vw - 32px)); height: auto; max-width: 100vw; max-height: calc(100dvh - 60px); padding: 0; overflow: hidden; }
+.workspace-card-dialog.global-search-dialog[open] { display: flex; flex-direction: column; }
+.workspace-card-dialog.global-search-dialog.search-expanded { width: calc(100vw - 24px); height: calc(100dvh - 60px); }
+#blazor-error-ui { z-index: 11000 !important; }

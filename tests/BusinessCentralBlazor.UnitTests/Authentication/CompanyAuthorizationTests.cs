@@ -102,8 +102,8 @@ public sealed class CompanyAuthorizationTests(AuthenticationWebApplicationFactor
         Assert.Equal(HttpStatusCode.OK, accessDenied.StatusCode);
         var accessDeniedHtml = await accessDenied.Content.ReadAsStringAsync();
         Assert.Contains("/account/company", accessDeniedHtml, StringComparison.Ordinal);
-        Assert.Contains("account-card", accessDeniedHtml, StringComparison.Ordinal);
-        Assert.Contains("account.css", accessDeniedHtml, StringComparison.Ordinal);
+        Assert.Contains("class=\"signin-card\"", accessDeniedHtml, StringComparison.Ordinal);
+        Assert.Contains("signin.css", accessDeniedHtml, StringComparison.Ordinal);
         using var companySelection = await client.GetAsync("/account/company");
         Assert.Equal(HttpStatusCode.OK, companySelection.StatusCode);
 

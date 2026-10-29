@@ -10,7 +10,7 @@
 
 <Home />
 <PageTitle>Trial Balance</PageTitle>
-@if (loading) { <p role="status">Loading report options...</p> }
+@if (loading) { <LoadingIndicator /> }
 @if (!requestOpen && !previewOpen && errorMessage is not null) { <div class="alert alert-danger" role="alert">@errorMessage</div> }
 @if (requestOpen)
 {

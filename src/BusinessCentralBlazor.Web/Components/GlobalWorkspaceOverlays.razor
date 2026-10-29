@@ -1,0 +1,174 @@
+@inject AuthenticationStateProvider Authentication
+@inject IActiveCompanyContext CompanyContext
+@inject IJSRuntime JS
+@inject ILogger<GlobalWorkspaceOverlays> Logger
+@inject NavigationManager Navigation
+@implements IDisposable
+
+@if (searchOpen)
+{
+    <WorkspaceCardDialog CssClass="@(searchExpanded ? "global-search-dialog search-expanded" : "global-search-dialog")" OnClose="CloseSearch"
+                         LabelledBy="global-search-heading" ReturnFocusSelector="#global-search-toggle">
+        <div class="global-search-heading">
+            <h2 id="global-search-heading">Tell me what you want to do</h2>
+            <button type="button" class="search-expand" aria-label="@(searchExpanded ? "Restore search" : "Expand search")" @onclick="() => searchExpanded = !searchExpanded">
+                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 1h5v5m0-5-5 5M6 15H1v-5m0 5 5-5" /></svg>
+            </button>
+            <button type="button" aria-label="Close search" @onclick="CloseSearch">&times;</button>
+        </div>
+        <div class="global-search-content">
+            <input type="search" class="global-page-search" autofocus aria-label="Search pages and reports" autocomplete="off"
+                   value="@pageQuery" @oninput="UpdatePageQuery" @onkeydown="SearchKeyDown" />
+            @if (string.IsNullOrWhiteSpace(pageQuery) && searchReports is null)
+            {
+                <p class="search-intro">Don't know what to search for? Try <button type="button" @onclick="() => searchReports = false">exploring pages</button>
+                    or <button type="button" @onclick="() => searchReports = true">exploring reports</button></p>
+            }
+            else
+            {
+                var matches = PageSearchCatalog.Search(pageQuery, searchReports);
+                @foreach (var reports in new[] { false, true })
+                {
+                    var group = matches.Where(item => item.IsReport == reports).ToArray();
+                    if (group.Length == 0) { continue; }
+                    <section class="search-result-group">
+                        <h3>@(reports ? "Go to Reports and Analysis" : "Go to Pages and Tasks") <small>@group.Length @(group.Length == 1 ? "result" : "results")</small></h3>
+                        @foreach (var item in group)
+                        {
+                            @if (item.IsCompanyInformation)
+                            {
+                                <button type="button" class="search-result" @onclick="OpenInformationAsync"><span>@item.Label</span><small>@item.Group</small></button>
+                            }
+                            else
+                            {
+                                <a class="search-result" href="@item.Href"><span>@item.Label</span><small>@item.Group</small></a>
+                            }
+                        }
+                    </section>
+                }
+                @if (matches.Count == 0) { <p role="status">No pages or reports match your search.</p> }
+            }
+        </div>
+    </WorkspaceCardDialog>
+}
+@if (notificationsOpen)
+{
+    <WorkspaceCardDialog CssClass="company-panel" OnClose="CloseNotifications" LabelledBy="notifications-heading"
+                         ReturnFocusSelector="#global-notifications-toggle">
+        <div class="company-panel-heading"><h2 id="notifications-heading">Notifications</h2><button type="button" aria-label="Close Notifications" @onclick="CloseNotifications">&times;</button></div>
+        <div class="company-panel-content"><p>Nothing new right now.</p></div>
+    </WorkspaceCardDialog>
+}
+
+@if (informationOpen)
+{
+    <CompanyInformationCard @ref="information" OnClose="() => informationOpen = false" />
+}
+@if (companiesOpen)
+{
+    <WorkspaceCardDialog CssClass="company-panel" OnClose="CloseCompanies" LabelledBy="available-companies-heading"
+                         ReturnFocusSelector="#environment-company-toggle">
+        <div class="company-panel-heading"><h2 id="available-companies-heading">Available Companies</h2><button type="button" aria-label="Close Available Companies" @onclick="CloseCompanies">&times;</button></div>
+        <div class="company-panel-content">
+            @if (loading) { <LoadingIndicator /> }
+            @if (error is not null) { <div class="alert alert-danger" role="alert">@error</div> }
+            <input type="search" class="company-search" aria-label="Search companies" placeholder="Search companies" @bind="search" @bind:event="oninput" />
+            <h3>Local</h3>
+            <form method="post" action="/account/company" data-company-switch="true" @ref="switchForm">
+                <AntiforgeryToken />
+                <input type="hidden" name="SelectedCompanyId" value="@selectedCompany" />
+                <input type="hidden" name="ReturnUrl" value="@(informationOpen ? "/?companyInformation=1" : "/")" />
+                @foreach (var company in companies.Where(c => c.Name.Contains(search, StringComparison.OrdinalIgnoreCase) || c.Code.Contains(search, StringComparison.OrdinalIgnoreCase)))
+                {
+                    <button type="button" class="company-choice @(company.CompanyId == activeCompany ? "current" : null)"
+                            aria-current="@(company.CompanyId == activeCompany ? "true" : null)" @onclick="() => SelectCompanyAsync(company.CompanyId)">
+                        <span class="company-building" aria-hidden="true">&#9637;</span>
+                        <span>@company.Name<small>@company.Code &middot; @(company.CompanyId == activeCompany ? "Current company" : "Open company")</small></span>
+                        @if (company.CompanyId == activeCompany) { <span class="company-check" aria-hidden="true">&#10003;</span> }
+                    </button>
+                }
+            </form>
+            @if (!loading && !companies.Any(c => c.Name.Contains(search, StringComparison.OrdinalIgnoreCase) || c.Code.Contains(search, StringComparison.OrdinalIgnoreCase)))
+            { <p role="status">No available companies match your search.</p> }
+            <p class="company-panel-note">Only companies available to your signed-in account appear here.</p>
+        </div>
+    </WorkspaceCardDialog>
+}
+
+@code {
+    private bool informationOpen, companiesOpen, loading, submitPending;
+    private bool searchOpen, notificationsOpen, searchExpanded;
+    private string pageQuery = "";
+    private bool? searchReports;
+    private CompanyInformationCard? information;
+    private string search = "";
+    private string? error;
+    private Guid? activeCompany;
+    private Guid selectedCompany;
+    private ElementReference switchForm;
+    private IReadOnlyList<CompanyMembershipOption> companies = [];
+
+    public Task OpenInformationAsync()
+    {
+        searchOpen = notificationsOpen = false;
+        companiesOpen = false; informationOpen = true;
+        return InvokeAsync(StateHasChanged);
+    }
+    public async Task OpenCompaniesAsync()
+    {
+        searchOpen = notificationsOpen = false;
+        if (companiesOpen) { CloseCompanies(); return; }
+        companiesOpen = loading = true; search = ""; error = null;
+        await InvokeAsync(StateHasChanged);
+        try
+        {
+            var user = (await Authentication.GetAuthenticationStateAsync()).User;
+            companies = await CompanyContext.GetEligibleCompaniesAsync(user);
+            activeCompany = (await CompanyContext.ResolveAsync(user))?.CompanyId;
+        }
+        catch (Exception ex) { Logger.LogError(ex, "Unable to load available companies"); error = "Available companies could not be loaded. Close and reopen the panel to try again."; }
+        finally { loading = false; await InvokeAsync(StateHasChanged); }
+    }
+    private void CloseCompanies() { companiesOpen = false; StateHasChanged(); }
+    public Task OpenSearchAsync()
+    {
+        searchOpen = !searchOpen; companiesOpen = notificationsOpen = false;
+        pageQuery = ""; searchReports = null; searchExpanded = false;
+        return InvokeAsync(StateHasChanged);
+    }
+    public Task OpenNotificationsAsync()
+    {
+        notificationsOpen = !notificationsOpen; companiesOpen = searchOpen = false;
+        return InvokeAsync(StateHasChanged);
+    }
+    private void CloseSearch() { searchOpen = false; StateHasChanged(); }
+    private void CloseNotifications() { notificationsOpen = false; StateHasChanged(); }
+    private void UpdatePageQuery(ChangeEventArgs args) { pageQuery = args.Value?.ToString() ?? ""; searchReports = null; }
+    private async Task SearchKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key != "Enter" || (string.IsNullOrWhiteSpace(pageQuery) && searchReports is null)) return;
+        var first = PageSearchCatalog.Search(pageQuery, searchReports).FirstOrDefault();
+        if (first is null) return;
+        if (first.IsCompanyInformation) await OpenInformationAsync();
+        else Navigation.NavigateTo(first.Href);
+    }
+    protected override void OnInitialized() => Navigation.LocationChanged += OnLocationChanged;
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        informationOpen = companiesOpen = searchOpen = notificationsOpen = false;
+        _ = InvokeAsync(StateHasChanged);
+    }
+    public void Dispose() => Navigation.LocationChanged -= OnLocationChanged;
+    private async Task SelectCompanyAsync(Guid id)
+    {
+        if (id == activeCompany) { CloseCompanies(); return; }
+        if (informationOpen && information is not null && !await information.ConfirmLeaveAsync()) return;
+        selectedCompany = id; submitPending = true;
+    }
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!submitPending) return;
+        submitPending = false;
+        await JS.InvokeVoidAsync("globalWorkspace.submitCompany", switchForm);
+    }
+}

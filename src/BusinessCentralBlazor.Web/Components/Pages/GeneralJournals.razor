@@ -19,7 +19,7 @@
 }
 @if (isLoading)
 {
-    <p role="status" aria-live="polite">Loading journal batches...</p>
+    <LoadingIndicator />
 }
 else if (companyContextUnavailable)
 {
@@ -28,7 +28,7 @@ else if (companyContextUnavailable)
 }
 else
 {
-    <RecordWorkspace Title="General journals"
+    <RecordWorkspace Title="General Journals"
                      IdPrefix="general-journals"
                      StatusControlId="journal-status-quick"
                      StatusFilter="@statusFilter"
@@ -42,7 +42,7 @@ else
                      EmptyMessage="@(periods.Count == 0 ? "No journal batches are available." : "No journal batches match the current search and filters.")">
         <HeaderActions>
             <a id="new-journal-batch-action" class="record-workspace-action"
-               href="/financial/journals/new">+ New</a>
+               href="/financial/journals/new"><span class="workspace-new-icon" aria-hidden="true"></span>New</a>
             <span class="record-workspace-separator" aria-hidden="true"></span>
             <a class="record-workspace-action" href="/financial/accounting-periods">Accounting periods</a>
         </HeaderActions>
@@ -155,7 +155,6 @@ else
             }
         </DetailsContent>
     </RecordWorkspace>
-
     @if (periods.Count == 0)
     {
         <div class="alert alert-info mt-3" role="status">

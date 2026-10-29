@@ -1,0 +1,30 @@
+.company-panel-heading { display: flex; align-items: center; justify-content: space-between; padding: 24px; }
+.company-panel-heading h2 { font-size: 23px; font-weight: 500; margin: 0; }
+.company-panel-heading button { border: 0; background: transparent; font-size: 25px; color: #657985; }
+.company-panel-content { padding: 0 24px 24px; overflow: auto; overscroll-behavior: contain; }
+.company-search { width: 100%; border: 1px solid #00838f; padding: 8px 12px; font-size: 13px; border-radius: 0; }
+h3 { font-size: 13px; font-weight: 600; color: #5a6c7d; margin: 26px 0 12px; }
+.company-choice { display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; padding: 16px 12px; border: 0; background: transparent; font-size: 14px; }
+.company-choice:hover { background: #e9f2f3; }
+.company-choice.current { border-left: 3px solid #00838f; background: #e1eff0; }
+.company-choice small { display: block; font-size: 11px; color: #697c87; margin-top: 5px; }
+.company-check { margin-left: auto; color: #00838f; }
+.company-panel-note { border-top: 1px solid #c9cfd4; padding-top: 18px; margin-top: 24px; font-size: 12px; line-height: 1.7; color: #72818a; }
+.global-search-heading { display: flex; align-items: center; gap: 12px; padding: 24px 30px; }
+.global-search-heading h2 { flex: 1; margin: 0; color: #5a6c7d; font-size: 17px; font-weight: 400; }
+.global-search-heading button { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; background: transparent; color: #657985; font-size: 28px; }
+.search-expand svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.5; }
+.global-search-content { padding: 8px 30px 24px; overflow: auto; overscroll-behavior: contain; }
+.global-page-search { width: 100%; height: 38px; padding: 6px 10px; border: 1px solid #00838f; border-radius: 0; font-size: 17px; }
+.search-intro { margin: 20px 0 0; font-size: 15px; }
+.search-intro button { padding: 0; border: 0; background: transparent; color: #00838f; }
+.search-result-group { margin-top: 24px; }
+.search-result-group h3 { display: flex; justify-content: space-between; gap: 12px; margin: 0 0 12px; color: #292929; font-size: 16px; }
+.search-result-group small { color: #647485; font-size: 13px; font-weight: 400; }
+.search-result { display: flex; align-items: center; justify-content: space-between; gap: 14px; width: 100%; padding: 13px 10px; border: 0; background: transparent; color: #00838f; font-size: 16px; text-align: left; text-decoration: none; }
+.search-result:hover, .search-result:focus-visible { background: #d9eff1; color: #006e7c; }
+.search-result-group + .search-result-group { border-top: 1px solid #d8dfe2; padding-top: 20px; }
+@media(max-width: 600px) {
+    .global-search-heading { padding: 18px 16px; }
+    .global-search-content { padding: 8px 16px 20px; }
+}
