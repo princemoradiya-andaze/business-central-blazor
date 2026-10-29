@@ -1,197 +1,236 @@
 @page "/financial/company-settings"
-@using System.ComponentModel.DataAnnotations
 @attribute [Authorize(Policy = CompanyAuthorizationPolicies.ActiveCompany)]
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject ICompanySettingsService CompanySettingsService
+@inject ICompanyScopeAuthorizer CompanyScope
+@inject ILogger<CompanySettings> Logger
+@inject IJSRuntime JS
 
-<PageTitle>Company settings</PageTitle>
-<h1>Company settings</h1>
-<p class="text-body-secondary">Configure the active company's base currency.</p>
+<PageTitle>Company Settings</PageTitle>
+<NavigationLock ConfirmExternalNavigation="@(isSaving || HasChanges)" OnBeforeInternalNavigation="BeforeNavigationAsync" />
 
-@if (isLoading)
-{
-    <p role="status">Loading company settings...</p>
-}
-else
-{
-    @if (!string.IsNullOrWhiteSpace(statusMessage))
-    {
-        <div class="alert alert-success" role="status">@statusMessage</div>
-    }
-    @if (!string.IsNullOrWhiteSpace(errorMessage))
-    {
-        <div class="alert alert-danger" role="alert">@errorMessage</div>
-    }
-
-    <section class="card mb-4" aria-labelledby="base-currency-heading">
-        <div class="card-body">
-            <h2 id="base-currency-heading" class="h4">Base currency</h2>
-            @if (currencies.Count == 0)
-            {
-                <div class="alert alert-info" role="status">
-                    No active currencies are available. Add a currency to the shared catalog below, then assign it here.
-                </div>
-            }
-            else
-            {
-                <EditForm Model="@input" OnValidSubmit="SaveAsync" FormName="company-base-currency">
-                    <DataAnnotationsValidator />
-                    <div class="mb-3">
-                        <label class="form-label" for="base-currency">Base currency</label>
-                        <InputSelect id="base-currency" class="form-select" @bind-Value="input.BaseCurrencyCode">
-                            <option value="">Select a currency</option>
+<FinancialDetailLayout Title="Company Settings" BackUrl="/" BackLabel="Back to Home"
+                       Breadcrumb="More / Company Settings" Status="@(isLoading ? "Loading..." : !loaded ? "Unavailable" : isSaving ? "Saving..." : HasChanges ? "Unsaved changes" : "Saved - Company-scoped")">
+    <Commands>
+        <button type="submit" form="company-base-currency" disabled="@(isLoading || !loaded || isSaving || currencies.Count == 0)">Save base currency</button>
+        <button type="button" disabled="@(isSaving || !HasChanges)" @onclick="Discard">Discard changes</button>
+        <button type="button" id="settings-add-currency" disabled="@(isLoading || !loaded || isSaving)" @onclick="OpenCurrency">+ Add currency</button>
+    </Commands>
+    <ChildContent>
+        @if (statusMessage is not null) { <div class="alert alert-success" role="status">@statusMessage</div> }
+        @if (errorMessage is not null) { <div class="alert alert-danger" role="alert">@errorMessage</div> }
+        @if (isLoading) { <p role="status">Loading company settings...</p> }
+        else if (loaded)
+        {
+            <section aria-labelledby="settings-general">
+                <h2 id="settings-general">General</h2>
+                <dl class="detail-fields">
+                    <div><dt>Company</dt><dd>@companyName</dd></div>
+                    <div><dt>Company code</dt><dd>@companyCode</dd></div>
+                    <div><dt>Saved base currency</dt><dd>@SavedCurrencyLabel</dd></div>
+                    <div><dt>Currency precision</dt><dd>@(SavedCurrency is { } savedCurrency ? $"{savedCurrency.MinorUnit} decimal places" : "Not configured")</dd></div>
+                </dl>
+            </section>
+            <section class="detail-section" aria-labelledby="settings-base">
+                <h2 id="settings-base">Base Currency</h2>
+                <p class="detail-note">Select an active currency for this company. Changes apply only when you choose Save base currency.</p>
+                <EditForm id="company-base-currency" Model="@input" OnValidSubmit="SaveAsync" FormName="company-base-currency">
+                    <DataAnnotationsValidator /><ValidationSummary />
+                    @if (currencies.Count == 0)
+                    {
+                        <div class="alert alert-info" role="status">No active currencies are available. Add a currency to the shared catalog, then assign it here.</div>
+                    }
+                    <div class="detail-fields">
+                        <div>
+                            <label for="base-currency">Base currency</label>
+                            <InputSelect id="base-currency" class="form-select" disabled="@(isSaving || currencies.Count == 0)" @bind-Value="input.BaseCurrencyCode">
+                                <option value="">Select a currency</option>
+                                @foreach (var currency in currencies) { <option value="@currency.Code">@currency.Code - @currency.Name</option> }
+                            </InputSelect>
+                        </div>
+                    </div>
+                </EditForm>
+                <p class="settings-warning">Once a configured company has bank accounts, journal lines, ledger entries, or currency rates, its base currency cannot be changed.</p>
+            </section>
+            <section class="detail-section" aria-labelledby="settings-catalog">
+                <h2 id="settings-catalog">Shared Currency Catalog</h2>
+                <p class="detail-note">Currency entries are shared reference data available to all companies. Adding a currency does not automatically change this company's base currency.</p>
+                <div class="catalog-heading"><span>@currencies.Count active currencies</span><button type="button" class="btn" disabled="@isSaving" @onclick="OpenCurrency">+ Add currency</button></div>
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <caption class="visually-hidden">Active currencies in the shared catalog</caption>
+                        <thead><tr><th scope="col">Currency Code</th><th scope="col">Name</th><th scope="col">Minor Units</th><th scope="col">Status</th></tr></thead>
+                        <tbody>
                             @foreach (var currency in currencies)
                             {
-                                <option value="@currency.Code">@currency.Code — @currency.Name</option>
+                                <tr class="@(currency.Code == savedCode ? "settings-base-row" : null)"><th scope="row">@currency.Code</th><td>@currency.Name</td><td>@currency.MinorUnit</td><td>@(currency.Code == savedCode ? "Active / Company base" : "Active")</td></tr>
                             }
-                        </InputSelect>
-                    </div>
-                    <button class="btn btn-primary" type="submit" disabled="@isSaving">
-                        @(isSaving ? "Saving..." : "Save base currency")
-                    </button>
-                </EditForm>
-            }
-        </div>
-    </section>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        }
+    </ChildContent>
+</FinancialDetailLayout>
 
-    <section class="card" aria-labelledby="currency-catalog-heading">
-        <div class="card-body">
-            <h2 id="currency-catalog-heading" class="h4">Add currency to shared catalog</h2>
-            <p class="text-body-secondary">
-                Currency entries are shared reference data and become available to all companies.
-            </p>
-            <EditForm Model="@currencyInput" OnValidSubmit="CreateCurrencyAsync" FormName="create-currency">
-                <DataAnnotationsValidator />
-                <ValidationSummary class="alert alert-danger" />
-                <fieldset disabled="@isSaving">
-                    <div class="row g-3">
-                        <div class="col-md-4">
-                            <label class="form-label" for="currency-code">Currency code</label>
-                            <InputText id="currency-code" class="form-control" maxlength="3"
-                                       @bind-Value="currencyInput.Code" />
-                            <ValidationMessage For="@(() => currencyInput.Code)" />
-                        </div>
-                        <div class="col-md-5">
-                            <label class="form-label" for="currency-name">Name</label>
-                            <InputText id="currency-name" class="form-control" maxlength="80"
-                                       @bind-Value="currencyInput.Name" />
-                            <ValidationMessage For="@(() => currencyInput.Name)" />
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label" for="currency-minor-unit">Minor units</label>
-                            <InputNumber id="currency-minor-unit" class="form-control" min="0" max="4"
-                                         @bind-Value="currencyInput.MinorUnit" />
-                            <ValidationMessage For="@(() => currencyInput.MinorUnit)" />
-                        </div>
-                    </div>
-                    <button class="btn btn-outline-primary mt-3" type="submit">Add currency</button>
+@if (currencyOpen)
+{
+    <WorkspaceCardDialog OnClose="CloseCurrencyAsync" IsSaving="@isSaving" LabelledBy="currency-card-heading"
+                         DescribedBy="currency-card-help" ReturnFocusSelector="#settings-add-currency"
+                         CssClass="@(currencyExpanded ? "currency-card expanded" : "currency-card")">
+        <div class="workspace-card-top">
+            <button type="button" class="workspace-card-back" aria-label="Back to Company Settings" disabled="@isSaving" @onclick="CloseCurrencyAsync">&#8592;</button>
+            <span>Company Settings / Currency Card</span>
+            <span class="currency-card-spacer"></span>
+            <button type="button" class="currency-icon" aria-label="@(currencyExpanded ? "Restore dialog" : "Expand dialog")"
+                    title="@(currencyExpanded ? "Restore dialog" : "Expand dialog")" @onclick="() => currencyExpanded = !currencyExpanded">
+                <svg aria-hidden="true" viewBox="0 0 16 16"><path d="@(currencyExpanded ? "M1 6h5V1M6 6 1 1m14 9h-5v5m0-5 5 5" : "M10 1h5v5m0-5-5 5M6 15H1v-5m0 5 5-5")" /></svg>
+            </button>
+            <button type="button" class="currency-icon" aria-label="Close New Currency" disabled="@isSaving" @onclick="CloseCurrencyAsync">&times;</button>
+        </div>
+        <h2 id="currency-card-heading" class="workspace-card-title">New Currency</h2>
+        <p class="currency-card-subtitle">Shared currency catalog - New record</p>
+        <div class="workspace-card-commands">
+            <button type="submit" form="settings-currency-form" disabled="@isSaving">Save</button>
+            <button type="button" disabled="@isSaving" @onclick="CloseCurrencyAsync">Cancel</button>
+            <span>@(isSaving ? "Saving..." : "Not saved")</span>
+        </div>
+        <div class="workspace-card-body">
+            @if (currencyError is not null) { <div class="alert alert-danger" role="alert">@currencyError</div> }
+            <EditForm id="settings-currency-form" Model="@currencyInput" OnValidSubmit="CreateCurrencyAsync" FormName="create-currency">
+                <DataAnnotationsValidator /><ValidationSummary class="text-danger" />
+                <h3 class="workspace-card-section">General</h3>
+                <fieldset disabled="@isSaving" class="currency-card-fields" @oninput="() => currencyEdited = true">
+                    <div><label for="currency-code">Currency code</label><InputText id="currency-code" class="form-control" maxlength="3" placeholder="e.g. CAD" @bind-Value="currencyInput.Code" /><ValidationMessage For="@(() => currencyInput.Code)" /></div>
+                    <div><label for="currency-name">Name</label><InputText id="currency-name" class="form-control" maxlength="80" placeholder="Canadian Dollar" @bind-Value="currencyInput.Name" /><ValidationMessage For="@(() => currencyInput.Name)" /></div>
+                    <div><label for="currency-minor-unit">Minor units</label><InputNumber id="currency-minor-unit" class="form-control" min="0" max="4" @bind-Value="currencyInput.MinorUnit" /><ValidationMessage For="@(() => currencyInput.MinorUnit)" /></div>
                 </fieldset>
+                <p id="currency-card-help" class="currency-card-help">This creates shared reference data available to all companies. Saving this card selects the currency on Company Settings; use Save base currency there to assign it to the active company.</p>
             </EditForm>
         </div>
-    </section>
+    </WorkspaceCardDialog>
 }
 
 @code {
-    private readonly BaseCurrencyInput input = new();
-    private readonly CurrencyInput currencyInput = new();
+    private BaseCurrencyInput input = new();
+    private CurrencyInput currencyInput = new();
     private IReadOnlyList<CompanyCurrencyOption> currencies = [];
-    private bool isLoading = true;
-    private bool isSaving;
-    private string? statusMessage;
-    private string? errorMessage;
+    private string companyName = "", companyCode = "", savedCode = "";
+    private bool isLoading = true, loaded, isSaving, currencyOpen, currencyExpanded, currencyEdited;
+    private string? statusMessage, errorMessage, currencyError;
+    private bool HasChanges => input.BaseCurrencyCode != savedCode || CurrencyHasChanges;
+    private bool CurrencyHasChanges => currencyOpen && currencyEdited;
+    private CompanyCurrencyOption? SavedCurrency => currencies.FirstOrDefault(currency => currency.Code == savedCode);
+    private string SavedCurrencyLabel => SavedCurrency is { } currency ? $"{currency.Code} - {currency.Name}" : savedCode.Length > 0 ? savedCode : "Not configured";
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
             var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+            var company = await CompanyScope.ResolveActiveCompanyAsync(user) ?? throw new UnauthorizedAccessException();
+            companyName = company.Name;
+            companyCode = company.Code;
             var settings = await CompanySettingsService.GetAsync(user);
             currencies = settings.Currencies;
-            input.BaseCurrencyCode = settings.BaseCurrencyCode ?? string.Empty;
+            savedCode = settings.BaseCurrencyCode ?? "";
+            input.BaseCurrencyCode = savedCode;
+            loaded = true;
         }
-        catch (UnauthorizedAccessException)
+        catch (UnauthorizedAccessException) { errorMessage = "Your active company is no longer available. Select an active company and try again."; }
+        catch (Exception exception)
         {
-            errorMessage = "Your active company is no longer available. Select an active company and try again.";
+            Logger.LogError(exception, "Unable to load company settings");
+            errorMessage = "Company settings could not be loaded. Reload the page to try again.";
         }
-        finally
-        {
-            isLoading = false;
-        }
+        finally { isLoading = false; }
+    }
+
+    private void Discard()
+    {
+        if (isSaving) return;
+        input = new() { BaseCurrencyCode = savedCode };
+        errorMessage = null;
+        statusMessage = "Unsaved base-currency selection discarded. Currencies already added to the shared catalog are retained.";
+    }
+
+    private void OpenCurrency()
+    {
+        if (isSaving || !loaded) return;
+        currencyInput = new(); currencyError = null; currencyExpanded = false; currencyEdited = false; currencyOpen = true;
+    }
+
+    private async Task CloseCurrencyAsync()
+    {
+        if (isSaving) return;
+        if (CurrencyHasChanges && !await JS.InvokeAsync<bool>("confirm", "Discard this unsaved currency?")) return;
+        currencyOpen = false;
+    }
+
+    private async Task BeforeNavigationAsync(LocationChangingContext context)
+    {
+        if (isSaving) { context.PreventNavigation(); return; }
+        if (HasChanges && !await JS.InvokeAsync<bool>("confirm", "Discard unsaved settings and currency changes? Currencies already added to the shared catalog are retained."))
+            context.PreventNavigation();
     }
 
     private async Task SaveAsync()
     {
-        isSaving = true;
-        errorMessage = null;
-        statusMessage = null;
+        if (isSaving || !loaded) return;
+        isSaving = true; errorMessage = statusMessage = null;
         try
         {
             var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
             await CompanySettingsService.SaveBaseCurrencyAsync(user, input.BaseCurrencyCode);
-            var settings = await CompanySettingsService.GetAsync(user);
-            currencies = settings.Currencies;
-            input.BaseCurrencyCode = settings.BaseCurrencyCode ?? string.Empty;
-            statusMessage = $"Base currency saved as {input.BaseCurrencyCode}.";
+            savedCode = input.BaseCurrencyCode.Trim().ToUpperInvariant();
+            input.BaseCurrencyCode = savedCode;
+            statusMessage = $"Base currency saved as {savedCode}.";
         }
-        catch (UnauthorizedAccessException)
+        catch (UnauthorizedAccessException) { errorMessage = "Your active company is no longer available. Select an active company and try again."; }
+        catch (ValidationException exception) { errorMessage = exception.Message; }
+        catch (Exception exception)
         {
-            errorMessage = "Your active company is no longer available. Select an active company and try again.";
+            Logger.LogError(exception, "Unable to save company base currency");
+            errorMessage = "The base-currency save could not be confirmed. Reload the page to verify the current setting before retrying.";
         }
-        catch (ValidationException exception)
-        {
-            errorMessage = exception.Message;
-        }
-        finally
-        {
-            isSaving = false;
-        }
+        finally { isSaving = false; }
     }
 
     private async Task CreateCurrencyAsync()
     {
-        isSaving = true;
-        errorMessage = null;
-        statusMessage = null;
+        if (isSaving || !loaded) return;
+        isSaving = true; currencyError = null; statusMessage = null;
         try
         {
             var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
-            var code = await CompanySettingsService.CreateCurrencyAsync(
-                user, currencyInput.Code, currencyInput.Name, currencyInput.MinorUnit);
-            var settings = await CompanySettingsService.GetAsync(user);
-            currencies = settings.Currencies;
+            var code = await CompanySettingsService.CreateCurrencyAsync(user, currencyInput.Code, currencyInput.Name, currencyInput.MinorUnit);
+            currencies = currencies.Append(new CompanyCurrencyOption(code, currencyInput.Name.Trim(), currencyInput.MinorUnit)).OrderBy(currency => currency.Code, StringComparer.Ordinal).ToArray();
             input.BaseCurrencyCode = code;
-            currencyInput.Code = string.Empty;
-            currencyInput.Name = string.Empty;
-            currencyInput.MinorUnit = 2;
-            statusMessage = $"Currency {code} was added to the shared catalog. Save it above to set it as the base currency.";
+            currencyOpen = false;
+            statusMessage = $"Currency {code} was added to the shared catalog. Save base currency separately to assign it to this company.";
         }
-        catch (UnauthorizedAccessException)
+        catch (UnauthorizedAccessException) { currencyError = "Your active company is no longer available. Select an active company and try again."; }
+        catch (ValidationException exception) { currencyError = exception.Message; }
+        catch (Exception exception)
         {
-            errorMessage = "Your active company is no longer available. Select an active company and try again.";
+            Logger.LogError(exception, "Unable to create shared currency");
+            currencyError = "The currency save could not be confirmed. Reload the page to check the catalog before retrying.";
         }
-        catch (ValidationException exception)
-        {
-            errorMessage = exception.Message;
-        }
-        finally
-        {
-            isSaving = false;
-        }
+        finally { isSaving = false; }
     }
 
     private sealed class BaseCurrencyInput
     {
-        public string BaseCurrencyCode { get; set; } = string.Empty;
+        [Required(ErrorMessage = "Select an active currency.")]
+        public string BaseCurrencyCode { get; set; } = "";
     }
 
     private sealed class CurrencyInput
     {
-        [Required, StringLength(3, MinimumLength = 3)]
-        public string Code { get; set; } = string.Empty;
-
+        [Required, StringLength(3, MinimumLength = 3), RegularExpression("^[A-Za-z]{3}$", ErrorMessage = "Enter a three-letter currency code.")]
+        public string Code { get; set; } = "";
         [Required, StringLength(80)]
-        public string Name { get; set; } = string.Empty;
-
+        public string Name { get; set; } = "";
         [Range(0, 4)]
         public int MinorUnit { get; set; } = 2;
     }

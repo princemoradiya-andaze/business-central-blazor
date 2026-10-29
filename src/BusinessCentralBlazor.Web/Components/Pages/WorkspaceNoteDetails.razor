@@ -1,4 +1,3 @@
-@page "/workspace/notes/{NoteId:guid}"
 @attribute [Authorize(Policy = CompanyAuthorizationPolicies.ActiveCompany)]
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject IWorkspaceNoteService WorkspaceNoteService

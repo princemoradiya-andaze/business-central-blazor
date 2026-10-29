@@ -40,7 +40,9 @@ public sealed class WorkspaceNotePageTests(AuthenticationWebApplicationFactory f
         Assert.Contains("Reports", html, StringComparison.Ordinal);
         Assert.Contains("directory-count", html, StringComparison.Ordinal);
         Assert.Contains("(5)", html, StringComparison.Ordinal);
-        Assert.Contains("Workspace notes", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("Workspace notes", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("href=\"/workspace", html, StringComparison.Ordinal);
+        Assert.Contains("href=\"/financial/company-settings\"", html, StringComparison.Ordinal);
         Assert.Contains("- General journals", html, StringComparison.Ordinal);
         Assert.DoesNotContain("aria-hidden=\"true\">›", html, StringComparison.Ordinal);
         Assert.Contains("href=\"/financial/sales/customers\"", html, StringComparison.Ordinal);
@@ -51,7 +53,7 @@ public sealed class WorkspaceNotePageTests(AuthenticationWebApplicationFactory f
     }
 
     [Fact]
-    public async Task ActiveCompanyNavigationAndNotePagesRenderForSignedInMembers()
+    public async Task RetiredNoteRoutesCannotRenderCrudAndPreserveStoredData()
     {
         var email = $"workspace-note-pages-{Guid.NewGuid():N}@example.invalid";
         await factory.CreateTestUserAsync(email, TestPassword);
@@ -72,35 +74,29 @@ public sealed class WorkspaceNotePageTests(AuthenticationWebApplicationFactory f
             });
         }
 
-        using var listResponse = await client.GetAsync("/workspace/notes");
-        var listHtml = await listResponse.Content.ReadAsStringAsync();
-        Assert.Equal(HttpStatusCode.OK, listResponse.StatusCode);
-        Assert.Contains("Workspace notes", listHtml, StringComparison.Ordinal);
-        Assert.Contains("Navigation test note", listHtml, StringComparison.Ordinal);
-        Assert.Contains("/workspace/notes/new", listHtml, StringComparison.Ordinal);
-        Assert.Contains("Company: Notes Page Company (NOTEPAGE)", listHtml, StringComparison.Ordinal);
-        Assert.DoesNotContain("home-quick-links", listHtml, StringComparison.Ordinal);
-        Assert.Contains("company-switcher", listHtml, StringComparison.Ordinal);
-        Assert.Contains("/account/company", listHtml, StringComparison.Ordinal);
-
-        using var detailResponse = await client.GetAsync($"/workspace/notes/{noteId}");
-        var detailHtml = await detailResponse.Content.ReadAsStringAsync();
-        Assert.Equal(HttpStatusCode.OK, detailResponse.StatusCode);
-        Assert.Contains("A safe, synthetic note for the page test.", detailHtml, StringComparison.Ordinal);
-        Assert.Contains("Delete", detailHtml, StringComparison.Ordinal);
-
-        using var editResponse = await client.GetAsync($"/workspace/notes/{noteId}/edit");
-        var editHtml = await editResponse.Content.ReadAsStringAsync();
-        Assert.Equal(HttpStatusCode.OK, editResponse.StatusCode);
-        Assert.Contains("Save changes", editHtml, StringComparison.Ordinal);
-        Assert.Contains("Navigation test note", editHtml, StringComparison.Ordinal);
-
-        using var createResponse = await client.GetAsync("/workspace/notes/new");
-        var createHtml = await createResponse.Content.ReadAsStringAsync();
-        Assert.Equal(HttpStatusCode.OK, createResponse.StatusCode);
-        Assert.Contains("Create workspace note", createHtml, StringComparison.Ordinal);
-        Assert.Contains("maxlength=\"120\"", createHtml, StringComparison.Ordinal);
-        Assert.Contains("maxlength=\"4000\"", createHtml, StringComparison.Ordinal);
+        foreach (var route in new[] { "/workspace/notes", "/workspace/notes/new", $"/workspace/notes/{noteId}",
+                     $"/workspace/notes/{noteId}/edit", "/workspace/notes/unknown/path" })
+        {
+            using var response = await client.GetAsync(route);
+            var html = await response.Content.ReadAsStringAsync();
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.Contains("Page unavailable", html);
+            Assert.DoesNotContain("Navigation test note", html);
+            Assert.DoesNotContain("A safe, synthetic note for the page test.", html);
+            Assert.DoesNotContain("Create note", html);
+            Assert.DoesNotContain("Save changes", html);
+            Assert.DoesNotContain("Confirm delete", html);
+            Assert.DoesNotContain("href=\"/workspace", html);
+            using var post = await client.PostAsync(route, new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["Input.Title"] = "Should not save", ["Input.Body"] = "Retired"
+            }));
+            Assert.False(post.IsSuccessStatusCode);
+        }
+        await using var verifyScope = factory.Services.CreateAsyncScope();
+        var retained = await verifyScope.ServiceProvider.GetRequiredService<IWorkspaceNoteService>().GetAsync(principal, noteId);
+        Assert.NotNull(retained);
+        Assert.Equal("Navigation test note", retained.Title);
     }
 
     [Fact]
@@ -143,14 +139,14 @@ public sealed class WorkspaceNotePageTests(AuthenticationWebApplicationFactory f
         using var detailsResponse = await ownerClient.GetAsync($"/workspace/notes/{privateNoteId}");
         var detailsHtml = await detailsResponse.Content.ReadAsStringAsync();
         Assert.Equal(HttpStatusCode.OK, detailsResponse.StatusCode);
-        Assert.Contains("Note not found", detailsHtml, StringComparison.Ordinal);
+        Assert.Contains("Page unavailable", detailsHtml, StringComparison.Ordinal);
         Assert.DoesNotContain("Private company note", detailsHtml, StringComparison.Ordinal);
         Assert.DoesNotContain("This content must stay private.", detailsHtml, StringComparison.Ordinal);
 
         using var editResponse = await ownerClient.GetAsync($"/workspace/notes/{privateNoteId}/edit");
         var editHtml = await editResponse.Content.ReadAsStringAsync();
         Assert.Equal(HttpStatusCode.OK, editResponse.StatusCode);
-        Assert.Contains("Note not found", editHtml, StringComparison.Ordinal);
+        Assert.Contains("Page unavailable", editHtml, StringComparison.Ordinal);
         Assert.DoesNotContain("Private company note", editHtml, StringComparison.Ordinal);
         Assert.DoesNotContain("This content must stay private.", editHtml, StringComparison.Ordinal);
     }

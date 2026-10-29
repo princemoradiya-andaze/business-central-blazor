@@ -1,0 +1,12 @@
+@page "/workspace/notes"
+@page "/workspace/notes/{*Path}"
+@attribute [Authorize(Policy = CompanyAuthorizationPolicies.ActiveCompany)]
+
+<PageTitle>Page unavailable</PageTitle>
+<h1>Page unavailable</h1>
+<p>Workspace notes is no longer available in the application. Existing notes are retained; this page cannot view or modify them.</p>
+<a href="/">Return to Home</a>
+
+@code {
+    [Parameter] public string? Path { get; set; }
+}

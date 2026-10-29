@@ -4,7 +4,7 @@ An independently implemented, modular-monolith ERP application using Blazor Serv
 
 ## Status
 
-Phase 0 and Phase 1 are complete on `main`. Phase 1 delivers administrator-managed authentication, tenant/company context and authorization, the authenticated application shell, and a generic company-scoped Workspace notes example. Workspace notes is foundation UI, not an equivalent Business Central feature. Public self-registration is disabled. Hosted deployment is not part of the current workflow.
+Phase 0 and Phase 1 are complete on `main`. Phase 1 delivers administrator-managed authentication, tenant/company context and authorization, the authenticated application shell, and a generic company-scoped Workspace notes example. Workspace notes was foundation UI, not an equivalent Business Central feature; it is now retired from product navigation and its former pages display an unavailable notice without CRUD. Existing notes, schema, example components, and company-scoped service code are retained. Public self-registration is disabled. Hosted deployment is not part of the current workflow.
 
 ## Prerequisites
 
@@ -33,6 +33,12 @@ Set `ConnectionStrings__ErpDatabase` in the current PowerShell session before ru
 See [the architecture overview](docs/architecture/overview.md), [the schema discovery report](docs/schema/discovery-report.md), [the initial application schema](docs/schema/initial-schema.md), and [the roadmap](docs/roadmap.md).
 
 ## Development workflow
+
+**More** contains Home (unchanged) and **Company Settings**, which uses the shared financial detail
+layout. Its **New Currency** card uses the shared card dialog with Save/Cancel, General fields,
+and SVG expand/restore. Shared-catalog creation and active-company base-currency saving remain
+separate operations, with validation, unsaved-change protection, and existing financial-activity
+restrictions preserved. No migration or note-data deletion is needed.
 
 Reports provides a compact **General Ledger Entries** workspace with applied filters, search,
 selection, list/tile views, Details, and links to account activity and posted journals.

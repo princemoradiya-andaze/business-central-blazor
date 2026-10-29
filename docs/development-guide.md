@@ -54,7 +54,7 @@ Blazor Server circuits can run component operations concurrently. Web services t
 
 ## Shared shell and workspace notes
 
-The authenticated Blazor shell shows the active company, grouped module menus, and an **All pages** directory at `/navigation`. Both navigation surfaces use the same catalog and link only to implemented company pages or their existing task sections. The shell also links to a SQL-backed Workspace notes example. Notes are stored in the `WorkspaceNotes` table, and the service derives the tenant/company scope from the authenticated principal for every list, detail, create, edit, or delete operation. Company and tenant IDs are never accepted from the note form. A note ID from another company is treated as not found. The example is generic foundation UI, not an ERP module; no sample notes are seeded automatically.
+The authenticated Blazor shell shows the active company, grouped module menus, and an **All pages** directory at `/navigation`. Both navigation surfaces use the same catalog and link only to implemented company pages or their existing task sections. **More** contains Home and Company settings. The SQL-backed Workspace notes foundation example is retired from navigation: `/workspace/notes` and every child path display a company-authorized unavailable notice with no note service calls or CRUD controls. The original example components have no route directives, but their code, the company-scoped service, service tests, `WorkspaceNotes` table, and migrations remain intact. No existing note data is removed. Company and tenant IDs are still derived from the authenticated principal by the retained service, never accepted from note forms. No sample notes are seeded automatically.
 
 The `AddWorkspaceNotes` EF migration has been applied to the documented local development database, `BusinessCentralBlazor_Phase0` on `.\BCDEMO`. For another SQL Server database, check the target database name before running `dotnet ef database update`. Users also need an active company membership before the Blazor workspace is available.
 
@@ -118,7 +118,13 @@ These reports read immutable `GeneralLedgerEntries` only. Account and active-com
 ## Company base currency
 
 `/financial/company-settings` configures the active company's base currency and can add entries to
-the shared currency catalogue (visible to all companies). The base currency is required before
+the shared currency catalogue (visible to all companies). The shared financial detail layout groups
+General, Base Currency, and Shared Currency Catalog. Add currency opens a Currency Card with
+Save/Cancel, General fields, and SVG expand/restore. Saving the card selects the newly created
+currency, but assigning it to the active company requires a separate **Save base currency** action.
+Discard resets the company selection without deleting shared currencies already created.
+Closing a dirty card or leaving a page with unsaved changes requests confirmation.
+The base currency is required before
 bank-account setup; changing it is blocked after the company has journal lines, bank accounts,
 posted ledger activity, or currency rates.
 
