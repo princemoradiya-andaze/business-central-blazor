@@ -34,6 +34,10 @@ See [the architecture overview](docs/architecture/overview.md), [the schema disc
 
 ## Development workflow
 
+**All pages** (`/navigation`) shows a pale-cyan directory with Home shortcuts and all existing
+menu destinations. Each group starts expanded; click its heading/chevron, or focus it and press
+Enter or Space, to collapse or expand its links independently.
+
 The global **Settings > Company Information** card edits the active company's core profile
 and logo, independently of base-currency settings. **Environment: Local** opens a searchable
 Available Companies panel above the current page or card without losing its draft. The header

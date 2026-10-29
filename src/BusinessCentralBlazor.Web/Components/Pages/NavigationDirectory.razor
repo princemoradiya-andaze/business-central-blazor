@@ -18,19 +18,39 @@
     </header>
 
     <nav class="directory-groups" aria-label="All implemented pages">
-        @foreach (var group in NavigationMenuCatalog.Groups)
+        @foreach (var group in DirectoryGroups)
         {
-            <section class="directory-group" aria-labelledby="@($"directory-{group.Key}")">
-                <h2 id="@($"directory-{group.Key}")">
-                    @group.Label <span class="directory-count">(@group.Items.Count)</span>
-                </h2>
-                <ul>
+            <details class="directory-group" open>
+                <summary aria-controls="@($"directory-{group.Key}-links")">
+                    <h2>
+                        @group.Label <span class="directory-count">(@group.Items.Count)</span>
+                    </h2>
+                    <svg class="directory-chevron" aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+                        <path d="m3 16 9-9 9 9" />
+                    </svg>
+                </summary>
+                <ul id="@($"directory-{group.Key}-links")">
                     @foreach (var item in group.Items)
                     {
                         <li><a href="@item.Href">- @item.Label</a></li>
                     }
                 </ul>
-            </section>
+            </details>
         }
     </nav>
 </div>
+
+@code {
+    private static readonly IReadOnlyList<NavigationGroup> DirectoryGroups =
+    [
+        new("home", "Home",
+        [
+            new("Customers", "/financial/sales/customers"),
+            new("Vendors", "/financial/purchasing/vendors"),
+            new("Items", "/financial/inventory"),
+            new("Bank Accounts", "/financial/banks"),
+            new("Chart of Accounts", "/financial/general-ledger/accounts")
+        ], []),
+        .. NavigationMenuCatalog.Groups
+    ];
+}

@@ -70,6 +70,52 @@ public sealed class HomeDashboardPageTests(AuthenticationWebApplicationFactory f
         Assert.Contains("href=\"/navigation\"", html, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task NavigationDirectoryShowsExpandedGroupsAndPreservesDestinations()
+    {
+        var email = $"navigation-directory-{Guid.NewGuid():N}@example.invalid";
+        await factory.CreateTestUserAsync(email, Password);
+        var company = await factory.AddCompanyMembershipAsync(email, "NAVDIR", "Navigation Directory Company");
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false
+        });
+        await SignInAsync(client, email);
+        await SelectCompanyAsync(client, company.CompanyId);
+
+        using var response = await client.GetAsync("/navigation");
+        var html = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(8, Regex.Matches(html, "<details class=\"directory-group\" open[^>]*>").Count);
+        foreach (var key in new[] { "home", "finance", "sales", "purchasing", "cash", "inventory", "reports", "more" })
+        {
+            Assert.Contains($"<summary aria-controls=\"directory-{key}-links\"", html, StringComparison.Ordinal);
+            Assert.Contains($"<ul id=\"directory-{key}-links\"", html, StringComparison.Ordinal);
+        }
+
+        var home = Regex.Match(html, "<ul id=\"directory-home-links\"[^>]*>(.*?)</ul>", RegexOptions.Singleline).Value;
+        Assert.Equal(5, Regex.Matches(home, "<li[^>]*>").Count);
+        Assert.Contains("- Customers", home, StringComparison.Ordinal);
+        Assert.Contains("- Vendors", home, StringComparison.Ordinal);
+        Assert.Contains("- Items", home, StringComparison.Ordinal);
+        Assert.Contains("- Bank Accounts", home, StringComparison.Ordinal);
+        Assert.Contains("- Chart of Accounts", home, StringComparison.Ordinal);
+        foreach (var route in new[]
+        {
+            "/financial/sales/customers", "/financial/purchasing/vendors", "/financial/inventory",
+            "/financial/banks", "/financial/general-ledger/accounts", "/financial/journals",
+            "/financial/dimensions", "/financial/accounting-periods", "/financial/tax-setup",
+            "/financial/sales/orders", "/financial/sales/fulfillment", "/financial/sales/receivables",
+            "/financial/purchasing/orders", "/financial/purchasing/fulfillment", "/financial/purchasing/payables",
+            "/financial/inventory/movements", "/financial/general-ledger/entries",
+            "/financial/general-ledger/trial-balance", "/", "/financial/company-settings"
+        })
+        {
+            Assert.Contains($"href=\"{route}\"", html, StringComparison.Ordinal);
+        }
+    }
+
     private static async Task SignInAsync(HttpClient client, string email)
     {
         var login = await client.GetAsync("/account/login");
