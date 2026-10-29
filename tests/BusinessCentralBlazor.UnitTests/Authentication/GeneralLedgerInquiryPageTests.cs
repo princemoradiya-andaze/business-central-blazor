@@ -43,22 +43,30 @@ public sealed class GeneralLedgerInquiryPageTests(AuthenticationWebApplicationFa
         using var entriesResponse = await client.GetAsync("/financial/general-ledger/entries");
         var entriesHtml = await entriesResponse.Content.ReadAsStringAsync();
         Assert.Equal(HttpStatusCode.OK, entriesResponse.StatusCode);
-        Assert.Contains("General ledger entries", entriesHtml, StringComparison.Ordinal);
+        Assert.Contains("General Ledger Entries", entriesHtml, StringComparison.Ordinal);
         Assert.Contains("No posted entries match these filters.", entriesHtml, StringComparison.Ordinal);
 
         using var activityResponse = await client.GetAsync(
             $"/financial/general-ledger/accounts/{accountId}/activity");
         var activityHtml = await activityResponse.Content.ReadAsStringAsync();
         Assert.Equal(HttpStatusCode.OK, activityResponse.StatusCode);
-        Assert.Contains("1000 — Cash", activityHtml, StringComparison.Ordinal);
+        Assert.Contains("1000 — Cash", HttpUtility.HtmlDecode(activityHtml), StringComparison.Ordinal);
         Assert.Contains("Opening debit", activityHtml, StringComparison.Ordinal);
+        Assert.Contains("financial-detail", activityHtml, StringComparison.Ordinal);
+        Assert.Contains("Back to General Ledger Entries", activityHtml, StringComparison.Ordinal);
+        Assert.Contains("account-activity-filter", activityHtml, StringComparison.Ordinal);
+        Assert.Contains("Posted entries", activityHtml, StringComparison.Ordinal);
 
         using var trialBalanceResponse = await client.GetAsync("/financial/general-ledger/trial-balance");
         var trialBalanceHtml = await trialBalanceResponse.Content.ReadAsStringAsync();
         Assert.Equal(HttpStatusCode.OK, trialBalanceResponse.StatusCode);
-        Assert.Contains("Trial balance", trialBalanceHtml, StringComparison.Ordinal);
-        Assert.Contains("Debits and credits reconcile.", trialBalanceHtml, StringComparison.Ordinal);
+        Assert.Contains("Trial Balance", trialBalanceHtml, StringComparison.Ordinal);
+        Assert.Contains("id=\"trial-request-heading\"", trialBalanceHtml, StringComparison.Ordinal);
+        Assert.DoesNotContain("trial-preview-heading", trialBalanceHtml, StringComparison.Ordinal);
         Assert.Contains("Cash", trialBalanceHtml, StringComparison.Ordinal);
+        Assert.Contains("id=\"home-heading\"", trialBalanceHtml, StringComparison.Ordinal);
+        Assert.Contains("report-size-icon", trialBalanceHtml, StringComparison.Ordinal);
+        Assert.DoesNotContain("run-trial-balance", trialBalanceHtml, StringComparison.Ordinal);
     }
 
     [Fact]

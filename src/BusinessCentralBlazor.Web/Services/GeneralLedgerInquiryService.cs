@@ -28,7 +28,8 @@ public sealed record GeneralLedgerEntryListItem(
     string DocumentNumber,
     string Description,
     decimal DebitAmount,
-    decimal CreditAmount);
+    decimal CreditAmount,
+    Guid JournalBatchId = default);
 
 public sealed record GeneralLedgerEntryReport(
     IReadOnlyList<GeneralLedgerEntryListItem> Entries,
@@ -74,6 +75,7 @@ public interface IGeneralLedgerInquiryService
         DateOnly? fromDate,
         DateOnly? throughDate);
     Task<TrialBalanceReport> GetTrialBalanceAsync(ClaimsPrincipal user, DateOnly asOfDate);
+    Task<TrialBalanceReport> GetTrialBalanceAsync(ClaimsPrincipal user, TrialBalanceRequest request);
 }
 
 public sealed class GeneralLedgerInquiryService(
@@ -143,7 +145,8 @@ public sealed class GeneralLedgerInquiryService(
                 item.Entry.DocumentNumber,
                 item.Entry.Description,
                 item.Entry.DebitAmount,
-                item.Entry.CreditAmount))
+                item.Entry.CreditAmount,
+                item.Entry.JournalBatchId))
             .ToListAsync();
 
         return new GeneralLedgerEntryReport(
@@ -208,13 +211,25 @@ public sealed class GeneralLedgerInquiryService(
             Math.Max(-closingBalance, 0));
     }
 
-    public async Task<TrialBalanceReport> GetTrialBalanceAsync(ClaimsPrincipal user, DateOnly asOfDate)
+    public Task<TrialBalanceReport> GetTrialBalanceAsync(ClaimsPrincipal user, DateOnly asOfDate) =>
+        GetTrialBalanceAsync(user, new TrialBalanceRequest { AsOfDate = asOfDate });
+
+    public async Task<TrialBalanceReport> GetTrialBalanceAsync(ClaimsPrincipal user, TrialBalanceRequest request)
     {
+        ArgumentNullException.ThrowIfNull(request);
+        request.Validate();
         var company = await GetRequiredCompanyAsync(user);
         await using var dbContext = await dbContextFactory.CreateDbContextAsync();
-        var accountBalances = await dbContext.GeneralLedgerEntries
+        var entries = dbContext.GeneralLedgerEntries
             .AsNoTracking()
-            .Where(entry => entry.CompanyId == company.CompanyId && entry.PostingDate <= asOfDate)
+            .Where(entry => entry.CompanyId == company.CompanyId && entry.PostingDate <= request.AsOfDate);
+        var document = request.DocumentNumber?.Trim();
+        if (!string.IsNullOrEmpty(document))
+        {
+            entries = entries.Where(entry => entry.DocumentNumber.Contains(document));
+        }
+
+        var accountBalances = await entries
             .GroupBy(entry => entry.AccountId)
             .Select(group => new
             {
@@ -223,9 +238,26 @@ public sealed class GeneralLedgerInquiryService(
                 Credit = group.Sum(entry => entry.CreditAmount)
             })
             .ToDictionaryAsync(balance => balance.AccountId);
-        var accounts = await dbContext.GeneralLedgerAccounts
+        var accountQuery = dbContext.GeneralLedgerAccounts
             .AsNoTracking()
-            .Where(account => account.CompanyId == company.CompanyId && account.Type == AccountType.Posting)
+            .Where(account => account.CompanyId == company.CompanyId && account.Type == AccountType.Posting);
+        if (request.AccountId is { } accountId)
+        {
+            accountQuery = accountQuery.Where(account => account.Id == accountId);
+        }
+
+        var name = request.AccountName?.Trim();
+        if (!string.IsNullOrEmpty(name))
+        {
+            accountQuery = accountQuery.Where(account => account.Name.Contains(name));
+        }
+
+        if (request.Category is { } category)
+        {
+            accountQuery = accountQuery.Where(account => account.Category == category);
+        }
+
+        var accounts = await accountQuery
             .OrderBy(account => account.Number)
             .Select(account => new
             {
@@ -246,10 +278,16 @@ public sealed class GeneralLedgerInquiryService(
                 account.Category,
                 Math.Max(netBalance, 0),
                 Math.Max(-netBalance, 0));
-        }).ToArray();
+        }).Where(line => request.IncludeZeroBalances || line.DebitBalance != 0 || line.CreditBalance != 0).ToArray();
+
+        if (lines.Length > request.MaximumRows)
+        {
+            throw new ValidationException(
+                $"Report contains {lines.Length} rows, exceeding the maximum of {request.MaximumRows}. Increase the limit or narrow the filters. No partial totals are generated.");
+        }
 
         return new TrialBalanceReport(
-            asOfDate,
+            request.AsOfDate,
             lines,
             lines.Sum(line => line.DebitBalance),
             lines.Sum(line => line.CreditBalance));

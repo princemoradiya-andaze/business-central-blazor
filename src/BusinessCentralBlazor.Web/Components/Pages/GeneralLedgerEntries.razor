@@ -2,145 +2,181 @@
 @attribute [Authorize(Policy = CompanyAuthorizationPolicies.ActiveCompany)]
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject IGeneralLedgerInquiryService InquiryService
+@inject ILogger<GeneralLedgerEntries> Logger
+@inject ICompanyScopeAuthorizer CompanyScope
 
 <PageTitle>General Ledger Entries</PageTitle>
-
-<div class="mb-4">
-    <h1>General ledger entries</h1>
-    <p class="text-body-secondary mb-0">Search immutable posted activity for the active company.</p>
-</div>
-
-<EditForm Model="filter" OnValidSubmit="ApplyFilters">
-    <DataAnnotationsValidator />
-    <div class="row g-3 align-items-end mb-4">
-        <div class="col-sm-6 col-lg-2">
-            <label class="form-label" for="from-date">From date</label>
-            <InputDate id="from-date" class="form-control" @bind-Value="filter.FromDate" />
-        </div>
-        <div class="col-sm-6 col-lg-2">
-            <label class="form-label" for="through-date">Through date</label>
-            <InputDate id="through-date" class="form-control" @bind-Value="filter.ThroughDate" />
-        </div>
-        <div class="col-sm-6 col-lg-3">
-            <label class="form-label" for="account-filter">Account</label>
-            <InputSelect id="account-filter" class="form-select" @bind-Value="filter.AccountId">
-                <option value="">All accounts</option>
-                @foreach (var account in accounts)
-                {
-                    <option value="@account.Id">@account.Number — @account.Name</option>
-                }
-            </InputSelect>
-        </div>
-        <div class="col-sm-6 col-lg-3">
-            <label class="form-label" for="document-filter">Document number contains</label>
-            <InputText id="document-filter" class="form-control" @bind-Value="filter.DocumentNumber" />
-            <ValidationMessage For="() => filter.DocumentNumber" />
-        </div>
-        <div class="col-lg-2">
-            <button class="btn btn-primary" type="submit">Apply filters</button>
-        </div>
-    </div>
-    <ValidationSummary />
-</EditForm>
-
-@if (!string.IsNullOrWhiteSpace(errorMessage))
+@if (errorMessage is not null) { <div class="alert alert-danger" role="alert">@errorMessage</div> }
+@if (loading) { <p role="status">Loading general ledger entries...</p> }
+else if (loaded)
 {
-    <div class="alert alert-danger" role="alert">@errorMessage</div>
-}
-else if (report is not null && report.Entries.Count == 0)
-{
-    <div class="alert alert-info" role="status">No posted entries match these filters.</div>
-}
-else if (report is not null)
-{
-    <div class="d-flex gap-4 mb-3">
-        <span><strong>Debits:</strong> @report.TotalDebit.ToString("N4")</span>
-        <span><strong>Credits:</strong> @report.TotalCredit.ToString("N4")</span>
+    <div hidden="@analysisMode">
+    <RecordWorkspace Title="General Ledger Entries" IdPrefix="ledger-entries" StatusControlId="ledger-status"
+                     StatusOptionsOverride="@PostedStatus" StatusFilter="all"
+                     SearchPlaceholder="Search entry, account, document, or description" SearchTerm="@search" SearchTermChanged="SetSearch"
+                     HasRecords="@VisibleEntries.Any()" EmptyMessage="No posted entries match these filters.">
+        <HeaderActions>
+            <button type="button" class="record-workspace-action ledger-analysis-toggle" aria-label="Enter analysis mode" title="Enter analysis mode" @onclick="() => analysisMode = true">
+                <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="3" width="17" height="17" rx="3" /><path d="M7 7h3v4H7zm0 7h3v3H7zm6-7h4m-4 4h4m-4 4h2m2 3 3 3m0-7v7h-7" /></svg>
+            </button>
+            @if (Selected is { } entry)
+            {
+                <a class="record-workspace-action" href="@AccountUrl(entry)">Account activity</a>
+                <a class="record-workspace-action" href="@JournalUrl(entry)">Related journal</a>
+            }
+            <a class="record-workspace-action" href="/financial/general-ledger/trial-balance">Trial Balance</a>
+        </HeaderActions>
+        <FilterContent>
+            <EditForm Model="@filter" OnValidSubmit="LoadAsync">
+                <DataAnnotationsValidator /><ValidationSummary />
+                <label for="ledger-from">Posting date from</label><InputDate id="ledger-from" class="form-control" @bind-Value="filter.FromDate" />
+                <label for="ledger-through">Posting date through</label><InputDate id="ledger-through" class="form-control" @bind-Value="filter.ThroughDate" />
+                <label for="ledger-account">G/L Account No.</label>
+                <InputSelect id="ledger-account" class="form-select" @bind-Value="filter.AccountId">
+                    <option value="">All accounts</option>
+                    @foreach (var account in accounts) { <option value="@account.Id">@account.Number - @account.Name</option> }
+                </InputSelect>
+                <label for="ledger-document">Document number contains</label>
+                <InputText id="ledger-document" class="form-control" maxlength="64" @bind-Value="filter.DocumentNumber" />
+                <button class="btn btn-link btn-sm px-0" type="submit" disabled="@busy">Apply filters</button>
+                <button class="btn btn-link btn-sm" type="button" disabled="@busy" @onclick="ClearAsync">Clear filters</button>
+            </EditForm>
+        </FilterContent>
+        <ContextContent>
+            @if (busy) { <p role="status">Loading entries...</p> }
+        </ContextContent>
+        <ListContent>
+            <div class="table-responsive"><table class="table table-striped align-middle">
+                <caption class="visually-hidden">Posted general ledger entries for the active company</caption>
+                <thead><tr><th scope="col">Entry No.</th><th scope="col">Posting Date</th><th scope="col">G/L Account No.</th><th scope="col">G/L Account Name</th>
+                    <th scope="col">Document No.</th><th scope="col">Description</th><th scope="col" class="text-end">Debit Amount</th><th scope="col" class="text-end">Credit Amount</th></tr></thead>
+                <tbody>
+                    @foreach (var entry in VisibleEntries)
+                    {
+                        <tr @key="entry.Id" class="@(entry.Id == selectedId ? "record-row-selected" : null)" @onclick="() => selectedId = entry.Id">
+                            <th scope="row">@entry.EntryNumber</th><td>@entry.PostingDate.ToString("yyyy-MM-dd")</td>
+                            <td><a href="@AccountUrl(entry)" @onclick:stopPropagation="true">@entry.AccountNumber</a></td><td>@entry.AccountName</td>
+                            <td><a href="@JournalUrl(entry)" @onclick:stopPropagation="true">@entry.DocumentNumber</a></td><td>@entry.Description</td>
+                            <td class="text-end">@entry.DebitAmount.ToString("N4")</td><td class="text-end">@entry.CreditAmount.ToString("N4")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table></div>
+        </ListContent>
+        <TallTilesContent>@Tiles(true)</TallTilesContent><TilesContent>@Tiles(false)</TilesContent>
+        <DetailsContent>
+            @if (Selected is { } entry)
+            {
+                <dl>
+                    <div><dt>Entry No.</dt><dd>@entry.EntryNumber</dd></div><div><dt>Posting date</dt><dd>@entry.PostingDate.ToString("yyyy-MM-dd")</dd></div>
+                    <div><dt>Account</dt><dd>@entry.AccountNumber - @entry.AccountName</dd></div><div><dt>Document</dt><dd>@entry.DocumentNumber</dd></div>
+                    <div><dt>Description</dt><dd>@entry.Description</dd></div><div><dt>Debit</dt><dd>@entry.DebitAmount.ToString("N4")</dd></div>
+                    <div><dt>Credit</dt><dd>@entry.CreditAmount.ToString("N4")</dd></div>
+                </dl>
+            }
+            else { <p>No entry selected.</p> }
+        </DetailsContent>
+    </RecordWorkspace>
+    <div class="ledger-totals"><span>@VisibleEntries.Count() entries</span><span>Debits: @VisibleEntries.Sum(entry => entry.DebitAmount).ToString("N4")</span>
+        <span>Credits: @VisibleEntries.Sum(entry => entry.CreditAmount).ToString("N4")</span></div>
+    <p class="ledger-note">Posted entries are read-only. Totals reflect the applied filters and search.</p>
     </div>
-    <div class="table-responsive">
-        <table class="table table-striped align-middle">
-            <caption class="visually-hidden">Posted general ledger entries for the active company</caption>
-            <thead>
-                <tr>
-                    <th scope="col">Entry</th>
-                    <th scope="col">Posting date</th>
-                    <th scope="col">Account</th>
-                    <th scope="col">Document</th>
-                    <th scope="col">Description</th>
-                    <th scope="col" class="text-end">Debit</th>
-                    <th scope="col" class="text-end">Credit</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var entry in report.Entries)
-                {
-                    <tr>
-                        <th scope="row">@entry.EntryNumber</th>
-                        <td>@entry.PostingDate.ToString("yyyy-MM-dd")</td>
-                        <td>
-                            <a href="@($"/financial/general-ledger/accounts/{entry.AccountId}/activity")">
-                                @entry.AccountNumber — @entry.AccountName
-                            </a>
-                        </td>
-                        <td>@entry.DocumentNumber</td>
-                        <td>@entry.Description</td>
-                        <td class="text-end">@entry.DebitAmount.ToString("N4")</td>
-                        <td class="text-end">@entry.CreditAmount.ToString("N4")</td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    </div>
+    @if (analysisMode)
+    {
+        <LedgerAnalysisWorkspace Entries="@VisibleEntries.ToArray()" SourceCount="@entries.Count" StorageKey="@analysisStorageKey"
+                                 Search="@search" SearchChanged="SetSearch" Leave="() => analysisMode = false" />
+    }
 }
 
 @code {
-    [SupplyParameterFromQuery(Name = "accountId")]
-    public Guid? AccountFilter { get; set; }
-
+    [SupplyParameterFromQuery(Name = "accountId")] public Guid? AccountFilter { get; set; }
     private GeneralLedgerEntryFilter filter = new();
     private IReadOnlyList<GeneralLedgerAccountOption> accounts = [];
-    private GeneralLedgerEntryReport? report;
+    private IReadOnlyList<GeneralLedgerEntryListItem> entries = [];
+    private Guid? selectedId, appliedQueryAccount;
+    private bool loading = true, loaded, busy;
+    private bool analysisMode;
+    private string analysisStorageKey = "";
+    private string search = string.Empty;
     private string? errorMessage;
+    private static IReadOnlyList<(string Value, string Label)> PostedStatus => [("all", "All posted entries")];
+    private IEnumerable<GeneralLedgerEntryListItem> VisibleEntries => entries.Where(entry =>
+        string.IsNullOrWhiteSpace(search) || new[] { entry.EntryNumber.ToString(), entry.PostingDate.ToString("yyyy-MM-dd"),
+            entry.AccountNumber, entry.AccountName, entry.DocumentNumber, entry.Description }.Any(value => value.Contains(search.Trim(), StringComparison.OrdinalIgnoreCase)));
+    private GeneralLedgerEntryListItem? Selected => VisibleEntries.FirstOrDefault(entry => entry.Id == selectedId);
+    private static string AccountUrl(GeneralLedgerEntryListItem entry) => $"/financial/general-ledger/accounts/{entry.AccountId}/activity";
+    private static string JournalUrl(GeneralLedgerEntryListItem entry) => $"/financial/journals/{entry.JournalBatchId}";
+    private void Reconcile() => selectedId = RecordSelection.Reconcile(VisibleEntries.Select(entry => entry.Id), selectedId);
+    private void SetSearch(string value) { search = value; Reconcile(); }
 
     protected override async Task OnInitializedAsync()
     {
-        filter.AccountId = AccountFilter;
-        var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+        filter.AccountId = appliedQueryAccount = AccountFilter;
         try
         {
+            var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+            var company = await CompanyScope.ResolveActiveCompanyAsync(user) ?? throw new UnauthorizedAccessException();
+            var userId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                ?? throw new UnauthorizedAccessException();
+            analysisStorageKey = $"ledger-analysis:v1:{Uri.EscapeDataString(userId)}:{company.CompanyId}";
             accounts = await InquiryService.GetAccountsAsync(user);
+            loaded = true;
+            await LoadAsync();
         }
-        catch (UnauthorizedAccessException)
+        catch (UnauthorizedAccessException) { errorMessage = "Your active company is no longer available. Select an active company and try again."; }
+        catch (Exception exception)
         {
-            errorMessage = "Your active company is no longer available. Select an active company and try again.";
-            return;
+            Logger.LogError(exception, "Unable to load ledger account options");
+            errorMessage = "Ledger account options could not be loaded. Reload the page to try again.";
         }
-
-        await LoadReportAsync(user);
+        finally { loading = false; }
     }
 
-    private async Task ApplyFilters()
+    protected override async Task OnParametersSetAsync()
     {
+        if (loaded && appliedQueryAccount != AccountFilter)
+        {
+            filter.AccountId = appliedQueryAccount = AccountFilter;
+            await LoadAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        if (busy) return;
+        busy = true;
         errorMessage = null;
-        var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
-        await LoadReportAsync(user);
-    }
-
-    private async Task LoadReportAsync(System.Security.Claims.ClaimsPrincipal user)
-    {
         try
         {
-            report = await InquiryService.GetEntriesAsync(user, filter);
+            var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+            var report = await InquiryService.GetEntriesAsync(user, filter);
+            entries = report.Entries;
         }
-        catch (ValidationException exception)
+        catch (ValidationException exception) { entries = []; errorMessage = exception.Message; }
+        catch (UnauthorizedAccessException) { entries = []; errorMessage = "Your active company is no longer available. Select an active company and try again."; }
+        catch (Exception exception)
         {
-            report = null;
-            errorMessage = exception.Message;
+            entries = [];
+            Logger.LogError(exception, "Unable to load general ledger entries");
+            errorMessage = "General ledger entries could not be loaded. Apply filters again to retry.";
         }
-        catch (UnauthorizedAccessException)
-        {
-            report = null;
-            errorMessage = "Your active company is no longer available. Select an active company and try again.";
-        }
+        finally { busy = false; Reconcile(); }
     }
+
+    private async Task ClearAsync() { filter = new(); search = string.Empty; await LoadAsync(); }
+
+    private RenderFragment Tiles(bool tall) => @<div class="record-tile-grid">
+        @foreach (var entry in VisibleEntries)
+        {
+            <div @key="entry.Id" class="record-tile @(tall ? "tall" : null) @(entry.Id == selectedId ? "selected" : null)"
+                 tabindex="0" role="group" @onclick="() => selectedId = entry.Id"
+                 @onkeydown='args => { if (args.Key is "Enter" or " ") selectedId = entry.Id; }'>
+                <a class="record-tile-title" href="@JournalUrl(entry)" @onclick:stopPropagation="true">@entry.DocumentNumber</a>
+                <span class="record-tile-meta">@entry.AccountNumber - @entry.AccountName</span>
+                <span class="record-tile-meta">@entry.PostingDate.ToString("yyyy-MM-dd")</span>
+                @if (tall) { <span class="record-tile-meta">@entry.Description</span> }
+                <span class="record-tile-meta">Debit @entry.DebitAmount.ToString("N4") / Credit @entry.CreditAmount.ToString("N4")</span>
+            </div>
+        }
+    </div>;
 }

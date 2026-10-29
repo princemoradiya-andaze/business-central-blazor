@@ -1,123 +1,327 @@
 @page "/financial/general-ledger/trial-balance"
 @attribute [Authorize(Policy = CompanyAuthorizationPolicies.ActiveCompany)]
+@implements IAsyncDisposable
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject IGeneralLedgerInquiryService InquiryService
+@inject ICompanyScopeAuthorizer CompanyScope
+@inject IJSRuntime JS
+@inject ILogger<GeneralLedgerTrialBalance> Logger
+@inject NavigationManager Navigation
 
+<Home />
 <PageTitle>Trial Balance</PageTitle>
-
-<div class="mb-4">
-    <h1>Trial balance</h1>
-    <p class="text-body-secondary mb-0">Posting-account balances through the selected date for the active company.</p>
-</div>
-
-<EditForm Model="filter" OnValidSubmit="ApplyFilters">
-    <div class="row g-3 align-items-end mb-4">
-        <div class="col-sm-6 col-lg-3">
-            <label class="form-label" for="as-of-date">As of date</label>
-            <InputDate id="as-of-date" class="form-control" @bind-Value="filter.AsOfDate" />
-        </div>
-        <div class="col-lg-2">
-            <button class="btn btn-primary" type="submit">Run report</button>
-        </div>
-    </div>
-</EditForm>
-
-@if (!string.IsNullOrWhiteSpace(errorMessage))
+@if (loading) { <p role="status">Loading report options...</p> }
+@if (!requestOpen && !previewOpen && errorMessage is not null) { <div class="alert alert-danger" role="alert">@errorMessage</div> }
+@if (requestOpen)
 {
-    <div class="alert alert-danger" role="alert">@errorMessage</div>
+    <WorkspaceCardDialog @key="@("request")" CssClass="@($"report-request {(expanded ? "expanded" : "")}")"
+                         LabelledBy="trial-request-heading" IsSaving="@busy" OnClose="CloseRequest" ReturnFocusSelector=".home-actions a[href='/financial/general-ledger/trial-balance']">
+        <div class="report-shell">
+            <header class="report-head">
+                <h2 id="trial-request-heading">Trial Balance</h2>
+                <button type="button" aria-label="@(expanded ? "Restore dialog" : "Expand dialog")"
+                        title="@(expanded ? "Restore dialog" : "Expand dialog")" @onclick="() => expanded = !expanded">
+                    <svg class="report-size-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                        @if (expanded) { <path d="M1 6h5V1M6 6 1 1m14 9h-5v5m0-5 5 5" /> }
+                        else { <path d="M10 1h5v5m0-5-5 5M6 15H1v-5m0 5 5-5" /> }
+                    </svg>
+                </button>
+                <button type="button" aria-label="Close Trial Balance" disabled="@busy" @onclick="CloseRequest">&times;</button>
+            </header>
+            <EditForm EditContext="@context" OnValidSubmit="PreviewAsync" class="report-form" id="trial-request-form">
+                <DataAnnotationsValidator />
+                <div class="report-body">
+                    <p class="report-caption">Report request - @companyName</p>
+                    @if (busy) { <p role="status">Generating report...</p> }
+                    <fieldset disabled="@busy">
+                        <div class="report-field"><label for="trial-printer">Printer</label><select id="trial-printer"><option>Handled by the browser</option></select></div>
+                        <div class="report-field"><label for="trial-layout">Report Layout</label>
+                            <InputSelect id="trial-layout" @bind-Value="request.CompactLayout"><option value="false">Trial Balance - Standard</option><option value="true">Trial Balance - Compact</option></InputSelect>
+                        </div>
+                        <details open class="report-section"><summary>Options</summary>
+                            <div class="report-field"><label for="trial-category-column">Show account category</label><InputCheckbox id="trial-category-column" @bind-Value="request.ShowCategory" /></div>
+                            <div class="report-field"><label for="trial-zero">Include zero balances</label><InputCheckbox id="trial-zero" @bind-Value="request.IncludeZeroBalances" /></div>
+                            <p class="report-hint">Standard: separate debit and credit balances. Compact: one signed balance column.</p>
+                        </details>
+                        <details open class="report-section"><summary>Filter: G/L Account</summary>
+                            @if (numberFilter)
+                            {
+                                <div class="report-filter"><label for="trial-account">No.</label><InputSelect id="trial-account" @bind-Value="request.AccountId">
+                                    <option value="">All accounts</option>
+                                    @foreach (var account in accounts) { <option value="@account.Id">@account.Number - @account.Name</option> }
+                                </InputSelect><button type="button" aria-label="Remove No. filter" @onclick='() => RemoveAccountFilter("number")'>&times;</button></div>
+                            }
+                            @if (nameFilter)
+                            {
+                                <div class="report-filter"><label for="trial-name">Name contains</label><CardInputText id="trial-name" maxlength="100" @bind-Value="request.AccountName" />
+                                    <button type="button" aria-label="Remove Name filter" @onclick='() => RemoveAccountFilter("name")'>&times;</button></div>
+                            }
+                            @if (categoryFilter)
+                            {
+                                <div class="report-filter"><label for="trial-category">Account Category</label><InputSelect id="trial-category" @bind-Value="request.Category">
+                                    <option value="">All categories</option>
+                                    @foreach (var category in Enum.GetValues<AccountCategory>()) { <option value="@category">@category</option> }
+                                </InputSelect><button type="button" aria-label="Remove Account Category filter" @onclick='() => RemoveAccountFilter("category")'>&times;</button></div>
+                            }
+                            <div class="report-add"><label class="visually-hidden" for="trial-add-account">Choose account filter</label>
+                                <select id="trial-add-account" @bind="addAccount" disabled="@(numberFilter && nameFilter && categoryFilter)">
+                                    <option value="number" disabled="@numberFilter">No.</option><option value="name" disabled="@nameFilter">Name</option><option value="category" disabled="@categoryFilter">Account Category</option>
+                                </select><button type="button" disabled="@(numberFilter && nameFilter && categoryFilter)" @onclick="AddAccountFilter">+ Filter</button>
+                            </div>
+                            <p class="report-hint">Account Type is Posting. Only posting accounts contribute to this trial balance.</p>
+                        </details>
+                        <details open class="report-section"><summary>Filter totals by</summary>
+                            <div class="report-filter"><label for="trial-as-of">As of date</label><InputDate id="trial-as-of" @bind-Value="request.AsOfDate" /><span></span></div>
+                            @if (documentFilter)
+                            {
+                                <div class="report-filter"><label for="trial-document">Document No. contains</label><CardInputText id="trial-document" maxlength="64" @bind-Value="request.DocumentNumber" />
+                                    <button type="button" aria-label="Remove Document filter" @onclick="() => { documentFilter = false; request.DocumentNumber = null; }">&times;</button></div>
+                            }
+                            <div class="report-add"><label class="visually-hidden" for="trial-add-totals">Choose totals filter</label>
+                                <select id="trial-add-totals" disabled="@documentFilter"><option>Document No. contains</option></select>
+                                <button type="button" disabled="@documentFilter" @onclick="() => documentFilter = true">+ Filter</button>
+                            </div>
+                            <p class="report-hint">Cumulative balances through the selected date, including prior periods. Account or document filters can produce a subset that does not reconcile.</p>
+                        </details>
+                        <details class="report-section"><summary>Advanced</summary>
+                            <div class="report-field"><label for="trial-maximum">Maximum rows</label><InputNumber id="trial-maximum" min="1" max="500000" @bind-Value="request.MaximumRows" /></div>
+                            <div class="report-field"><label for="trial-region">Format region</label><InputSelect id="trial-region" @bind-Value="request.FormatRegion">
+                                <option value="en-GB">English (United Kingdom)</option><option value="en-US">English (United States)</option><option value="de-DE">German (Germany)</option>
+                            </InputSelect></div>
+                            <div class="report-field"><label for="trial-language">Language</label><select id="trial-language"><option>English</option></select></div>
+                            <p class="report-hint">Maximum rows is a generation safety limit, not a page size. Reports over this limit are rejected; totals are never truncated. Region controls date and number formatting. Report labels are English.</p>
+                        </details>
+                        <p class="report-scope">Only filters supported by this report are offered. Budget, Business Unit, Project, VAT reporting date, dimensions, and additional-currency reporting are not included. PDF uses the browser's Save as PDF destination.</p>
+                    </fieldset>
+                </div>
+                <div class="report-errors"><ValidationSummary />
+                    @if (errorMessage is not null) { <div class="alert alert-danger mb-0" role="alert">@errorMessage</div> }
+                </div>
+                <footer class="report-footer">
+                    <div class="report-send"><button type="button" class="report-outline" disabled="@busy" aria-expanded="@(sendOpen ? "true" : "false")" @onclick="() => sendOpen = !sendOpen">Send to... &#9662;</button>
+                        @if (sendOpen)
+                        {
+                            <div class="report-send-menu"><button type="button" disabled="@busy" @onclick="ExportRequestAsync">CSV</button>
+                                <button type="button" disabled="@busy" @onclick="PrintRequestAsync">PDF via browser print</button></div>
+                        }
+                    </div>
+                    <button class="report-outline" type="button" disabled="@busy" @onclick="PrintRequestAsync">Print</button>
+                    <button class="report-primary" type="submit" disabled="@busy">Preview</button>
+                    <button class="report-outline" type="button" disabled="@busy" @onclick="CloseRequest">Cancel</button>
+                </footer>
+            </EditForm>
+        </div>
+    </WorkspaceCardDialog>
 }
-else if (report is not null)
+@if (previewOpen && report is not null && snapshot is not null)
 {
-    <p><strong>As of:</strong> @report.AsOfDate.ToString("yyyy-MM-dd")</p>
-    @if (report.TotalDebit != report.TotalCredit)
-    {
-        <div class="alert alert-warning" role="alert">
-            Trial balance does not reconcile.             Difference: @Math.Abs(report.TotalDebit - report.TotalCredit).ToString("N4")
+    <WorkspaceCardDialog @key="@("preview")" CssClass="report-preview" LabelledBy="trial-preview-heading" IsSaving="@busy" OnClose="ClosePreview" ReturnFocusSelector=".home-actions a[href='/financial/general-ledger/trial-balance']">
+        <div class="report-shell">
+            <header class="report-output-toolbar"><h2 id="trial-preview-heading">Trial Balance - Preview</h2>
+                <button type="button" disabled="@busy" @onclick="OpenRequest">Edit request</button>
+                <button type="button" disabled="@busy" @onclick="ExportPreviewAsync">Download CSV</button>
+                <button type="button" disabled="@busy" @onclick="PrintPreviewAsync">Print / Save as PDF</button>
+                <button type="button" disabled="@busy" @onclick="ClosePreview">Close preview</button>
+            </header>
+            @if (errorMessage is not null) { <div class="alert alert-danger" role="alert">@errorMessage</div> }
+            <div class="report-paper-scroll">
+                <article class="report-paper" @ref="paper">
+                    <p>@companyName</p><h1>Trial Balance</h1><p>@(snapshot.CompactLayout ? "Compact layout" : "Standard layout")</p>
+                    <div class="report-meta">
+                        <div>As of @report.AsOfDate.ToString("d", snapshot.Culture) | Account Type: Posting</div>
+                        <div>Account: @snapshotAccount | Name contains: @(snapshot.AccountName ?? "Any") | Category: @(snapshot.Category?.ToString() ?? "All")</div>
+                        <div>Document contains: @(snapshot.DocumentNumber ?? "Any") | Zero balances: @(snapshot.IncludeZeroBalances ? "Included" : "Excluded")</div>
+                    </div>
+                    <table>
+                        <caption class="visually-hidden">Trial balance for @companyName</caption>
+                        <thead><tr><th scope="col">No.</th><th scope="col">Account Name</th>
+                            @if (snapshot.ShowCategory) { <th scope="col">Category</th> }
+                            @if (snapshot.CompactLayout) { <th scope="col" class="number">Balance</th> }
+                            else { <th scope="col" class="number">Debit Balance</th><th scope="col" class="number">Credit Balance</th> }
+                        </tr></thead>
+                        <tbody>
+                            @foreach (var line in report.Lines)
+                            {
+                                <tr><th scope="row">@line.AccountNumber</th><td>@line.AccountName</td>
+                                    @if (snapshot.ShowCategory) { <td>@line.Category</td> }
+                                    @if (snapshot.CompactLayout) { <td class="number">@((line.DebitBalance - line.CreditBalance).ToString("N4", snapshot.Culture))</td> }
+                                    else { <td class="number">@line.DebitBalance.ToString("N4", snapshot.Culture)</td><td class="number">@line.CreditBalance.ToString("N4", snapshot.Culture)</td> }
+                                </tr>
+                            }
+                        </tbody>
+                        <tfoot><tr><th scope="row" colspan="@(snapshot.ShowCategory ? 3 : 2)">Total</th>
+                            @if (snapshot.CompactLayout) { <th class="number">@((report.TotalDebit - report.TotalCredit).ToString("N4", snapshot.Culture))</th> }
+                            else { <th class="number">@report.TotalDebit.ToString("N4", snapshot.Culture)</th><th class="number">@report.TotalCredit.ToString("N4", snapshot.Culture)</th> }
+                        </tr></tfoot>
+                    </table>
+                    @if (report.Lines.Count == 0) { <p>No posting accounts match these report settings.</p> }
+                    @if (report.TotalDebit == report.TotalCredit) { <p>Debits and credits reconcile.</p> }
+                    else { <p>Debit/credit difference: @Math.Abs(report.TotalDebit - report.TotalCredit).ToString("N4", snapshot.Culture). Account or document filters can produce a non-reconciling subset.</p> }
+                </article>
+            </div>
         </div>
-    }
-    else
-    {
-        <div class="alert alert-success" role="status">Debits and credits reconcile.</div>
-    }
-    @if (report.Lines.Count == 0)
-    {
-        <div class="alert alert-info" role="status">No posting accounts are set up for this company.</div>
-    }
-    else
-    {
-        <div class="table-responsive">
-            <table class="table table-striped align-middle">
-                <caption class="visually-hidden">Trial balance for the active company</caption>
-                <thead>
-                    <tr>
-                        <th scope="col">Account</th>
-                        <th scope="col">Name</th>
-                        <th scope="col">Category</th>
-                        <th scope="col" class="text-end">Debit balance</th>
-                        <th scope="col" class="text-end">Credit balance</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var line in report.Lines)
-                    {
-                        <tr>
-                            <th scope="row">@line.AccountNumber</th>
-                            <td>
-                                <a href="@($"/financial/general-ledger/accounts/{line.AccountId}/activity")">
-                                    @line.AccountName
-                                </a>
-                            </td>
-                            <td>@line.Category</td>
-                            <td class="text-end">@line.DebitBalance.ToString("N4")</td>
-                            <td class="text-end">@line.CreditBalance.ToString("N4")</td>
-                        </tr>
-                    }
-                </tbody>
-                <tfoot>
-                    <tr>
-                        <th scope="row" colspan="3">Total</th>
-                        <td class="text-end"><strong>@report.TotalDebit.ToString("N4")</strong></td>
-                        <td class="text-end"><strong>@report.TotalCredit.ToString("N4")</strong></td>
-                    </tr>
-                </tfoot>
-            </table>
-        </div>
-    }
+    </WorkspaceCardDialog>
 }
 
 @code {
-    private sealed class TrialBalanceFilter
-    {
-        public DateOnly AsOfDate { get; set; } = DateOnly.FromDateTime(DateTime.Today);
-    }
-
-    private TrialBalanceFilter filter = new();
+    private TrialBalanceRequest request = new();
+    private EditContext context = default!;
+    private TrialBalanceRequest? snapshot;
     private TrialBalanceReport? report;
+    private IReadOnlyList<GeneralLedgerAccountOption> accounts = [];
+    private string companyName = "", snapshotAccount = "All", addAccount = "name";
     private string? errorMessage;
+    private Guid snapshotCompanyId;
+    private bool loading = true, loaded, requestOpen, previewOpen, expanded, sendOpen, busy;
+    private bool numberFilter = true, nameFilter, categoryFilter, documentFilter, printPending;
+    private ElementReference paper;
+    private IJSObjectReference? module;
 
     protected override async Task OnInitializedAsync()
     {
-        var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
-        await LoadReportAsync(user);
-    }
-
-    private async Task ApplyFilters()
-    {
-        errorMessage = null;
-        var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
-        await LoadReportAsync(user);
-    }
-
-    private async Task LoadReportAsync(System.Security.Claims.ClaimsPrincipal user)
-    {
+        context = new(request);
         try
         {
-            report = await InquiryService.GetTrialBalanceAsync(user, filter.AsOfDate);
+            var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+            var company = await CompanyScope.ResolveActiveCompanyAsync(user) ?? throw new UnauthorizedAccessException();
+            companyName = company.Name;
+            snapshotCompanyId = company.CompanyId;
+            accounts = await InquiryService.GetAccountsAsync(user);
+            loaded = requestOpen = true;
         }
-        catch (UnauthorizedAccessException)
+        catch (UnauthorizedAccessException) { errorMessage = "Your active company is no longer available. Select an active company and try again."; }
+        catch (Exception exception)
         {
-            report = null;
-            errorMessage = "Your active company is no longer available. Select an active company and try again.";
+            Logger.LogError(exception, "Unable to load trial balance options");
+            errorMessage = "Report options could not be loaded. Reload the page to try again.";
+        }
+        finally { loading = false; }
+    }
+
+    private void OpenRequest() { previewOpen = false; requestOpen = true; errorMessage = null; sendOpen = false; }
+    private void CloseRequest() { if (!busy) { requestOpen = false; sendOpen = false; Navigation.NavigateTo("/"); } }
+    private void ClosePreview() { if (!busy) { previewOpen = false; Navigation.NavigateTo("/"); } }
+    private void AddAccountFilter()
+    {
+        if (addAccount == "number") numberFilter = true;
+        else if (addAccount == "name") nameFilter = true;
+        else if (addAccount == "category") categoryFilter = true;
+        addAccount = !numberFilter ? "number" : !nameFilter ? "name" : "category";
+    }
+
+    private void RemoveAccountFilter(string field)
+    {
+        if (field == "number") { numberFilter = false; request.AccountId = null; }
+        else if (field == "name") { nameFilter = false; request.AccountName = null; }
+        else if (field == "category") { categoryFilter = false; request.Category = null; }
+        addAccount = field;
+    }
+
+    private Task PreviewAsync() => GenerateAsync("preview");
+    private Task PrintRequestAsync() => GenerateAsync("print");
+    private Task ExportRequestAsync() => GenerateAsync("csv");
+
+    private async Task GenerateAsync(string action)
+    {
+        if (busy) return;
+        errorMessage = null;
+        if (!context.Validate()) return;
+        busy = true;
+        sendOpen = false;
+        try
+        {
+            var settings = request with { AccountName = request.AccountName?.Trim(), DocumentNumber = request.DocumentNumber?.Trim() };
+            settings.Validate();
+            var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+            var company = await CompanyScope.ResolveActiveCompanyAsync(user) ?? throw new UnauthorizedAccessException();
+            var result = await InquiryService.GetTrialBalanceAsync(user, settings);
+            report = result;
+            snapshot = settings;
+            companyName = company.Name;
+            snapshotCompanyId = company.CompanyId;
+            snapshotAccount = accounts.FirstOrDefault(account => account.Id == settings.AccountId) is { } account ? $"{account.Number} - {account.Name}" : "All";
+            if (action == "csv") await DownloadAsync();
+            else
+            {
+                requestOpen = false;
+                previewOpen = true;
+                printPending = action == "print";
+            }
+        }
+        catch (ValidationException exception) { errorMessage = exception.Message; }
+        catch (UnauthorizedAccessException) { errorMessage = "Your active company is no longer available. Select an active company and try again."; }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "Unable to generate trial balance");
+            errorMessage = "The report could not be generated or exported. Retry the action.";
+        }
+        finally { busy = false; }
+    }
+
+    private async Task DownloadAsync()
+    {
+        if (report is null || snapshot is null) throw new InvalidOperationException("Generate a report before exporting.");
+        module ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/trialBalanceOutput.js");
+        await module.InvokeVoidAsync("download", $"trial-balance-{report.AsOfDate:yyyy-MM-dd}.csv",
+            TrialBalanceCsv.Create(companyName, report, snapshot, snapshotAccount));
+    }
+
+    private async Task ExportPreviewAsync()
+    {
+        if (busy) return;
+        busy = true; errorMessage = null;
+        try
+        {
+            await AuthorizeSnapshotAsync();
+            await DownloadAsync();
+        }
+        catch (UnauthorizedAccessException) { errorMessage = "Your active company is no longer available. Select an active company and try again."; }
+        catch (JSException exception) { Logger.LogError(exception, "Trial balance CSV download failed"); errorMessage = "The CSV download failed. Retry Download CSV."; }
+        finally { busy = false; }
+    }
+
+    private async Task PrintPreviewAsync()
+    {
+        if (busy) return;
+        busy = true; errorMessage = null;
+        try
+        {
+            await AuthorizeSnapshotAsync();
+            module ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/trialBalanceOutput.js");
+            await module.InvokeVoidAsync("print", paper);
+        }
+        catch (UnauthorizedAccessException) { errorMessage = "Your active company is no longer available. Select an active company and try again."; }
+        catch (JSException exception) { Logger.LogError(exception, "Trial balance printing failed"); errorMessage = "The browser print dialog could not be opened. Retry Print / Save as PDF."; }
+        finally { busy = false; }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (printPending && previewOpen)
+        {
+            printPending = false;
+            await PrintPreviewAsync();
+            await InvokeAsync(StateHasChanged);
+        }
+
+    }
+
+    private async Task AuthorizeSnapshotAsync()
+    {
+        var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+        var company = await CompanyScope.ResolveActiveCompanyAsync(user);
+        if (company?.CompanyId != snapshotCompanyId)
+        {
+            throw new UnauthorizedAccessException("The generated report's company is no longer selected or authorized.");
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (module is not null)
+        {
+            try { await module.DisposeAsync(); }
+            catch (JSDisconnectedException) { }
         }
     }
 }

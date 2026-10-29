@@ -1,0 +1,60 @@
+.analysis-workspace { color: #233e48; }
+.analysis-toolbar, .analysis-view-actions, .analysis-tabs, .analysis-rename { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+.analysis-toolbar { border-bottom: 1px solid #d5dfe2; padding: .5rem 0; }
+.analysis-toolbar h1 { font-size: 1.15rem; margin: 0 .5rem 0 0; }
+.analysis-toolbar h1 span { color: #00838f; font-weight: 400; }
+button { border: 0; background: transparent; padding: .5rem .65rem; color: #007e89; cursor: pointer; }
+button:hover { background: #e2eff1; }
+button:disabled { opacity: .4; cursor: default; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid #00838f; outline-offset: 2px; }
+.active, .analysis-toggle { background: #daeff1; border-bottom: 3px solid #00838f; }
+.analysis-toggle svg { width: 21px; height: 21px; stroke: currentColor; fill: none; stroke-width: 1.6; }
+.analysis-panel-toggle { margin-left: auto; }
+.analysis-view-actions { padding: .4rem 0; }
+.analysis-view-actions span { color: #657b83; font-size: .75rem; margin-left: auto; }
+input, select { font: inherit; color: inherit; border: 1px solid #a3b2b9; background: white; padding: .4rem; max-width: 100%; }
+.analysis-layout { display: flex; border: 1px solid #d5dfe2; background: white; height: min(65vh, 760px); min-height: 390px; }
+.analysis-grid { flex: 1; min-width: 0; overflow: auto; }
+table { border-collapse: collapse; min-width: 100%; white-space: nowrap; font-size: .875rem; }
+th, td { padding: .7rem .8rem; border-bottom: 1px solid #d5dfe2; }
+thead th { background: #daeff1; position: sticky; top: 0; z-index: 1; font-weight: 600; }
+thead th:has(button) { padding: 0; }
+thead button { color: inherit; text-align: left; width: 100%; padding: .85rem; }
+tbody tr:nth-child(even) { background: #f5f7f8; }
+tbody tr:hover { background: #edf7f8; }
+.numeric { text-align: right; font-variant-numeric: tabular-nums; }
+.numeric button { color: inherit; width: 100%; text-align: right; padding: 0; }
+.analysis-selected { background: #b7e7ea; }
+.analysis-total { background: #daeff1 !important; font-weight: 600; }
+.analysis-group { background: #eaf3f4 !important; font-weight: 600; }
+.analysis-subtotal { padding-left: 1rem; }
+.analysis-panel { width: 310px; flex-shrink: 0; border-left: 1px solid #d5dfe2; overflow: auto; }
+.analysis-panel-tabs { display: flex; border-bottom: 1px solid #d5dfe2; position: sticky; top: 0; background: white; z-index: 2; }
+.analysis-panel-tabs button { flex: 1; }
+.analysis-fields, .analysis-filters { padding: .8rem; }
+.analysis-fields > label { display: flex; gap: .5rem; margin-bottom: .6rem; }
+.analysis-fields > input { width: 100%; }
+.analysis-field-list { max-height: 240px; overflow: auto; margin-top: .5rem; }
+.analysis-field { display: flex; align-items: center; gap: .4rem; padding: .25rem 0; }
+.analysis-field label { flex: 1; display: flex; gap: .4rem; align-items: center; font-size: .83rem; }
+.analysis-field button { padding: .2rem; }
+.analysis-grip { color: #8c9fa7; cursor: grab; }
+.analysis-zone { padding: .85rem; border-top: 1px solid #d5dfe2; min-height: 100px; }
+.analysis-zone h2 { font-size: .9rem; margin: 0 0 .6rem; }
+.analysis-zone select { width: 100%; font-size: .8rem; }
+.analysis-chips { display: flex; gap: .3rem; flex-wrap: wrap; margin-bottom: .5rem; }
+.analysis-chip { border-radius: 20px; background: #daeff1; padding: .2rem .6rem; font-size: .75rem; display: inline-flex; align-items: center; }
+.analysis-chip button { padding: 0 .3rem; }
+.analysis-hint { color: #627880; font-size: .75rem; line-height: 1.5; padding: .7rem; margin: 0; }
+.analysis-filter { border-bottom: 1px solid #d5dfe2; margin-bottom: .8rem; }
+.analysis-filter label, .analysis-filter input, .analysis-filter select { display: block; width: 100%; font-size: .83rem; margin-bottom: .4rem; }
+.analysis-summary { display: flex; flex-wrap: wrap; gap: 1.25rem; padding: .8rem; align-items: center; background: #daeff1; font-size: .8rem; }
+.analysis-empty { padding: 1.5rem; color: #627880; }
+.analysis-rename { padding: .75rem; background: #edf5f6; }
+@media (max-width: 900px) { .analysis-toolbar h1 { width: 100%; } .analysis-panel { width: 270px; } }
+@media (max-width: 600px) {
+    .analysis-layout { flex-direction: column; height: auto; }
+    .analysis-grid { max-height: 420px; min-height: 260px; }
+    .analysis-panel { width: 100%; max-height: 450px; border-left: 0; border-top: 1px solid #d5dfe2; }
+    .analysis-summary { gap: .75rem; }
+}

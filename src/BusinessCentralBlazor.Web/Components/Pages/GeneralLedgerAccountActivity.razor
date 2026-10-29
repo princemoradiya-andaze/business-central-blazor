@@ -2,156 +2,124 @@
 @attribute [Authorize(Policy = CompanyAuthorizationPolicies.ActiveCompany)]
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject IGeneralLedgerInquiryService InquiryService
+@inject ILogger<GeneralLedgerAccountActivity> Logger
 
 <PageTitle>Account Activity</PageTitle>
-
-<div class="mb-4">
-    <h1>Account activity</h1>
-    <p class="text-body-secondary mb-0">Posted activity and balances for the active company.</p>
-</div>
-
-<EditForm Model="filter" OnValidSubmit="ApplyFilters">
-    <div class="row g-3 align-items-end mb-4">
-        <div class="col-sm-6 col-lg-3">
-            <label class="form-label" for="from-date">From date</label>
-            <InputDate id="from-date" class="form-control" @bind-Value="filter.FromDate" />
-        </div>
-        <div class="col-sm-6 col-lg-3">
-            <label class="form-label" for="through-date">Through date</label>
-            <InputDate id="through-date" class="form-control" @bind-Value="filter.ThroughDate" />
-        </div>
-        <div class="col-lg-2">
-            <button class="btn btn-primary" type="submit">Apply filters</button>
-        </div>
-    </div>
-</EditForm>
-
-@if (!string.IsNullOrWhiteSpace(errorMessage))
-{
-    <div class="alert alert-danger" role="alert">@errorMessage</div>
-}
-else if (activity is null)
-{
-    <div class="alert alert-warning" role="status">Account not found in the active company.</div>
-}
-else
-{
-    <h2>@activity.AccountNumber — @activity.AccountName</h2>
-    <div class="table-responsive">
-        <table class="table table-bordered">
-            <caption class="visually-hidden">Account opening, period, and closing balances</caption>
-            <thead>
-                <tr>
-                    <th scope="col">Opening debit</th>
-                    <th scope="col">Opening credit</th>
-                    <th scope="col">Period debit</th>
-                    <th scope="col">Period credit</th>
-                    <th scope="col">Closing debit</th>
-                    <th scope="col">Closing credit</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td>@activity.OpeningDebit.ToString("N4")</td>
-                    <td>@activity.OpeningCredit.ToString("N4")</td>
-                    <td>@activity.PeriodDebit.ToString("N4")</td>
-                    <td>@activity.PeriodCredit.ToString("N4")</td>
-                    <td>@activity.ClosingDebit.ToString("N4")</td>
-                    <td>@activity.ClosingCredit.ToString("N4")</td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-    @if (entryReport is not null && entryReport.Entries.Count == 0)
-    {
-        <div class="alert alert-info" role="status">No posted activity matches this date range.</div>
-    }
-    else if (entryReport is not null)
-    {
-        <div class="table-responsive">
-            <table class="table table-striped align-middle">
-                <caption class="visually-hidden">Posted account activity for the selected date range</caption>
-                <thead>
-                    <tr>
-                        <th scope="col">Entry</th>
-                        <th scope="col">Posting date</th>
-                        <th scope="col">Document</th>
-                        <th scope="col">Description</th>
-                        <th scope="col" class="text-end">Debit</th>
-                        <th scope="col" class="text-end">Credit</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var entry in entryReport.Entries)
-                    {
-                        <tr>
-                            <th scope="row">@entry.EntryNumber</th>
-                            <td>@entry.PostingDate.ToString("yyyy-MM-dd")</td>
-                            <td>@entry.DocumentNumber</td>
-                            <td>@entry.Description</td>
-                            <td class="text-end">@entry.DebitAmount.ToString("N4")</td>
-                            <td class="text-end">@entry.CreditAmount.ToString("N4")</td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
-    }
-    <a class="btn btn-outline-secondary"
-       href="@($"/financial/general-ledger/entries?accountId={AccountId}")">View account entries</a>
-}
+<FinancialDetailLayout Title="@(activity is null ? "Account activity" : $"{activity.AccountNumber} — {activity.AccountName}")"
+                       BackUrl="/financial/general-ledger/entries" BackLabel="Back to General Ledger Entries"
+                       Breadcrumb="Reports / General Ledger / Account activity" Status="Posted activity - Read-only">
+    <Commands>
+        <button type="submit" form="account-activity-filter" disabled="@busy">Apply filters</button>
+        <button type="button" disabled="@busy" @onclick="ClearFilters">Clear filters</button>
+        @if (activity is not null)
+        {
+            <a href="@($"/financial/general-ledger/entries?accountId={AccountId}")">View account entries</a>
+        }
+        <a href="/financial/general-ledger/accounts">Chart of Accounts</a>
+    </Commands>
+    <ChildContent>
+        @if (busy) { <p role="status">Loading account activity...</p> }
+        @if (errorMessage is not null) { <div class="alert alert-danger" role="alert">@errorMessage</div> }
+        <h2>Filters</h2>
+        <EditForm Model="@filter" OnValidSubmit="ApplyFilters" id="account-activity-filter">
+            <DataAnnotationsValidator /><ValidationSummary />
+            <fieldset disabled="@busy">
+                <div class="detail-fields">
+                    <div><label for="from-date">From date</label><InputDate id="from-date" class="form-control" @bind-Value="filter.FromDate" /></div>
+                    <div><label for="through-date">Through date</label><InputDate id="through-date" class="form-control" @bind-Value="filter.ThroughDate" /></div>
+                </div>
+            </fieldset>
+        </EditForm>
+        @if (!busy && errorMessage is null && activity is null)
+        {
+            <div class="alert alert-warning" role="status">Account not found in the active company.</div>
+        }
+        @if (activity is not null)
+        {
+            <h2 class="detail-section">General</h2>
+            <dl class="detail-fields">
+                <div><dt>G/L Account No.</dt><dd>@activity.AccountNumber</dd></div>
+                <div><dt>G/L Account Name</dt><dd>@activity.AccountName</dd></div>
+                <div><dt>Applied from date</dt><dd>@(activity.FromDate?.ToString("yyyy-MM-dd") ?? "All prior activity")</dd></div>
+                <div><dt>Applied through date</dt><dd>@(activity.ThroughDate?.ToString("yyyy-MM-dd") ?? "All posted dates")</dd></div>
+            </dl>
+            <h2 class="detail-section">Balances</h2>
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <caption class="visually-hidden">Account opening, period, and closing balances</caption>
+                    <thead><tr><th scope="col">Balance</th><th scope="col" class="text-end">Debit</th><th scope="col" class="text-end">Credit</th></tr></thead>
+                    <tbody>
+                        <tr><th scope="row">Opening</th><td class="text-end" aria-label="Opening debit">@activity.OpeningDebit.ToString("N4")</td><td class="text-end" aria-label="Opening credit">@activity.OpeningCredit.ToString("N4")</td></tr>
+                        <tr><th scope="row">Period</th><td class="text-end" aria-label="Period debit">@activity.PeriodDebit.ToString("N4")</td><td class="text-end" aria-label="Period credit">@activity.PeriodCredit.ToString("N4")</td></tr>
+                        <tr><th scope="row">Closing</th><td class="text-end" aria-label="Closing debit">@activity.ClosingDebit.ToString("N4")</td><td class="text-end" aria-label="Closing credit">@activity.ClosingCredit.ToString("N4")</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <p class="detail-note">Opening balances include entries before the applied from date. Period totals use the inclusive date range; closing balances combine opening and period activity.</p>
+            <h2 class="detail-section">Posted entries</h2>
+            @if (entryReport is not null && entryReport.Entries.Count == 0)
+            {
+                <p role="status">No posted activity matches this date range.</p>
+            }
+            else if (entryReport is not null)
+            {
+                <div class="table-responsive">
+                    <table class="table table-striped align-middle">
+                        <caption class="visually-hidden">Posted account activity for the selected date range</caption>
+                        <thead><tr><th scope="col">Entry No.</th><th scope="col">Posting Date</th><th scope="col">Document No.</th><th scope="col">Description</th>
+                            <th scope="col" class="text-end">Debit Amount</th><th scope="col" class="text-end">Credit Amount</th></tr></thead>
+                        <tbody>
+                            @foreach (var entry in entryReport.Entries)
+                            {
+                                <tr @key="entry.Id"><th scope="row">@entry.EntryNumber</th><td>@entry.PostingDate.ToString("yyyy-MM-dd")</td>
+                                    <td><a href="@($"/financial/journals/{entry.JournalBatchId}")">@entry.DocumentNumber</a></td><td>@entry.Description</td>
+                                    <td class="text-end">@entry.DebitAmount.ToString("N4")</td><td class="text-end">@entry.CreditAmount.ToString("N4")</td></tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        }
+    </ChildContent>
+</FinancialDetailLayout>
 
 @code {
-    [Parameter]
-    public Guid AccountId { get; set; }
-
+    [Parameter] public Guid AccountId { get; set; }
     private GeneralLedgerEntryFilter filter = new();
     private GeneralLedgerAccountActivityReport? activity;
     private GeneralLedgerEntryReport? entryReport;
     private string? errorMessage;
+    private bool busy;
 
-    protected override async Task OnParametersSetAsync()
-    {
-        var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
-        await LoadActivityAsync(user);
-    }
+    protected override Task OnParametersSetAsync() => ApplyFilters();
+
+    private async Task ClearFilters() { filter = new(); await ApplyFilters(); }
 
     private async Task ApplyFilters()
     {
+        if (busy) return;
+        busy = true;
         errorMessage = null;
-        var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
-        await LoadActivityAsync(user);
-    }
-
-    private async Task LoadActivityAsync(System.Security.Claims.ClaimsPrincipal user)
-    {
+        activity = null;
+        entryReport = null;
         try
         {
-            activity = await InquiryService.GetAccountActivityAsync(
-                user,
-                AccountId,
-                filter.FromDate,
-                filter.ThroughDate);
-            entryReport = activity is null
-                ? null
-                : await InquiryService.GetEntriesAsync(user, new GeneralLedgerEntryFilter
-                {
-                    FromDate = filter.FromDate,
-                    ThroughDate = filter.ThroughDate,
-                    AccountId = AccountId
-                });
+            var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+            var result = await InquiryService.GetAccountActivityAsync(user, AccountId, filter.FromDate, filter.ThroughDate);
+            var entries = result is null ? null : await InquiryService.GetEntriesAsync(user, new GeneralLedgerEntryFilter
+            {
+                FromDate = filter.FromDate, ThroughDate = filter.ThroughDate, AccountId = AccountId
+            });
+            activity = result;
+            entryReport = entries;
         }
-        catch (ValidationException exception)
+        catch (ValidationException exception) { errorMessage = exception.Message; }
+        catch (UnauthorizedAccessException) { errorMessage = "Your active company is no longer available. Select an active company and try again."; }
+        catch (Exception exception)
         {
-            activity = null;
-            entryReport = null;
-            errorMessage = exception.Message;
+            Logger.LogError(exception, "Unable to load account activity for {AccountId}", AccountId);
+            errorMessage = "Account activity could not be loaded. Apply filters again to retry.";
         }
-        catch (UnauthorizedAccessException)
-        {
-            activity = null;
-            entryReport = null;
-            errorMessage = "Your active company is no longer available. Select an active company and try again.";
-        }
+        finally { busy = false; }
     }
 }
