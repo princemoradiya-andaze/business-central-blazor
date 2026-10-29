@@ -21,7 +21,7 @@ public sealed class InventoryPageTests(AuthenticationWebApplicationFactory facto
         {
             AllowAutoRedirect = false
         });
-        foreach (var route in new[] { "/financial/inventory", "/financial/inventory/movements" })
+        foreach (var route in new[] { "/financial/inventory", "/financial/inventory/movements", "/financial/inventory/movements?new=movement" })
         {
             using var anonymousResponse = await anonymousClient.GetAsync(route);
             Assert.Equal(HttpStatusCode.Redirect, anonymousResponse.StatusCode);
@@ -51,19 +51,27 @@ public sealed class InventoryPageTests(AuthenticationWebApplicationFactory facto
         Assert.Contains("Details", html, StringComparison.Ordinal);
         Assert.DoesNotContain("id=\"movement-heading\"", html, StringComparison.Ordinal);
         Assert.DoesNotContain("id=\"movements-heading\"", html, StringComparison.Ordinal);
-        Assert.Contains("/financial/inventory/movements#movement-heading", html, StringComparison.Ordinal);
-        Assert.Contains("/financial/inventory/movements#movements-heading", html, StringComparison.Ordinal);
+        Assert.Contains("href=\"/financial/inventory/movements\"", html, StringComparison.Ordinal);
+        Assert.Contains(">Stock Movements</a>", html, StringComparison.Ordinal);
+        Assert.DoesNotContain(">Movement history</a>", html, StringComparison.Ordinal);
         Assert.Contains("Inventory", html, StringComparison.Ordinal);
 
         using var movementsResponse = await client.GetAsync("/financial/inventory/movements");
         var movementsHtml = await movementsResponse.Content.ReadAsStringAsync();
         Assert.Equal(HttpStatusCode.OK, movementsResponse.StatusCode);
-        Assert.Contains("id=\"movement-heading\"", movementsHtml, StringComparison.Ordinal);
         Assert.Contains("id=\"movements-heading\"", movementsHtml, StringComparison.Ordinal);
-        Assert.Contains("Create stock movement draft", movementsHtml, StringComparison.Ordinal);
-        Assert.Contains("Inventory movement history", movementsHtml, StringComparison.Ordinal);
-        Assert.Contains("Create or unblock an inventory item", movementsHtml, StringComparison.Ordinal);
+        Assert.Contains("Stock Movements", movementsHtml, StringComparison.Ordinal);
+        Assert.Contains("id=\"stock-movements-status\"", movementsHtml, StringComparison.Ordinal);
+        Assert.Contains("Choose view", movementsHtml, StringComparison.Ordinal);
+        Assert.Contains("No movements match", movementsHtml, StringComparison.Ordinal);
+        Assert.DoesNotContain("id=\"inventory-movement\"", movementsHtml, StringComparison.Ordinal);
         Assert.DoesNotContain("id=\"new-item-action\"", movementsHtml, StringComparison.Ordinal);
+        using var card = await client.GetAsync("/financial/inventory/movements?new=movement");
+        var cardHtml = await card.Content.ReadAsStringAsync();
+        Assert.Contains("New Stock Movement", cardHtml, StringComparison.Ordinal);
+        Assert.Contains("Create or unblock an inventory item", cardHtml, StringComparison.Ordinal);
+        Assert.Contains("Create an open, unlocked accounting period", cardHtml, StringComparison.Ordinal);
+        Assert.Matches("<fieldset\\b[^>]*\\bdisabled\\b", cardHtml);
     }
 
     [Fact]
@@ -95,13 +103,24 @@ public sealed class InventoryPageTests(AuthenticationWebApplicationFactory facto
         using var response = await client.GetAsync("/financial/inventory/movements");
         var html = await response.Content.ReadAsStringAsync();
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Contains("id=\"movement-item\"", html, StringComparison.Ordinal);
-        Assert.Contains("Visible movement item", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("id=\"movement-item\"", html, StringComparison.Ordinal);
+        Assert.Contains("record-row-selected", html, StringComparison.Ordinal);
         Assert.Contains("VISIBLE-MOVEMENT", html, StringComparison.Ordinal);
         Assert.Contains($"/financial/journals/{journalId}", html, StringComparison.Ordinal);
         Assert.DoesNotContain("BLOCKED-ITEM", html, StringComparison.Ordinal);
         Assert.DoesNotContain("PRIVATE-ITEM", html, StringComparison.Ordinal);
         Assert.DoesNotContain("PRIVATE-MOVEMENT", html, StringComparison.Ordinal);
+        using var card = await client.GetAsync("/financial/inventory/movements?new=movement");
+        var cardHtml = await card.Content.ReadAsStringAsync();
+        Assert.Contains("id=\"movement-item\"", cardHtml, StringComparison.Ordinal);
+        Assert.Contains("Visible movement item", cardHtml, StringComparison.Ordinal);
+        Assert.Contains("id=\"entity-card-heading\"", cardHtml, StringComparison.Ordinal);
+        Assert.Contains("id=\"inventory-movement\"", cardHtml, StringComparison.Ordinal);
+        Assert.Contains("Create draft journal", cardHtml, StringComparison.Ordinal);
+        Assert.Contains(">Cancel</button>", cardHtml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Previous record", cardHtml, StringComparison.Ordinal);
+        Assert.DoesNotContain("BLOCKED-ITEM", cardHtml, StringComparison.Ordinal);
+        Assert.DoesNotContain("PRIVATE-ITEM", cardHtml, StringComparison.Ordinal);
     }
 
     private static async Task SignInAsync(HttpClient client, string email)

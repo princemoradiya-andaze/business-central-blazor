@@ -34,6 +34,10 @@ See [the architecture overview](docs/architecture/overview.md), [the schema disc
 
 ## Development workflow
 
+Inventory uses one **Stock Movements** menu link for movement history, with the shared list/tile
+workspace and an explicit **+ New** stock movement card. Draft creation opens its linked journal;
+stock changes only on explicit posting. Items and the existing inventory services are unchanged.
+
 Cash Management keeps the Bank Accounts list and account cards unchanged. **Block/Reactivate** opens
 a bank-specific confirmation card; **Transactions** opens a compact receipts/payments workspace with
 a Manual statements tab. **+ New receipt**, **+ New payment**, and **+ New statement** use explicit

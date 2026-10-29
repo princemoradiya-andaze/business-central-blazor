@@ -159,9 +159,17 @@ The initial slice uses one company-wide balance per item and does not include wa
 The item list provides List, Tall tiles, and Tiles views, independent Filters and Details panes,
 search, active/blocked filtering, selection, and modal New/Edit cards. Blocking/reactivating uses the
 existing item update operation. The Items screen contains only the workspace and its card dialogs.
-Stock movement drafts and movement history are on `/financial/inventory/movements`, reachable from
-Inventory > Create stock movement / Movement history and from the selected item's Details pane.
-The separate workflow retains the same company authorization, validation, costing, and journal posting rules.
+Inventory > Stock Movements opens `/financial/inventory/movements`, with movement history in the shared
+List/Tall tiles/Tiles workspace, search by document/item/description, Draft/Posted status filtering,
+movement-type filtering, first-record selection, and independent Filters/Details panes.
+**+ New** opens the explicit creation card at `?new=movement`, with the existing receipt/issue fields.
+Issues hide receipt unit cost and use the existing weighted-average costing rules. Validation/save
+failures retain inputs; Back, Cancel, Escape, and internal navigation guard unsaved inputs, while external
+navigation uses the browser prompt. Creation opens the linked draft journal; it never posts automatically.
+Document and journal links open the existing styled journal detail page.
+The selected item's existing Details shortcut and legacy `#movement-heading` links open the creation
+card; `#movements-heading` continues to show history. The Items UI is unchanged.
+The workflow retains the same company authorization, validation, costing, and journal posting rules.
 
 Items, Bank accounts, and Chart of Accounts share the Vendors-style transparent command bar over the
 `#f5f6f7` workspace background. Flat commands, separators, and filter fields supplied through component
