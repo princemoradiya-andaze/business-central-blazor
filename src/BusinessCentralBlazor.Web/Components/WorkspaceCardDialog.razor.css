@@ -18,6 +18,12 @@
     background: rgb(0 0 0 / 26%);
 }
 
+.workspace-card-dialog.currency-card.expanded {
+    width: calc(100vw - 40px);
+    height: calc(100dvh - 40px);
+    max-height: calc(100dvh - 40px);
+}
+
 .workspace-card-dialog.report-request {
     width: min(760px, calc(100vw - 20px));
     height: min(810px, calc(100dvh - 40px));

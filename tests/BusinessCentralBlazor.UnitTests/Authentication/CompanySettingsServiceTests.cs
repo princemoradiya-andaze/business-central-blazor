@@ -119,11 +119,17 @@ public sealed class CompanySettingsServiceTests(AuthenticationWebApplicationFact
         using var page = await client.GetAsync("/financial/company-settings");
         Assert.Equal(HttpStatusCode.OK, page.StatusCode);
         var html = await page.Content.ReadAsStringAsync();
-        Assert.Contains("Company settings", html);
+        Assert.Contains("Company Settings", html);
         Assert.Contains("Base currency", html);
         Assert.Contains("Test Currency", html);
         Assert.Contains("Save base currency", html);
-        Assert.Contains("Add currency to shared catalog", html);
+        Assert.Contains("Shared Currency Catalog", html);
+        Assert.Contains("financial-detail", html);
+        Assert.Contains("Back to Home", html);
+        Assert.Contains("Discard changes", html);
+        Assert.Contains("Settings page company", html);
+        Assert.DoesNotContain("href=\"/workspace", html);
+        Assert.DoesNotContain("id=\"currency-card-heading\"", html);
         Assert.Contains("Company workspace settings", html);
     }
 

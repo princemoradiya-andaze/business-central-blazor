@@ -81,6 +81,7 @@
         {
             var path = "/" + Navigation.ToBaseRelativePath(Navigation.Uri).Split('?', '#')[0];
             return path.Equals("/financial/inventory", StringComparison.OrdinalIgnoreCase) ||
+                   path.Equals("/financial/company-settings", StringComparison.OrdinalIgnoreCase) ||
                    path.Equals("/financial/inventory/movements", StringComparison.OrdinalIgnoreCase) ||
                    path.Equals("/financial/banks", StringComparison.OrdinalIgnoreCase) ||
                    path.StartsWith("/financial/banks/", StringComparison.OrdinalIgnoreCase) ||

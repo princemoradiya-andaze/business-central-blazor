@@ -49,10 +49,9 @@ internal static class NavigationMenuCatalog
         new("more", "More",
         [
             new("Home", "/"),
-            new("Company settings", "/financial/company-settings"),
-            new("Workspace notes", "/workspace/notes")
+            new("Company settings", "/financial/company-settings")
         ],
-        ["/financial/company-settings", "/workspace"])
+        ["/financial/company-settings"])
     ];
 }
 
