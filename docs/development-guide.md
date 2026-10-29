@@ -89,8 +89,24 @@ posted activity exist.
 
 Bank setup uses the shared List, Tall tiles, and Tiles workspace with independent Filters and Details
 panes, search, status filtering, selection, modal New/Edit cards, and the existing block/reactivate
-status operation. The Details pane links to the existing receipt, payment, statement, and reconciliation
-workflow; it does not replace or alter those transaction screens.
+status operation. Block/Reactivate opens a bank-specific confirmation card displaying account, currency,
+and current/new status; confirmation uses the existing revision-checked update and retains history.
+The list layout and account New/Edit behavior are unchanged.
+
+`/financial/banks/{id}` opens the compact Bank transactions workspace, with receipt/payment history,
+search, status filters, first-record selection, List/Tall tiles/Tiles, and independent Filters/Details.
+The Manual statements tab uses `?view=statements` and opens existing statements in the
+reconciliation detail screen. Linked journal batches (`/financial/journals/{id}`) and statements
+(`/financial/bank-statements/{id}`) share the Business Central-style detail layout: back navigation,
+status, compact command bar, two-column General fields, and horizontally scrollable line grids.
+Journal edit/add/post/reversal actions and statement header saves, line import, matching, and completion
+remain explicit and use the existing handlers and services. Statement back navigation returns to the
+Manual statements tab. **+ New receipt**, **+ New payment**, and **+ New statement** open explicit
+creation cards (`?view=journals&new=receipt`, `?view=journals&new=payment`, or
+`?view=statements&new=statement`). Back, Cancel, Escape, and internal navigation protect modified
+inputs with Discard and close/Keep editing; external navigation uses the browser prompt.
+Validation/save failures retain inputs. Blocked accounts retain readable history but cannot create
+new journals or statements. No new fields, posting behavior, services, or migrations are introduced.
 
 The bank detail page creates a balanced draft CashReceipts or Payments journal atomically with its
 bank link. A positive receipt debits the bank and credits the selected offset; a positive payment does

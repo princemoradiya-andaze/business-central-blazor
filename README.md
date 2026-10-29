@@ -34,6 +34,14 @@ See [the architecture overview](docs/architecture/overview.md), [the schema disc
 
 ## Development workflow
 
+Cash Management keeps the Bank Accounts list and account cards unchanged. **Block/Reactivate** opens
+a bank-specific confirmation card; **Transactions** opens a compact receipts/payments workspace with
+a Manual statements tab. **+ New receipt**, **+ New payment**, and **+ New statement** use explicit
+creation cards with validation and unsaved-input protection. Journals still require separate review
+and posting in General journals. Linked journal batches and manual statement reconciliation use matching
+Business Central-style detail pages with compact commands, General fields, and responsive line grids.
+Posting, reversal, matching, completion, and company-scoped banking services are unchanged.
+
 Customers, Vendors, Items, Bank accounts, Chart of Accounts, General journals, Dimensions, Accounting periods and Tax setup select the first visible record on opening. Clicking a row or tile selects it without deselecting it; filters preserve that selection when possible, otherwise select the first remaining record. Empty results clear selection and details. List, Tall tiles and Tiles views and the independent Filters/Details panes remain available. Click a record's number/code link (also available in tiles) to open its prefilled, directly editable card.
 
 These modules share the same card layout and save lifecycle, using only their existing fields and company-scoped services. **New** has explicit Save/Cancel and no previous/next controls. Existing cards save valid changes on leaving a field, report Unsaved changes/Saving/Saved or an error, and retain invalid or failed drafts for retry or explicit discard. Saves use detached snapshots and run serially, including edits made during an outstanding save. Item/bank saves carry forward the concurrency token returned by that write, not a token from a later list refresh. Back, Escape, internal navigation and previous/next first flush pending edits and block on validation/save failure. Browser reload/close uses the standard unsaved-change prompt; it cannot guarantee persistence after a disconnected circuit or browser termination.

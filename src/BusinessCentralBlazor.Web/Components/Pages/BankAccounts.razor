@@ -131,10 +131,8 @@ else
 
     @if (isStatusDialogOpen && SelectedBank is { } pendingBank)
     {
-        <WorkspaceStatusConfirmation IdPrefix="bank" RecordLabel="@($"{pendingBank.Code} - {pendingBank.Name}")"
-                                     IsBlocked="@pendingBank.IsBlocked" IsSaving="@isSaving" ErrorMessage="@errorMessage"
-                                     ReturnFocusFallbackSelector="#new-bank-action"
-                                     OnClose="() => isStatusDialogOpen = false" OnConfirm="ToggleBankStatusAsync" />
+        <BankStatusConfirmation Bank="@pendingBank" IsSaving="@isSaving" ErrorMessage="@errorMessage"
+                                OnClose="() => isStatusDialogOpen = false" OnConfirm="ToggleBankStatusAsync" />
     }
 
     @if (isAccountDialogOpen)

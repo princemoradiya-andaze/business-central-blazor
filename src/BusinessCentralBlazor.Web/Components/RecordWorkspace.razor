@@ -88,6 +88,8 @@
         </div>
     </header>
 
+    @ContextContent
+
     <div class="record-workspace-layout @(IsFilterPaneOpen ? "record-filter-open" : null) @(IsDetailsPaneOpen ? "record-details-open" : null)">
         <aside id="@($"{IdPrefix}-filter-pane")" class="record-workspace-filter-pane"
               aria-label="@($"{Title} filters")" hidden="@(!IsFilterPaneOpen)">
@@ -166,6 +168,7 @@
     [Parameter] public bool HasRecords { get; set; }
     [Parameter] public string EmptyMessage { get; set; } = "No records match the current filters.";
     [Parameter] public RenderFragment? HeaderActions { get; set; }
+    [Parameter] public RenderFragment? ContextContent { get; set; }
     [Parameter] public RenderFragment? FilterContent { get; set; }
     [Parameter] public RenderFragment? ListContent { get; set; }
     [Parameter] public RenderFragment? TallTilesContent { get; set; }

@@ -1,0 +1,22 @@
+.bank-activity-context { font-size: 12px; color: #526775; padding: 14px 0 8px; }
+.bank-activity-tabs { display: flex; gap: 18px; border-bottom: 1px solid #d5dce1; margin-bottom: 12px; }
+.bank-activity-tabs a { text-decoration: none; color: #526775; font-size: 13px; padding: 8px 0; border-bottom: 2px solid transparent; }
+.bank-activity-tabs a.active { color: #005b85; border-color: #007c89; font-weight: 600; }
+.bank-activity-note { font-size: 12px; color: #667085; line-height: 1.7; margin-top: 16px; }
+.bank-activity-card { height: 100%; display: flex; flex-direction: column; padding: 22px 60px 0; }
+.bank-activity-top { display: flex; align-items: center; gap: 13px; font-size: 12px; color: #526775; }
+.bank-activity-back { border: 0; border-radius: 50%; width: 35px; height: 35px; background: #d8eff1; color: #45616a; font-size: 22px; }
+.bank-activity-state { margin-left: auto; }
+.bank-activity-title { font-size: 30px; font-weight: 300; margin: 15px 0 18px; }
+.bank-activity-commands { min-height: 39px; border-block: 1px solid #d5dce1; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.bank-activity-commands span { font-size: 13px; padding: 0 9px; }
+.bank-activity-commands button { border: 0; background: transparent; color: #005b85; padding: 6px 9px; font-size: 12px; }
+.bank-activity-body { overflow: auto; flex: 1; padding: 22px 0 30px; }
+.bank-activity-section { font-size: 17px; font-weight: 600; border-bottom: 1px solid #667085; padding-bottom: 6px; margin: 0 0 20px; }
+.bank-activity-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 20px 36px; }
+.bank-activity-fields label { display: flex; align-items: center; gap: 8px; color: #526775; font-size: 12px; margin-bottom: 6px; }
+.bank-activity-fields label::after { content: ""; flex: 1; border-bottom: 2px dotted #d5dce1; }
+.bank-activity-fields input, .bank-activity-fields ::deep input, .bank-activity-fields ::deep select { height: 34px; width: 100%; border: 1px solid #aeb8bf; border-radius: 0; padding: 4px 7px; background: white; }
+.bank-activity-fields input:read-only { background: #f5f6f7; }
+footer { border-top: 1px solid #d5dce1; padding: 13px 0; font-size: 11px; color: #667085; }
+@media (max-width: 900px) { .bank-activity-card { padding: 18px 24px 0; } .bank-activity-fields { grid-template-columns: 1fr; } .bank-activity-title { font-size: 25px; } }
