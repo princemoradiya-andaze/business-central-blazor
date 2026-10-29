@@ -1,13 +1,13 @@
 @page "/financial/inventory/movements"
 @attribute [Authorize(Policy = CompanyAuthorizationPolicies.ActiveCompany)]
+@implements IDisposable
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject IInventoryService InventoryService
 @inject NavigationManager Navigation
+@inject ILogger<StockMovements> Logger
 
-<PageTitle>Stock movements</PageTitle>
-<h1>Stock movements</h1>
-<p><a href="/financial/inventory">Items</a></p>
-@if (!string.IsNullOrWhiteSpace(errorMessage))
+<PageTitle>Stock Movements</PageTitle>
+@if (errorMessage is not null)
 {
     <div class="alert alert-danger" role="alert">@errorMessage</div>
 }
@@ -15,138 +15,141 @@
 {
     <p role="status">Loading stock movements...</p>
 }
-else
+else if (loaded)
 {
-    <section class="card mb-4" aria-labelledby="movement-heading">
-        <div class="card-body">
-            <h2 id="movement-heading" class="h4">Create stock movement draft</h2>
-            <p class="text-body-secondary">
-                Positive receipts/opening adjustments add stock at the entered unit cost. Issues use the current weighted-average
-                cost and cannot exceed stock on hand. Open the linked journal and post it to update stock.
-            </p>
-            @if (items.All(item => item.IsBlocked))
+    <RecordWorkspace Title="Stock Movements" IdPrefix="stock-movements" StatusControlId="stock-movements-status"
+                     StatusOptionsOverride="@StatusOptions" StatusFilter="@status" StatusFilterChanged="SetStatus"
+                     SearchPlaceholder="Search document, item, or description" SearchTerm="@search" SearchTermChanged="SetSearch"
+                     HasRecords="@VisibleMovements.Any()" EmptyMessage="No movements match the current search and filters.">
+        <HeaderActions>
+            <a class="record-workspace-action" href="/financial/inventory">Items</a>
+            <a id="new-movement-action" class="record-workspace-action" href="/financial/inventory/movements?new=movement">+ New</a>
+            @if (SelectedMovement is { } selected)
             {
-                <div class="alert alert-info" role="status">
-                    Create or unblock an inventory item before entering movements.
-                    <a href="/financial/inventory">Items</a>
-                </div>
+                <a class="record-workspace-action" href="@JournalUrl(selected)">Open journal</a>
             }
-            else if (periods.Count == 0)
-            {
-                <div class="alert alert-info" role="status">
-                    Create an open, unlocked accounting period before entering movements.
-                    <a href="/financial/accounting-periods">Accounting periods</a>
-                </div>
-            }
-            else
-            {
-                <EditForm Model="@movementInput" OnValidSubmit="CreateMovementAsync" FormName="inventory-movement">
-                    <DataAnnotationsValidator />
-                    <ValidationSummary />
-                    <fieldset disabled="@isSaving">
-                        <div class="row g-3">
-                            <div class="col-md-4">
-                                <label class="form-label" for="movement-item">Item</label>
-                                <InputSelect id="movement-item" class="form-select" @bind-Value="movementInput.ItemId">
-                                    <option value="@Guid.Empty">Select item</option>
-                                    @foreach (var item in items.Where(item => !item.IsBlocked))
-                                    {
-                                        <option value="@item.Id">@item.Number - @item.Description</option>
-                                    }
-                                </InputSelect>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label" for="movement-period">Accounting period</label>
-                                <InputSelect id="movement-period" class="form-select" @bind-Value="movementInput.AccountingPeriodId">
-                                    <option value="@Guid.Empty">Select period</option>
-                                    @foreach (var period in periods)
-                                    {
-                                        <option value="@period.Id">@period.Name (@period.StartsOn - @period.EndsOn)</option>
-                                    }
-                                </InputSelect>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label" for="movement-date">Posting date</label>
-                                <InputDate id="movement-date" class="form-control" TValue="DateOnly" @bind-Value="movementInput.PostingDate" />
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label" for="movement-number">Unique document number</label>
-                                <InputText id="movement-number" class="form-control" @bind-Value="movementInput.DocumentNumber" />
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label" for="movement-description">Description</label>
-                                <InputText id="movement-description" class="form-control" @bind-Value="movementInput.Description" />
-                            </div>
-                            <div class="col-md-2">
-                                <label class="form-label" for="movement-kind">Movement</label>
-                                <InputSelect id="movement-kind" class="form-select" @bind-Value="movementInput.IsReceipt">
-                                    <option value="true">Receipt / increase</option>
-                                    <option value="false">Issue / decrease</option>
-                                </InputSelect>
-                            </div>
-                            <div class="col-md-2">
-                                <label class="form-label" for="movement-quantity">Quantity</label>
-                                <InputNumber id="movement-quantity" class="form-control" step="0.0001" @bind-Value="movementInput.Quantity" />
-                            </div>
-                            @if (movementInput.IsReceipt)
-                            {
-                                <div class="col-md-3">
-                                    <label class="form-label" for="movement-unit-cost">Receipt unit cost</label>
-                                    <InputNumber id="movement-unit-cost" class="form-control" step="0.0001" @bind-Value="movementInput.UnitCost" />
-                                </div>
-                            }
-                        </div>
-                        <button class="btn btn-primary mt-3" type="submit">Create draft journal</button>
-                    </fieldset>
-                </EditForm>
-            }
-        </div>
-    </section>
-
-    <section aria-labelledby="movements-heading">
-        <h2 id="movements-heading" class="h4">Inventory movement history</h2>
-        @if (movements.Count == 0)
-        {
-            <p>No inventory movements have been entered for this company.</p>
-        }
-        else
-        {
+        </HeaderActions>
+        <FilterContent>
+            <label for="movement-filter-kind">Movement type</label>
+            <select id="movement-filter-kind" class="form-select" value="@kindFilter" @onchange="SetKind">
+                <option value="all">All</option><option value="receipt">Receipt / increase</option><option value="issue">Issue / decrease</option>
+            </select>
+            <button type="button" class="btn btn-link btn-sm px-0" @onclick="ClearFilters">Clear filters</button>
+        </FilterContent>
+        <ListContent>
             <div class="table-responsive">
                 <table class="table table-striped align-middle">
-                    <caption>Inventory movement drafts and posted movements</caption>
-                    <thead>
-                        <tr>
-                            <th scope="col">Date</th>
-                            <th scope="col">Document</th>
-                            <th scope="col">Item</th>
-                            <th scope="col">Description</th>
-                            <th scope="col" class="text-end">Quantity</th>
-                            <th scope="col" class="text-end">Unit cost</th>
-                            <th scope="col" class="text-end">Value</th>
-                            <th scope="col">Status</th>
-                            <th scope="col">Journal</th>
-                        </tr>
-                    </thead>
+                    <caption class="visually-hidden">Inventory movement drafts and posted movements</caption>
+                    <thead><tr><th scope="col">Date</th><th scope="col">Document</th><th scope="col">Item</th><th scope="col">Description</th>
+                        <th scope="col" class="text-end">Quantity</th><th scope="col" class="text-end">Unit cost</th><th scope="col" class="text-end">Value</th><th scope="col">Status</th><th scope="col">Journal</th></tr></thead>
                     <tbody>
-                        @foreach (var movement in movements)
+                        @foreach (var movement in VisibleMovements)
                         {
-                            <tr>
+                            <tr @key="movement.Id" class="@(selectedId == movement.Id ? "record-row-selected" : null)" @onclick="() => selectedId = movement.Id">
                                 <td>@movement.PostingDate.ToString("yyyy-MM-dd")</td>
-                                <td>@movement.DocumentNumber</td>
-                                <td>@movement.ItemNumber</td>
-                                <td>@movement.Description</td>
-                                <td class="text-end">@movement.Quantity.ToString("N4")</td>
-                                <td class="text-end">@movement.UnitCost.ToString("N4")</td>
-                                <td class="text-end">@movement.InventoryValue.ToString("N4")</td>
-                                <td>@(movement.IsPosted ? "Posted" : "Draft")</td>
-                                <td><a href="@($"/financial/journals/{movement.JournalBatchId}")">Open journal</a></td>
+                                <th scope="row"><a href="@JournalUrl(movement)" @onclick:stopPropagation="true">@movement.DocumentNumber</a></th>
+                                <td>@movement.ItemNumber</td><td>@movement.Description</td>
+                                <td class="text-end">@movement.Quantity.ToString("N4")</td><td class="text-end">@movement.UnitCost.ToString("N4")</td>
+                                <td class="text-end">@movement.InventoryValue.ToString("N4")</td><td>@MovementStatus(movement)</td>
+                                <td><a href="@JournalUrl(movement)" @onclick:stopPropagation="true">Open journal</a></td>
                             </tr>
                         }
                     </tbody>
                 </table>
             </div>
-        }
-    </section>
+        </ListContent>
+        <TallTilesContent>@Tiles(true)</TallTilesContent>
+        <TilesContent>@Tiles(false)</TilesContent>
+        <DetailsContent>
+            <h3>Movement details</h3>
+            @if (SelectedMovement is { } movement)
+            {
+                <dl>
+                    <div><dt>Document</dt><dd>@movement.DocumentNumber</dd></div>
+                    <div><dt>Item</dt><dd>@movement.ItemNumber</dd></div>
+                    <div><dt>Description</dt><dd>@movement.Description</dd></div>
+                    <div><dt>Posting date</dt><dd>@movement.PostingDate.ToString("yyyy-MM-dd")</dd></div>
+                    <div><dt>Movement</dt><dd>@(movement.Quantity > 0 ? "Receipt / increase" : "Issue / decrease")</dd></div>
+                    <div><dt>Quantity</dt><dd>@movement.Quantity.ToString("N4")</dd></div>
+                    <div><dt>Unit cost</dt><dd>@movement.UnitCost.ToString("N4")</dd></div>
+                    <div><dt>Value</dt><dd>@movement.InventoryValue.ToString("N4")</dd></div>
+                    <div><dt>Status</dt><dd>@MovementStatus(movement)</dd></div>
+                </dl>
+            }
+            else { <p>No movement selected.</p> }
+        </DetailsContent>
+    </RecordWorkspace>
+    <p class="movement-note" id="movements-heading">Movement history includes drafts and posted movements. Creating a movement creates a linked draft journal only;
+        stock changes when that journal is explicitly posted. Posted movements remain read-only.</p>
+
+    @if (cardOpen)
+    {
+        <WorkspaceCardDialog LabelledBy="entity-card-heading" IsSaving="@isSaving" OnClose="RequestClose" ReturnFocusSelector="#new-movement-action">
+            <NavigationLock ConfirmExternalNavigation="@(isSaving || HasPendingChanges)" OnBeforeInternalNavigation="BeforeNavigation" />
+            <div class="movement-card">
+                <div class="movement-top">
+                    <button class="movement-back" type="button" aria-label="Close record card" disabled="@isSaving" @onclick="RequestClose">&#8592;</button>
+                    <span>Inventory / Stock Movement</span><span class="movement-state">@(isSaving ? "Saving..." : "Unsaved draft")</span>
+                </div>
+                <h2 class="movement-title" id="entity-card-heading">New Stock Movement</h2>
+                <div class="movement-commands">
+                    <span>Home</span>
+                    <button type="submit" form="inventory-movement" disabled="@(isSaving || !CanCreate)">Create draft journal</button>
+                    <button type="button" disabled="@isSaving" @onclick="RequestClose">Cancel</button>
+                </div>
+                <div class="movement-body">
+                    @if (cardError is not null) { <div class="alert alert-danger" role="alert">@cardError</div> }
+                    @if (confirmDiscard)
+                    {
+                        <div class="alert alert-warning" role="alert">Discard unsaved inputs before leaving?
+                            <button type="button" class="btn btn-link btn-sm" @onclick="Discard">Discard and close</button>
+                            <button type="button" class="btn btn-link btn-sm" @onclick="() => confirmDiscard = false">Keep editing</button>
+                        </div>
+                    }
+                    <h3 id="movement-heading">General</h3>
+                    @if (items.All(item => item.IsBlocked))
+                    {
+                        <div class="alert alert-info" role="status">Create or unblock an inventory item before entering movements. <a href="/financial/inventory">Items</a></div>
+                    }
+                    @if (periods.Count == 0)
+                    {
+                        <div class="alert alert-info" role="status">Create an open, unlocked accounting period before entering movements. <a href="/financial/accounting-periods">Accounting periods</a></div>
+                    }
+                    <EditForm EditContext="@context" OnValidSubmit="CreateMovementAsync" FormName="inventory-movement" id="inventory-movement">
+                        <DataAnnotationsValidator /><ValidationSummary />
+                        <fieldset disabled="@(isSaving || !CanCreate)">
+                            <div class="movement-fields" @oninput="() => draftChanged = true">
+                                <div><label for="movement-item">Item</label><InputSelect id="movement-item" @bind-Value="movementInput.ItemId">
+                                    <option value="@Guid.Empty">Select item</option>
+                                    @foreach (var item in items.Where(item => !item.IsBlocked)) { <option value="@item.Id">@item.Number - @item.Description</option> }
+                                </InputSelect></div>
+                                <div><label for="movement-period">Accounting period</label><InputSelect id="movement-period" @bind-Value="movementInput.AccountingPeriodId">
+                                    <option value="@Guid.Empty">Select period</option>
+                                    @foreach (var period in periods) { <option value="@period.Id">@period.Name (@period.StartsOn - @period.EndsOn)</option> }
+                                </InputSelect></div>
+                                <div><label for="movement-date">Posting date</label><InputDate id="movement-date" @bind-Value="movementInput.PostingDate" /></div>
+                                <div><label for="movement-number">Unique document number</label><CardInputText id="movement-number" maxlength="64" @bind-Value="movementInput.DocumentNumber" /></div>
+                                <div><label for="movement-description">Description</label><CardInputText id="movement-description" maxlength="250" @bind-Value="movementInput.Description" /></div>
+                                <div><label for="movement-kind">Movement</label><InputSelect id="movement-kind" @bind-Value="movementInput.IsReceipt">
+                                    <option value="true">Receipt / increase</option><option value="false">Issue / decrease</option>
+                                </InputSelect></div>
+                                <div><label for="movement-quantity">Quantity</label><InputNumber id="movement-quantity" step="0.0001" @bind-Value="movementInput.Quantity" /></div>
+                                @if (movementInput.IsReceipt)
+                                {
+                                    <div><label for="movement-unit-cost">Receipt unit cost</label><InputNumber id="movement-unit-cost" step="0.0001" @bind-Value="movementInput.UnitCost" /></div>
+                                }
+                            </div>
+                        </fieldset>
+                    </EditForm>
+                    <p class="alert alert-info mt-4">@(movementInput.IsReceipt
+                        ? "Positive receipts/opening adjustments add stock at the entered unit cost."
+                        : "Issues use the current weighted-average cost and cannot exceed stock on hand.")
+                        Open the linked journal and post it to update stock. Creating a draft does not change stock on hand.</p>
+                </div>
+                <footer>Explicit draft creation only. Review and post in the linked journal. Cancel discards unsaved inputs.</footer>
+            </div>
+        </WorkspaceCardDialog>
+    }
 }
 
 @code {
@@ -154,59 +157,119 @@ else
     private IReadOnlyList<InventoryItemListItem> items = [];
     private IReadOnlyList<InventoryMovementListItem> movements = [];
     private InventoryMovementInput movementInput = new();
-    private bool isLoading = true;
-    private bool isSaving;
-    private string? errorMessage;
+    private EditContext context = new(new InventoryMovementInput());
+    private Guid? selectedId, createdId;
+    private string search = string.Empty, status = "all", kindFilter = "all";
+    private bool isLoading = true, loaded, isSaving, cardOpen, draftChanged, confirmDiscard, leaving;
+    private string? errorMessage, cardError;
+    private bool HasPendingChanges => draftChanged || context.IsModified();
+    private bool CanCreate => items.Any(item => !item.IsBlocked) && periods.Count > 0;
+    private static IReadOnlyList<(string Value, string Label)> StatusOptions => [("all", "All"), ("Draft", "Draft"), ("Posted", "Posted")];
+    private IEnumerable<InventoryMovementListItem> VisibleMovements => movements.Where(item =>
+        (status == "all" || MovementStatus(item) == status) &&
+        (kindFilter == "all" || (kindFilter == "receipt" ? item.Quantity > 0 : item.Quantity < 0)) &&
+        (item.DocumentNumber.Contains(search.Trim(), StringComparison.OrdinalIgnoreCase) ||
+         item.ItemNumber.Contains(search.Trim(), StringComparison.OrdinalIgnoreCase) ||
+         item.Description.Contains(search.Trim(), StringComparison.OrdinalIgnoreCase)));
+    private InventoryMovementListItem? SelectedMovement => VisibleMovements.FirstOrDefault(item => item.Id == selectedId);
+    private static string MovementStatus(InventoryMovementListItem item) => item.IsPosted ? "Posted" : "Draft";
+    private static string JournalUrl(InventoryMovementListItem item) => $"/financial/journals/{item.JournalBatchId}";
+    private void EnsureSelection() => selectedId = RecordSelection.Reconcile(VisibleMovements.Select(item => item.Id), selectedId);
+    private void SetSearch(string value) { search = value; EnsureSelection(); }
+    private void SetStatus(string value) { status = value; EnsureSelection(); }
+    private void SetKind(ChangeEventArgs args) { kindFilter = args.Value?.ToString() ?? "all"; EnsureSelection(); }
+    private void ClearFilters() { search = string.Empty; status = kindFilter = "all"; EnsureSelection(); }
 
     protected override async Task OnInitializedAsync()
     {
+        Navigation.LocationChanged += LocationChanged;
         try
         {
             var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
             periods = await InventoryService.GetOpenPeriodsAsync(user);
             items = await InventoryService.GetItemsAsync(user);
             movements = await InventoryService.GetMovementsAsync(user);
-            if (periods.Count > 0)
-            {
-                movementInput.AccountingPeriodId = periods[0].Id;
-            }
+            loaded = true;
+            EnsureSelection();
+            SyncCard();
         }
-        catch (UnauthorizedAccessException)
+        catch (UnauthorizedAccessException) { errorMessage = "Your active company is no longer available. Select an active company and try again."; }
+        catch (Exception exception)
         {
-            errorMessage = "Your active company is no longer available. Select an active company and try again.";
+            Logger.LogError(exception, "Unable to load stock movements");
+            errorMessage = "Stock movements could not be loaded. Reload the page to try again.";
         }
-        finally
-        {
-            isLoading = false;
-        }
+        finally { isLoading = false; }
     }
 
+    private void LocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs args)
+        => _ = InvokeAsync(() => { if (loaded) SyncCard(); StateHasChanged(); });
+    private void SyncCard()
+    {
+        var uri = new Uri(Navigation.Uri);
+        if (!uri.AbsolutePath.TrimEnd('/').EndsWith("/financial/inventory/movements", StringComparison.OrdinalIgnoreCase)) return;
+        var open = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query).TryGetValue("new", out var value) && value == "movement" ||
+            uri.Fragment == "#movement-heading";
+        if (open && !cardOpen)
+        {
+            movementInput = new() { AccountingPeriodId = periods.FirstOrDefault()?.Id ?? Guid.Empty };
+            context = new(movementInput);
+            draftChanged = confirmDiscard = leaving = false;
+            cardError = null; createdId = null;
+        }
+        cardOpen = open;
+    }
+    private void RequestClose()
+    {
+        if (isSaving) return;
+        if (HasPendingChanges) { confirmDiscard = true; return; }
+        Discard();
+    }
+    private void Discard()
+    {
+        if (isSaving) return;
+        leaving = true;
+        Navigation.NavigateTo("/financial/inventory/movements");
+    }
+    private void BeforeNavigation(LocationChangingContext args)
+    {
+        if (!leaving && (isSaving || HasPendingChanges)) { args.PreventNavigation(); confirmDiscard = true; }
+    }
     private async Task CreateMovementAsync()
     {
-        if (isSaving)
-        {
-            return;
-        }
-
-        isSaving = true;
-        errorMessage = null;
+        if (isSaving) return;
+        isSaving = true; cardError = null;
         try
         {
             var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
-            var batchId = await InventoryService.CreateMovementDraftAsync(user, movementInput);
-            Navigation.NavigateTo($"/financial/journals/{batchId}");
+            createdId ??= await InventoryService.CreateMovementDraftAsync(user, movementInput);
+            leaving = true;
+            Navigation.NavigateTo($"/financial/journals/{createdId}");
         }
-        catch (ValidationException exception)
+        catch (ValidationException exception) { cardError = exception.Message; }
+        catch (UnauthorizedAccessException) { cardError = "Your active company is no longer available. Select an active company and try again."; }
+        catch (Exception exception)
         {
-            errorMessage = exception.Message;
+            Logger.LogError(exception, "Unable to create stock movement draft");
+            cardError = "The draft could not be created. Your inputs have been retained.";
         }
-        catch (UnauthorizedAccessException)
-        {
-            errorMessage = "Your active company is no longer available. Select an active company and try again.";
-        }
-        finally
-        {
-            isSaving = false;
-        }
+        finally { isSaving = false; }
     }
+    private RenderFragment Tiles(bool tall) => @<div class="record-tile-grid">
+        @foreach (var movement in VisibleMovements)
+        {
+            <div @key="movement.Id" class="record-tile @(tall ? "tall" : null) @(selectedId == movement.Id ? "selected" : null)"
+                 tabindex="0" role="group" @onclick="() => selectedId = movement.Id"
+                 @onkeydown='args => { if (args.Key is "Enter" or " ") selectedId = movement.Id; }'>
+                <a class="record-tile-title" href="@JournalUrl(movement)" @onclick:stopPropagation="true">@movement.DocumentNumber</a>
+                <span class="record-tile-meta">@movement.ItemNumber - @MovementStatus(movement)</span>
+                @if (tall)
+                {
+                    <span class="record-tile-meta">@movement.Description</span>
+                    <span class="record-tile-meta">@movement.PostingDate.ToString("yyyy-MM-dd") / @movement.Quantity.ToString("N4")</span>
+                }
+            </div>
+        }
+    </div>;
+    public void Dispose() => Navigation.LocationChanged -= LocationChanged;
 }

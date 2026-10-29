@@ -37,8 +37,7 @@ internal static class NavigationMenuCatalog
         new("inventory", "Inventory",
         [
             new("Items", "/financial/inventory"),
-            new("Create stock movement", "/financial/inventory/movements#movement-heading"),
-            new("Movement history", "/financial/inventory/movements#movements-heading")
+            new("Stock Movements", "/financial/inventory/movements")
         ],
         ["/financial/inventory"]),
         new("reports", "Reports",

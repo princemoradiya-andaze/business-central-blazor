@@ -1,0 +1,17 @@
+.movement-note { font-size: 12px; color: #667085; line-height: 1.7; margin-top: 16px; }
+.movement-card { height: 100%; display: flex; flex-direction: column; padding: 22px 60px 0; }
+.movement-top { display: flex; align-items: center; gap: 13px; font-size: 12px; color: #526775; }
+.movement-back { border: 0; border-radius: 50%; width: 35px; height: 35px; background: #d8eff1; color: #45616a; font-size: 22px; }
+.movement-state { margin-left: auto; }
+.movement-title { font-size: 30px; font-weight: 300; margin: 15px 0 18px; }
+.movement-commands { min-height: 39px; border-block: 1px solid #d5dce1; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.movement-commands span { font-size: 13px; padding: 0 9px; }
+.movement-commands button { border: 0; background: transparent; color: #005b85; padding: 6px 9px; font-size: 12px; }
+.movement-body { overflow: auto; flex: 1; padding: 22px 0 30px; }
+.movement-body h3 { font-size: 17px; font-weight: 600; border-bottom: 1px solid #667085; padding-bottom: 6px; margin: 0 0 20px; }
+.movement-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px 36px; }
+.movement-fields label { display: flex; align-items: baseline; gap: 8px; color: #526775; font-size: 12px; margin-bottom: 6px; }
+.movement-fields label::after { content: ""; flex: 1; border-bottom: 2px dotted #d5dce1; }
+.movement-fields ::deep input, .movement-fields ::deep select { height: 34px; width: 100%; border: 1px solid #aeb8bf; border-radius: 0; padding: 4px 7px; background: white; }
+footer { border-top: 1px solid #d5dce1; padding: 13px 0; font-size: 11px; color: #667085; }
+@media (max-width: 900px) { .movement-card { padding: 18px 24px 0; } .movement-fields { grid-template-columns: minmax(0, 1fr); } .movement-title { font-size: 25px; } }
