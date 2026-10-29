@@ -1,0 +1,133 @@
+.dimension-values-page {
+    min-width: 0;
+}
+
+.dimension-values-context {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    color: #526b7a;
+    font: 14px "Segoe UI", Arial, sans-serif;
+}
+
+.dimension-values-back {
+    display: grid;
+    width: 35px;
+    height: 35px;
+    flex-shrink: 0;
+    place-items: center;
+    border-radius: 50%;
+    background: #d8f0f2;
+    color: #42616b;
+}
+
+.dimension-values-back svg {
+    width: 24px;
+    height: 24px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.2;
+}
+
+.dimension-values-back:hover {
+    background: #c5ebee;
+}
+
+.dimension-values-back:focus-visible,
+.dimension-value-select:focus-visible,
+.dimension-value-tile-select:focus-visible {
+    outline: 2px solid #00838f;
+    outline-offset: -2px;
+}
+
+.dimension-values-summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    padding: 16px 0 4px;
+    color: #526775;
+    font-size: 14px;
+}
+
+.dimension-values-summary strong {
+    color: #323b43;
+    font-weight: 600;
+}
+
+.dimension-values-page ::deep table.dimension-values-table {
+    min-width: 480px;
+    font: 14px "Segoe UI", Arial, sans-serif;
+    --bs-table-bg: #fff;
+}
+
+.dimension-values-page ::deep table.dimension-values-table th,
+.dimension-values-page ::deep table.dimension-values-table td {
+    height: 38px;
+    padding: 8px 14px;
+    border-bottom-color: #e4e8eb;
+    font-weight: 400;
+}
+
+.dimension-values-page ::deep table.dimension-values-table thead th {
+    color: #242424;
+    background: #f5f6f7;
+    border-bottom-color: #b9c5cb;
+    font-weight: 600;
+}
+
+.dimension-values-page ::deep table.dimension-values-table .dimension-value-marker {
+    width: 32px;
+    padding: 0;
+}
+
+.dimension-value-select {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 38px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #42616b;
+    font-size: 20px;
+}
+
+.dimension-value-blocked {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.dimension-value-checkbox {
+    display: inline-grid;
+    width: 14px;
+    height: 14px;
+    place-items: center;
+    border: 1px solid #8a9ba3;
+    background: #fff;
+    color: #333;
+    font-size: 11px;
+    line-height: 1;
+}
+
+.dimension-value-tile-select {
+    padding: 0;
+    border: 0;
+    color: inherit;
+    background: transparent;
+    font: inherit;
+    text-align: left;
+}
+
+.dimension-values-count {
+    margin: 12px 0 0;
+    color: #526775;
+    font-size: 12px;
+}
+
+.dimension-value-card-context {
+    margin-bottom: 20px;
+    color: #526775;
+}
