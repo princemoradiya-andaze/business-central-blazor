@@ -80,7 +80,7 @@ else
                                 <td>@dimension.Name</td>
                                 <td>@dimension.ValueCount</td>
                                 <td>
-                                    <a class="btn btn-sm btn-outline-primary"
+                                    <a class="dimension-manage-values"
                                        href="@($"/financial/dimensions/{dimension.Id}")">Manage values</a>
                                 </td>
                             </tr>
@@ -128,7 +128,7 @@ else
                     <div><dt>Name</dt><dd>@details.Name</dd></div>
                     <div><dt>Dimension values</dt><dd>@details.ValueCount</dd></div>
                 </dl>
-                <a class="btn btn-sm btn-outline-primary mt-3"
+                <a class="dimension-manage-values mt-3"
                    href="@($"/financial/dimensions/{details.Id}")">Manage values</a>
             }
             else

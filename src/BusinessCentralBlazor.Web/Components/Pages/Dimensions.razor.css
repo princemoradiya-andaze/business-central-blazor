@@ -1,0 +1,16 @@
+.dimension-manage-values {
+    display: inline-block;
+    color: #00838f;
+    text-decoration: none;
+}
+
+.dimension-manage-values:hover {
+    color: #000;
+    background: transparent;
+}
+
+.dimension-manage-values:focus-visible {
+    color: #000;
+    outline: 2px solid #00838f;
+    outline-offset: 3px;
+}

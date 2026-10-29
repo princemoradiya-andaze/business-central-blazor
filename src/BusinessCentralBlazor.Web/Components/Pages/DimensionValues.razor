@@ -1,113 +1,302 @@
 @page "/financial/dimensions/{DimensionId:guid}"
+@page "/financial/dimensions/{DimensionId:guid}/values/new"
+@page "/financial/dimensions/{DimensionId:guid}/values/{ValueId:guid}/edit"
+@implements IDisposable
 @attribute [Authorize(Policy = CompanyAuthorizationPolicies.ActiveCompany)]
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject IDimensionService DimensionService
+@inject NavigationManager Navigation
 
-<PageTitle>Dimension values</PageTitle>
+<PageTitle>Dimension Values</PageTitle>
 
-<nav aria-label="Breadcrumb">
-    <ol class="breadcrumb">
-        <li class="breadcrumb-item"><a href="/financial/dimensions">Dimensions</a></li>
-        <li class="breadcrumb-item active" aria-current="page">Values</li>
-    </ol>
-</nav>
+<section class="dimension-values-page">
+    <nav class="dimension-values-context" aria-label="Breadcrumb">
+        <a class="dimension-values-back" href="/financial/dimensions" aria-label="Back to Dimensions">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5m7-7-7 7 7 7" /></svg>
+        </a>
+        <span>Finance / Dimensions / Values</span>
+    </nav>
 
-@if (isLoading)
-{
-    <LoadingIndicator />
-}
-else if (companyContextUnavailable)
-{
-    <div class="alert alert-danger" role="alert">@errorMessage</div>
-    <a href="/account/company" data-enhance-nav="false">Select an active company</a>
-}
-else if (dimension is null)
-{
-    <h1>Dimension not found</h1>
-    <p>This dimension does not exist in the active company.</p>
-    <a href="/financial/dimensions">Back to dimensions</a>
-}
-else
-{
-    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
-        <div>
-            <h1>@dimension.Name <small class="text-body-secondary">(@dimension.Code)</small></h1>
-            <p class="text-body-secondary mb-0">Dimension values define the available analysis codes.</p>
-        </div>
-        <div class="d-flex gap-2">
-            <a class="btn btn-outline-secondary" href="@($"/financial/dimensions/{DimensionId}/edit")">Edit dimension</a>
-            <a class="btn btn-primary" href="@($"/financial/dimensions/{DimensionId}/values/new")">New value</a>
-        </div>
-    </div>
-
-    @if (values.Count == 0)
+    @if (isLoading)
     {
-        <div class="alert alert-info" role="status">No values have been added to this dimension yet.</div>
+        <LoadingIndicator />
+    }
+    else if (companyContextUnavailable)
+    {
+        <div class="alert alert-danger" role="alert">@errorMessage</div>
+        <a href="/account/company" data-enhance-nav="false">Select an active company</a>
+    }
+    else if (dimension is null)
+    {
+        <h1>@(ValueId.HasValue ? "Dimension value not found" : "Dimension not found")</h1>
+        <p>This dimension or value does not exist in the active company.</p>
+        <a href="/financial/dimensions">Back to dimensions</a>
     }
     else
     {
-        <div class="table-responsive">
-            <table class="table table-striped align-middle">
-                <caption class="visually-hidden">Values for dimension @dimension.Code</caption>
-                <thead>
-                    <tr>
-                        <th scope="col">Code</th>
-                        <th scope="col">Name</th>
-                        <th scope="col">Status</th>
-                        <th scope="col"><span class="visually-hidden">Actions</span></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var value in values)
+        @if (!string.IsNullOrWhiteSpace(errorMessage))
+        {
+            <div class="alert alert-danger" role="alert">@errorMessage</div>
+        }
+        @if (!string.IsNullOrWhiteSpace(statusMessage))
+        {
+            <div class="alert alert-success" role="status">@statusMessage</div>
+        }
+        <RecordWorkspace Title="Dimension Values"
+                         IdPrefix="dimension-values"
+                         StatusControlId="dimension-value-status"
+                         StatusFilter="@statusFilter"
+                         StatusFilterChanged="HandleStatusChanged"
+                         StatusOptionsOverride="@StatusOptions"
+                         AllStatusLabel="All"
+                         SearchPlaceholder="Search dimension values"
+                         SearchTerm="@searchTerm"
+                         SearchTermChanged="HandleSearchChanged"
+                         HasRecords="@FilteredValues.Any()"
+                         EmptyMessage="@(values.Count == 0 ? "No values have been added to this dimension yet." : "No dimension values match the current search and filters.")">
+            <HeaderActions>
+                <a id="new-dimension-value-action" class="record-workspace-action"
+                   href="@($"{ListUrl}/values/new")"><span class="workspace-new-icon" aria-hidden="true"></span>New value</a>
+            </HeaderActions>
+            <ContextContent>
+                <div class="dimension-values-summary">
+                    <strong>@dimension.Name</strong>
+                    <span>@dimension.Code</span>
+                    <span>Available analysis codes for this dimension</span>
+                </div>
+            </ContextContent>
+            <FilterContent>
+                <label for="dimension-value-filter-status">Status</label>
+                <select id="dimension-value-filter-status" class="form-select" value="@statusFilter"
+                        @onchange="args => HandleStatusChanged(args.Value?.ToString() ?? AllStatus)">
+                    @foreach (var option in StatusOptions)
                     {
-                        <tr>
-                            <th scope="row">@value.Code</th>
-                            <td>@value.Name</td>
-                            <td>
-                                @if (value.IsBlocked)
-                                {
-                                    <span class="badge text-bg-secondary">Blocked</span>
-                                }
-                                else
-                                {
-                                    <span class="badge text-bg-success">Active</span>
-                                }
-                            </td>
-                            <td>
-                                <a class="btn btn-sm btn-outline-primary"
-                                   href="@($"/financial/dimensions/{DimensionId}/values/{value.Id}/edit")">Edit</a>
-                            </td>
-                        </tr>
+                        <option value="@option.Value">@option.Label</option>
                     }
-                </tbody>
-            </table>
-        </div>
+                </select>
+                <button class="btn btn-link btn-sm mt-2 px-0" type="button" @onclick="ClearFilters">Clear filters</button>
+            </FilterContent>
+            <ListContent>
+                <div class="table-responsive">
+                    <table class="table dimension-values-table">
+                        <caption class="visually-hidden">Values for dimension @dimension.Code</caption>
+                        <thead>
+                            <tr>
+                                <th scope="col" class="dimension-value-marker"><span class="visually-hidden">Selection</span></th>
+                                <th scope="col">Code</th>
+                                <th scope="col">Name</th>
+                                <th scope="col">Blocked</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var value in FilteredValues)
+                            {
+                                <tr class="@(selectedValueId == value.Id ? "record-row-selected" : null)"
+                                    @onclick="() => SelectValue(value.Id)" @key="value.Id">
+                                    <td class="dimension-value-marker">
+                                        <button type="button" class="dimension-value-select" aria-label="@($"Select {value.Code}")"
+                                                aria-pressed="@(selectedValueId == value.Id ? "true" : "false")"
+                                                @onclick="() => SelectValue(value.Id)" @onclick:stopPropagation="true">
+                                            <span aria-hidden="true">@(selectedValueId == value.Id ? "\u203a" : string.Empty)</span>
+                                        </button>
+                                    </td>
+                                    <th scope="row">
+                                        <a id="@($"dimension-value-record-{value.Id}")" class="record-select"
+                                           href="@EditUrl(value.Id)" @onclick:stopPropagation="true">@value.Code</a>
+                                    </th>
+                                    <td>@value.Name</td>
+                                    <td><span class="dimension-value-blocked" role="img" aria-label="@(value.IsBlocked ? "Blocked" : "Active")">
+                                        <span class="dimension-value-checkbox" aria-hidden="true">@(value.IsBlocked ? "\u2713" : string.Empty)</span>
+                                        <span aria-hidden="true">@(value.IsBlocked ? "Yes" : "No")</span>
+                                    </span></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </ListContent>
+            <TallTilesContent>
+                <div class="record-tile-grid">
+                    @foreach (var value in FilteredValues)
+                    {
+                        <div class="record-tile tall @(selectedValueId == value.Id ? "selected" : null)"
+                             @onclick="() => SelectValue(value.Id)" @key="value.Id">
+                            <a class="record-tile-title" href="@EditUrl(value.Id)"
+                               @onclick:stopPropagation="true">@value.Code</a>
+                            <button class="dimension-value-tile-select" type="button" aria-label="@($"Select {value.Code}")"
+                                    aria-pressed="@(selectedValueId == value.Id ? "true" : "false")"
+                                    @onclick="() => SelectValue(value.Id)" @onclick:stopPropagation="true">@value.Name</button>
+                            <span class="record-tile-meta">Blocked: @(value.IsBlocked ? "Yes" : "No")</span>
+                        </div>
+                    }
+                </div>
+            </TallTilesContent>
+            <TilesContent>
+                <div class="record-tile-grid">
+                    @foreach (var value in FilteredValues)
+                    {
+                        <div class="record-tile @(selectedValueId == value.Id ? "selected" : null)"
+                             @onclick="() => SelectValue(value.Id)" @key="value.Id">
+                            <a class="record-tile-title" href="@EditUrl(value.Id)"
+                               @onclick:stopPropagation="true">@value.Code</a>
+                            <button class="dimension-value-tile-select" type="button" aria-label="@($"Select {value.Code}")"
+                                    aria-pressed="@(selectedValueId == value.Id ? "true" : "false")"
+                                    @onclick="() => SelectValue(value.Id)" @onclick:stopPropagation="true">@value.Name</button>
+                            <span class="record-tile-meta">Blocked: @(value.IsBlocked ? "Yes" : "No")</span>
+                        </div>
+                    }
+                </div>
+            </TilesContent>
+            <DetailsContent>
+                @if (SelectedValue is { } details)
+                {
+                    <h3>@details.Code</h3>
+                    <dl>
+                        <div><dt>Name</dt><dd>@details.Name</dd></div>
+                        <div><dt>Blocked</dt><dd>@(details.IsBlocked ? "Yes" : "No")</dd></div>
+                        <div><dt>Dimension</dt><dd>@dimension.Code</dd></div>
+                    </dl>
+                }
+                else
+                {
+                    <p>Select a dimension value to see its details.</p>
+                }
+            </DetailsContent>
+        </RecordWorkspace>
+        <p class="dimension-values-count" role="status">@FilteredValues.Count() of @values.Count values</p>
+
+        @if (isValueCardOpen)
+        {
+            <EntityRecordCard Model="@input" Save="SaveValueAsync"
+                              Module="Finance" CardType="Dimension Value Card"
+                              Title="@($"{input.Code} — {input.Name}")"
+                              IsNew="@(!editingValueId.HasValue)" OnClose="CloseValueCard"
+                              CanPrevious="@(BrowseTarget(-1).HasValue)" CanNext="@(BrowseTarget(1).HasValue)"
+                              OnBrowse="BrowseAsync"
+                              ReturnFocusSelector="@(editingValueId is { } id ? $"#dimension-value-record-{id}" : "#new-dimension-value-action")"
+                              ReturnFocusFallbackSelector="#new-dimension-value-action">
+                <div class="dimension-value-card-context">Dimension: @dimension.Code — @dimension.Name</div>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label" for="dimension-value-code">Code</label>
+                        <InputText id="dimension-value-code" class="form-control" maxlength="32"
+                                   autocomplete="off" @bind-Value="input.Code" />
+                        <ValidationMessage For="@(() => input.Code)" />
+                    </div>
+                    <div class="col-md-8">
+                        <label class="form-label" for="dimension-value-name">Name</label>
+                        <InputText id="dimension-value-name" class="form-control" maxlength="120" @bind-Value="input.Name" />
+                        <ValidationMessage For="@(() => input.Name)" />
+                    </div>
+                    <div class="col-12">
+                        <div class="form-check">
+                            <InputCheckbox id="dimension-value-blocked" class="form-check-input" @bind-Value="input.IsBlocked" />
+                            <label class="form-check-label" for="dimension-value-blocked">Blocked</label>
+                        </div>
+                    </div>
+                </div>
+            </EntityRecordCard>
+        }
     }
-}
+</section>
 
 @code {
-    [Parameter]
-    public Guid DimensionId { get; set; }
+    private const string AllStatus = "all";
+    private static readonly (string Value, string Label)[] StatusOptions =
+    [
+        (AllStatus, "All"),
+        ("active", "Active"),
+        ("blocked", "Blocked")
+    ];
+
+    [Parameter] public Guid DimensionId { get; set; }
+    [Parameter] public Guid? ValueId { get; set; }
 
     private DimensionDetail? dimension;
     private IReadOnlyList<DimensionValueListItem> values = [];
+    private DimensionValueInput input = new();
+    private Guid? loadedDimensionId;
+    private Guid? selectedValueId;
+    private Guid? editingValueId;
+    private string searchTerm = string.Empty;
+    private string statusFilter = AllStatus;
     private bool isLoading = true;
+    private bool isValueCardOpen;
     private bool companyContextUnavailable;
     private string? errorMessage;
+    private string? statusMessage;
+
+    private string ListUrl => $"/financial/dimensions/{DimensionId}";
+    private string EditUrl(Guid id) => $"{ListUrl}/values/{id}/edit";
+    private IEnumerable<DimensionValueListItem> FilteredValues => values.Where(value =>
+        (statusFilter == AllStatus || (statusFilter == "blocked") == value.IsBlocked) &&
+        (string.IsNullOrWhiteSpace(searchTerm) ||
+         value.Code.Contains(searchTerm.Trim(), StringComparison.OrdinalIgnoreCase) ||
+         value.Name.Contains(searchTerm.Trim(), StringComparison.OrdinalIgnoreCase)));
+    private DimensionValueListItem? SelectedValue => FilteredValues.SingleOrDefault(value => value.Id == selectedValueId);
+
+    protected override void OnInitialized() => Navigation.LocationChanged += OnLocationChanged;
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        var path = new Uri(args.Location).AbsolutePath.TrimEnd('/');
+        if (path.Equals($"{ListUrl}/values/new", StringComparison.OrdinalIgnoreCase))
+            OpenNewValue();
+        else if (path.Equals(ListUrl, StringComparison.OrdinalIgnoreCase))
+            isValueCardOpen = false;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose() => Navigation.LocationChanged -= OnLocationChanged;
 
     protected override async Task OnParametersSetAsync()
     {
+        errorMessage = null;
+        companyContextUnavailable = false;
+        isValueCardOpen = false;
         try
         {
             var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
-            dimension = await DimensionService.GetAsync(user, DimensionId);
-            if (dimension is not null)
+            if (loadedDimensionId != DimensionId)
             {
-                values = await DimensionService.GetValuesAsync(user, DimensionId);
+                searchTerm = string.Empty;
+                statusFilter = AllStatus;
+                selectedValueId = null;
+                statusMessage = null;
+                dimension = await DimensionService.GetAsync(user, DimensionId);
+                values = dimension is null ? [] : await DimensionService.GetValuesAsync(user, DimensionId);
+                loadedDimensionId = DimensionId;
             }
+
+            if (dimension is null) return;
+            if (ValueId is { } id)
+            {
+                var value = await DimensionService.GetValueAsync(user, DimensionId, id);
+                if (value is null)
+                {
+                    errorMessage = "Dimension value not found. This value does not exist in the selected dimension in the active company.";
+                }
+                else
+                {
+                    statusMessage = null;
+                    selectedValueId = id;
+                    editingValueId = id;
+                    input = new DimensionValueInput { Code = value.Code, Name = value.Name, IsBlocked = value.IsBlocked };
+                    isValueCardOpen = true;
+                }
+            }
+            else if (new Uri(Navigation.Uri).AbsolutePath.TrimEnd('/')
+                         .Equals($"{ListUrl}/values/new", StringComparison.OrdinalIgnoreCase))
+            {
+                OpenNewValue();
+            }
+            EnsureSelection();
         }
         catch (UnauthorizedAccessException)
         {
+            dimension = null;
+            values = [];
+            loadedDimensionId = null;
             companyContextUnavailable = true;
             errorMessage = "Your active company is no longer available. Select an active company and try again.";
         }
@@ -115,5 +304,75 @@ else
         {
             isLoading = false;
         }
+    }
+
+    private void EnsureSelection() =>
+        selectedValueId = RecordSelection.Reconcile(FilteredValues.Select(value => value.Id), selectedValueId);
+
+    private void OpenNewValue()
+    {
+        errorMessage = null;
+        statusMessage = null;
+        editingValueId = null;
+        input = new DimensionValueInput();
+        isValueCardOpen = true;
+    }
+
+    private void SelectValue(Guid id) => selectedValueId = id;
+    private Guid? BrowseTarget(int offset) => editingValueId is { } id
+        ? RecordSelection.Adjacent(FilteredValues.Select(value => value.Id), id, offset)
+        : null;
+
+    private Task BrowseAsync(int offset)
+    {
+        if (BrowseTarget(offset) is { } id)
+            Navigation.NavigateTo(EditUrl(id));
+        else
+            CloseValueCard();
+        return Task.CompletedTask;
+    }
+
+    private void CloseValueCard()
+    {
+        isValueCardOpen = false;
+        Navigation.NavigateTo(ListUrl);
+    }
+
+    private async Task SaveValueAsync(DimensionValueInput snapshot)
+    {
+        var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+        if (editingValueId is { } id)
+        {
+            if (!await DimensionService.UpdateValueAsync(user, DimensionId, id, snapshot))
+                throw new ValidationException("The dimension value was not found in the active company.");
+            statusMessage = "Dimension value changes saved.";
+        }
+        else
+        {
+            selectedValueId = await DimensionService.CreateValueAsync(user, DimensionId, snapshot);
+            statusMessage = "Dimension value created.";
+        }
+        values = await DimensionService.GetValuesAsync(user, DimensionId);
+        EnsureSelection();
+    }
+
+    private Task HandleSearchChanged(string value)
+    {
+        searchTerm = value;
+        EnsureSelection();
+        return Task.CompletedTask;
+    }
+
+    private void HandleStatusChanged(string value)
+    {
+        statusFilter = value;
+        EnsureSelection();
+    }
+
+    private void ClearFilters()
+    {
+        searchTerm = string.Empty;
+        statusFilter = AllStatus;
+        EnsureSelection();
     }
 }

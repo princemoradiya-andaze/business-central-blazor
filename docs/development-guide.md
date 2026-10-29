@@ -60,6 +60,14 @@ The `AddWorkspaceNotes` EF migration has been applied to the documented local de
 
 ## General-ledger inquiry and trial balance
 
+Dimension Values at `/financial/dimensions/{dimensionId}` uses the shared list workspace with
+search, Active/Blocked status filters, List/Tall tiles/Tiles views, row selection, and Details.
+**New value** and the clickable value **Code** open the shared Dimension Value Card over the list;
+the existing `/values/new` and `/values/{valueId}/edit` URLs also open these cards directly.
+New cards use Save/Cancel; existing cards save when leaving a field and before closing or browsing
+records, with validation errors retained in the card. Parent dimensions are edited from Dimensions,
+not through a separate Edit button on the values list. All operations retain company-scoped service checks.
+
 The Chart of Accounts at `/financial/general-ledger/accounts` is a company-scoped workspace with
 List, Tall tiles, and Tiles views, independently toggleable Filters and Details panes, search,
 status/category filters, selection, and modal account cards for New/Edit. The details pane retains

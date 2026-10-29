@@ -68,21 +68,35 @@ public sealed class DimensionPageTests(AuthenticationWebApplicationFactory facto
         Assert.Contains("Sales", dimensionHtml, StringComparison.Ordinal);
         Assert.Contains("/financial/dimensions/", dimensionHtml, StringComparison.Ordinal);
         Assert.Contains("New value", dimensionHtml, StringComparison.Ordinal);
+        Assert.Contains("id=\"dimension-value-status\"", dimensionHtml, StringComparison.Ordinal);
+        Assert.Contains("id=\"new-dimension-value-action\"", dimensionHtml, StringComparison.Ordinal);
+        Assert.Contains($"id=\"dimension-value-record-{valueId}\"", dimensionHtml, StringComparison.Ordinal);
+        Assert.Contains("Choose view", dimensionHtml, StringComparison.Ordinal);
+        Assert.DoesNotContain(">Edit</a>", dimensionHtml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Edit dimension", dimensionHtml, StringComparison.Ordinal);
 
         using var newValueResponse = await client.GetAsync(
             $"/financial/dimensions/{dimensionId}/values/new");
         var newValueHtml = await newValueResponse.Content.ReadAsStringAsync();
         Assert.Equal(HttpStatusCode.OK, newValueResponse.StatusCode);
-        Assert.Contains("New value for Department (DEPT)", newValueHtml, StringComparison.Ordinal);
+        Assert.Contains("New Dimension Value Card", newValueHtml, StringComparison.Ordinal);
         Assert.Contains("dimension-value-code", newValueHtml, StringComparison.Ordinal);
 
         using var editValueResponse = await client.GetAsync(
             $"/financial/dimensions/{dimensionId}/values/{valueId}/edit");
         var editValueHtml = await editValueResponse.Content.ReadAsStringAsync();
         Assert.Equal(HttpStatusCode.OK, editValueResponse.StatusCode);
-        Assert.Contains("Edit value for Department (DEPT)", editValueHtml, StringComparison.Ordinal);
+        Assert.Contains("Dimension Value Card", editValueHtml, StringComparison.Ordinal);
+        Assert.Contains("SALES — Sales", HttpUtility.HtmlDecode(editValueHtml), StringComparison.Ordinal);
         Assert.Contains("value=\"SALES\"", editValueHtml, StringComparison.Ordinal);
         Assert.Contains("Blocked", editValueHtml, StringComparison.Ordinal);
+
+        using var missingValueResponse = await client.GetAsync(
+            $"/financial/dimensions/{dimensionId}/values/{Guid.NewGuid()}/edit");
+        var missingValueHtml = await missingValueResponse.Content.ReadAsStringAsync();
+        Assert.Equal(HttpStatusCode.OK, missingValueResponse.StatusCode);
+        Assert.Contains("Dimension value not found", missingValueHtml, StringComparison.Ordinal);
+        Assert.DoesNotContain("id=\"dimension-value-code\"", missingValueHtml, StringComparison.Ordinal);
     }
 
     [Fact]
