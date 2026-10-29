@@ -79,6 +79,12 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (IsNavigationDirectory)
+        {
+            await UnbindOutsideClickAsync();
+            return;
+        }
+
         if (outsideClickListenerId is not null || companyNavigation.Context is null)
         {
             return;
@@ -123,14 +129,19 @@
         _ = InvokeAsync(StateHasChanged);
     }
 
-    public async ValueTask DisposeAsync()
+    private async Task UnbindOutsideClickAsync()
     {
-        Navigation.LocationChanged -= OnLocationChanged;
-
         if (outsideClickListenerId is not null && outsideClickModule is not null)
         {
             await outsideClickModule.InvokeVoidAsync("unbindOutsideClick", outsideClickListenerId);
+            outsideClickListenerId = null;
         }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        Navigation.LocationChanged -= OnLocationChanged;
+        await UnbindOutsideClickAsync();
 
         dotNetReference?.Dispose();
 

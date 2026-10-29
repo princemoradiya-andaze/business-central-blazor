@@ -54,6 +54,11 @@ Blazor Server circuits can run component operations concurrently. Web services t
 
 ## Shared shell and workspace notes
 
+The company navbar is removed on All pages. Its outside-click listener is unbound after
+that render and rebound to the new navbar when leaving the directory. When verifying
+navigation, repeat Home -> All pages -> a destination -> a module dropdown link with
+a normal-duration mouse click, and confirm outside clicks still dismiss the dropdown.
+
 The authenticated Blazor shell shows the active company, grouped module menus, and an **All pages** directory at `/navigation`. Both navigation surfaces use the same catalog and link only to implemented company pages or their existing task sections. **More** contains Home and Company settings. The SQL-backed Workspace notes foundation example is retired from navigation: `/workspace/notes` and every child path display a company-authorized unavailable notice with no note service calls or CRUD controls. The original example components have no route directives, but their code, the company-scoped service, service tests, `WorkspaceNotes` table, and migrations remain intact. No existing note data is removed. Company and tenant IDs are still derived from the authenticated principal by the retained service, never accepted from note forms. No sample notes are seeded automatically.
 
 The `AddWorkspaceNotes` EF migration has been applied to the documented local development database, `BusinessCentralBlazor_Phase0` on `.\BCDEMO`. For another SQL Server database, check the target database name before running `dotnet ef database update`. Users also need an active company membership before the Blazor workspace is available.
