@@ -1,0 +1,32 @@
+.financial-detail { padding: 22px 40px 32px; color: #35495b; min-width: 0; }
+.detail-context { display: flex; align-items: center; gap: 12px; font-size: 12px; color: #526775; }
+.detail-back { display: grid; place-items: center; width: 35px; height: 35px; flex-shrink: 0; border-radius: 50%; background: #d8eff1; color: #45616a; font-size: 22px; text-decoration: none; }
+.detail-status { margin-left: auto; }
+h1 { font-size: 30px; font-weight: 300; margin: 15px 0 18px; overflow-wrap: anywhere; }
+.detail-commands { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; border-block: 1px solid #d5dce1; min-height: 42px; }
+.detail-commands > span { padding: 6px 9px; font-size: 13px; }
+.detail-commands ::deep a, .detail-commands ::deep button,
+.detail-body ::deep .btn { border: 0; border-radius: 0; background: transparent; color: #005b85; padding: 6px 9px; font-size: 12px; text-decoration: none; box-shadow: none; }
+.detail-commands ::deep a:hover, .detail-commands ::deep button:hover,
+.detail-body ::deep .btn:hover { background: #d8eff1; }
+.detail-body { padding-top: 22px; min-width: 0; }
+.detail-body ::deep h2, .detail-body ::deep legend { font-size: 18px; font-weight: 600; border-bottom: 1px solid #aeb8bf; padding-bottom: 7px; margin: 0 0 18px; float: none; }
+.detail-body ::deep .detail-section { margin-top: 26px; }
+.detail-body ::deep .detail-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 36px; margin-bottom: 20px; }
+.detail-body ::deep .detail-fields > div { min-width: 0; }
+.detail-body ::deep .detail-fields label, .detail-body ::deep .detail-fields dt { display: flex; align-items: baseline; gap: 8px; color: #526775; font-size: 12px; font-weight: 400; margin-bottom: 6px; }
+.detail-body ::deep .detail-fields label::after, .detail-body ::deep .detail-fields dt::after { content: ""; flex: 1; border-bottom: 2px dotted #d5dce1; }
+.detail-body ::deep .detail-fields dd { padding: 6px 8px; margin: 0; background: #f0f3f5; min-height: 32px; font-size: 14px; overflow-wrap: anywhere; }
+.detail-body ::deep .form-control, .detail-body ::deep .form-select { border: 1px solid #aeb8bf; border-radius: 0; font-size: 13px; min-height: 32px; }
+.detail-body ::deep .detail-note { font-size: 12px; line-height: 1.7; color: #667085; }
+.detail-body ::deep .table { font-size: 12px; --bs-table-bg: transparent; --bs-table-striped-bg: #f0f3f5; }
+.detail-body ::deep .table th, .detail-body ::deep .table td { padding: 9px 10px; border-color: #e1e6e9; vertical-align: middle; }
+.detail-body ::deep .table thead th { font-weight: 500; color: #526775; }
+.detail-body ::deep .table caption { caption-side: top; font-size: 16px; color: #35495b; }
+.detail-body ::deep .table a { color: #005b85; }
+.detail-body ::deep .table-responsive { margin-bottom: 22px; }
+.detail-body ::deep .card { border: 0; border-radius: 0; background: transparent; }
+.detail-body ::deep .card-body { padding: 0; }
+.detail-body ::deep .alert { font-size: 13px; border-radius: 0; }
+.detail-commands ::deep :disabled, .detail-body ::deep button:disabled { opacity: .45; }
+@media (max-width: 900px) { .financial-detail { padding: 18px 12px 24px; } .detail-body ::deep .detail-fields { grid-template-columns: 1fr; } h1 { font-size: 25px; } }

@@ -4,63 +4,108 @@
 @inject IBankService BankService
 
 <PageTitle>Manual bank reconciliation</PageTitle>
-<h1>Manual bank reconciliation</h1>
 @if (error is not null)
 {
     <div class="alert alert-danger" role="alert">@error</div>
 }
-<button class="btn btn-outline-secondary" disabled="@saving" @onclick="ReloadAsync">Reload</button>
 @if (statement is not null)
 {
-    <a href="@($"/financial/banks/{statement.BankAccountId}")">Bank activity</a>
+    <FinancialDetailLayout Title="Manual bank reconciliation" Breadcrumb="Cash management / Bank Statement"
+                           BackUrl="@($"/financial/banks/{statement.BankAccountId}?view=statements")"
+                           BackLabel="Back to Manual statements" Status="@(statement.IsCompleted ? "Completed" : "Open")">
+    <Commands>
+        <a href="@($"/financial/banks/{statement.BankAccountId}?view=statements")">Bank activity</a>
+        <button type="button" disabled="@saving" @onclick="ReloadAsync">Reload</button>
+        @if (!statement.IsCompleted)
+        {
+            <button type="submit" form="statement-header" disabled="@saving">Save header</button>
+            <a href="#statement-line-heading">Add line</a>
+            <a href="#statement-import-heading">Import lines</a>
+            <button type="button" disabled="@(saving || statement.Lines.Count == 0 ||
+                statement.Lines.Any(line => line.EntryId is null) || statement.StatementDifference != 0)"
+                    @onclick="CompleteAsync">Complete reconciliation</button>
+        }
+    </Commands>
+    <ChildContent>
     <h2>@statement.Reference - @(statement.IsCompleted ? "Completed" : "Open")</h2>
-    <p>Statement period: @statement.StartsOn through @statement.EndsOn.
-        Opening: @statement.OpeningBalance.ToString("N4"); closing: @statement.ClosingBalance.ToString("N4").</p>
-    <p><strong>Statement balance difference:</strong> @statement.StatementDifference.ToString("N4")
-        (closing minus opening and statement lines).</p>
-    <p><strong>Statement minus G/L closing balance:</strong> @statement.BookDifference.ToString("N4").
+    <dl class="detail-fields">
+        <div><dt>Statement period</dt><dd>@statement.StartsOn.ToString("yyyy-MM-dd") through @statement.EndsOn.ToString("yyyy-MM-dd")</dd></div>
+        <div><dt>Opening balance</dt><dd>@statement.OpeningBalance.ToString("N4")</dd></div>
+        <div><dt>Closing balance</dt><dd>@statement.ClosingBalance.ToString("N4")</dd></div>
+        <div><dt>Statement balance difference</dt><dd>@statement.StatementDifference.ToString("N4")</dd></div>
+        <div><dt>Statement minus G/L closing balance</dt><dd>@statement.BookDifference.ToString("N4")</dd></div>
+    </dl>
+    <p class="detail-note">Statement balance difference is closing minus opening and statement lines.
         Outstanding posted items are shown below, including earlier uncleared entries.
         Timing differences do not create adjusting entries automatically.</p>
     @if (!statement.IsCompleted)
     {
-        <EditForm Model="@headerInput" OnValidSubmit="UpdateHeaderAsync" FormName="statement-header">
+        <EditForm Model="@headerInput" OnValidSubmit="UpdateHeaderAsync" FormName="statement-header" id="statement-header">
             <DataAnnotationsValidator /><ValidationSummary />
             <fieldset disabled="@saving">
                 <legend>Correct statement header</legend>
+                <div class="detail-fields">
+                <div>
                 <label for="header-reference">Reference</label>
                 <InputText id="header-reference" class="form-control" @bind-Value="headerInput.Reference" />
+                </div>
+                <div>
                 <label for="header-start">From</label>
                 <InputDate id="header-start" class="form-control" @bind-Value="headerInput.StartsOn" />
+                </div>
+                <div>
                 <label for="header-end">Through</label>
                 <InputDate id="header-end" class="form-control" @bind-Value="headerInput.EndsOn" />
+                </div>
+                <div>
                 <label for="header-opening">Opening balance</label>
                 <InputNumber id="header-opening" class="form-control" step="0.0001" @bind-Value="headerInput.OpeningBalance" />
+                </div>
+                <div>
                 <label for="header-closing">Closing balance</label>
                 <InputNumber id="header-closing" class="form-control" step="0.0001" @bind-Value="headerInput.ClosingBalance" />
-                <button type="submit" class="btn btn-outline-primary my-3">Save header</button>
+                </div>
+                </div>
             </fieldset>
         </EditForm>
+        <section class="detail-section" aria-labelledby="statement-line-heading">
+        <h2 id="statement-line-heading">Manual statement line</h2>
         <EditForm Model="@lineInput" OnValidSubmit="AddLineAsync" FormName="statement-line">
             <DataAnnotationsValidator /><ValidationSummary />
             <fieldset disabled="@saving">
-                <legend>Manual statement line</legend>
+                <div class="detail-fields">
+                <div>
                 <label for="line-reference">Unique line reference</label>
                 <InputText id="line-reference" class="form-control" @bind-Value="lineInput.Reference" />
+                </div>
+                <div>
                 <label for="line-date">Transaction date</label>
                 <InputDate id="line-date" class="form-control" @bind-Value="lineInput.TransactionDate" />
+                </div>
+                <div>
                 <label for="line-description">Description</label>
                 <InputText id="line-description" class="form-control" @bind-Value="lineInput.Description" />
+                </div>
+                <div>
                 <label for="line-amount">Signed amount (receipt positive, payment negative)</label>
                 <InputNumber id="line-amount" class="form-control" step="0.0001" @bind-Value="lineInput.Amount" />
+                </div>
+                </div>
                 <button type="submit" class="btn btn-primary my-3">Add line</button>
             </fieldset>
         </EditForm>
+        </section>
+        <section class="detail-section" aria-labelledby="statement-import-heading">
+        <h2 id="statement-import-heading">Import statement lines</h2>
         <label for="statement-import">Paste tab-separated lines, without a header:
             yyyy-MM-dd, reference, description, signed amount (invariant decimal point).</label>
         <textarea id="statement-import" class="form-control" rows="5" maxlength="400000" disabled="@saving" @bind="importText"></textarea>
         <button class="btn btn-outline-primary my-3" disabled="@saving" @onclick="ImportAsync">Import all lines</button>
-        <p>Import is all-or-nothing, maximum 1000 lines. Duplicate references are rejected; no automatic matching.</p>
+        <p class="detail-note">Import is all-or-nothing, maximum 1000 lines. Duplicate references are rejected; no automatic matching.</p>
+        </section>
     }
+    <section class="detail-section" aria-label="Statement lines">
+    <div class="table-responsive">
     <table class="table">
         <caption>Statement lines - @statement.Lines.Count(line => line.EntryId is null) unmatched</caption>
         <thead><tr><th>Reference / date</th><th>Description</th><th>Amount</th><th>Match</th></tr></thead>
@@ -101,6 +146,9 @@
             }
         </tbody>
     </table>
+    </div>
+    </section>
+    <div class="table-responsive">
     <table class="table">
         <caption>Unreconciled posted bank activity through @statement.EndsOn</caption>
         <thead><tr><th>Entry</th><th>Date</th><th>Document</th><th>Description</th><th>Signed amount</th></tr></thead>
@@ -112,14 +160,19 @@
             }
         </tbody>
     </table>
+    </div>
     @if (!statement.IsCompleted)
     {
-        <p>Completion locks the statement and its matches. All statement lines must be matched and the
+        <p class="detail-note">Completion locks the statement and its matches. All statement lines must be matched and the
             statement balance difference must be zero. Outstanding G/L items may remain as timing differences.</p>
-        <button class="btn btn-primary" disabled="@(saving || statement.Lines.Count == 0 ||
-            statement.Lines.Any(line => line.EntryId is null) || statement.StatementDifference != 0)"
-                @onclick="CompleteAsync">Complete reconciliation</button>
     }
+    </ChildContent>
+    </FinancialDetailLayout>
+}
+else
+{
+    <h1>Manual bank reconciliation</h1>
+    <button class="btn btn-outline-secondary" disabled="@saving" @onclick="ReloadAsync">Reload</button>
 }
 
 @code {

@@ -1,0 +1,27 @@
+<article class="financial-detail">
+    <header>
+        <div class="detail-context">
+            <a class="detail-back" href="@BackUrl" aria-label="@BackLabel">&#8592;</a>
+            <span>@Breadcrumb</span>
+            <span class="detail-status" role="status">@Status</span>
+        </div>
+        <h1>@Title</h1>
+        <nav class="detail-commands" aria-label="Record actions">
+            <span>Home</span>
+            @Commands
+        </nav>
+    </header>
+    <div class="detail-body">
+        @ChildContent
+    </div>
+</article>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string BackUrl { get; set; } = string.Empty;
+    [Parameter] public string BackLabel { get; set; } = "Back";
+    [Parameter] public string Breadcrumb { get; set; } = string.Empty;
+    [Parameter] public string Status { get; set; } = string.Empty;
+    [Parameter] public RenderFragment? Commands { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

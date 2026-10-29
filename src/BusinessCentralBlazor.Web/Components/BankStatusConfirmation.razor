@@ -1,0 +1,45 @@
+<WorkspaceCardDialog OnClose="OnClose" IsSaving="@IsSaving" LabelledBy="entity-card-heading"
+                     ReturnFocusSelector="#bank-status-action" ReturnFocusFallbackSelector="@ReturnFocusFallbackSelector">
+    <NavigationLock ConfirmExternalNavigation="@IsSaving" OnBeforeInternalNavigation="BeforeNavigation" />
+    <div class="bank-status-frame">
+        <div class="bank-status-top">
+            <button type="button" class="bank-status-back" aria-label="Close status confirmation" disabled="@IsSaving" @onclick="OnClose">&#8592;</button>
+            <span>Cash management / Bank account status</span>
+            <span class="bank-status-state">@(IsSaving ? "Saving..." : "Confirmation required")</span>
+        </div>
+        <h2 id="entity-card-heading" class="bank-status-title">@ActionLabel Bank Account</h2>
+        <div class="bank-status-commands">
+            <span>Home</span>
+            <button type="button" disabled="@IsSaving" @onclick="OnConfirm">Confirm @ActionLabel.ToLowerInvariant()</button>
+            <button type="button" disabled="@IsSaving" autofocus @onclick="OnClose">Cancel</button>
+        </div>
+        <div class="bank-status-body">
+            @if (!string.IsNullOrWhiteSpace(ErrorMessage))
+            {
+                <div class="alert alert-danger" role="alert">@ErrorMessage</div>
+            }
+            <h3>General</h3>
+            <div class="bank-status-fields">
+                <div><label for="bank-status-account">Bank account</label><input id="bank-status-account" value="@($"{Bank.Code} - {Bank.Name}")" readonly /></div>
+                <div><label for="bank-status-currency">Currency</label><input id="bank-status-currency" value="@Bank.CurrencyCode" readonly /></div>
+                <div><label for="bank-status-current">Current status</label><input id="bank-status-current" value="@(Bank.IsBlocked ? "Blocked" : "Active")" readonly /></div>
+                <div><label for="bank-status-next">New status</label><input id="bank-status-next" value="@(Bank.IsBlocked ? "Active" : "Blocked")" readonly /></div>
+            </div>
+            <p class="alert @(Bank.IsBlocked ? "alert-info" : "alert-warning") mt-3">
+                @ActionLabel @Bank.Code - @Bank.Name? Existing records and history are retained. The existing posting and validation rules continue to apply.
+            </p>
+        </div>
+        <footer>Explicit confirmation is required. Cancel leaves the account unchanged.</footer>
+    </div>
+</WorkspaceCardDialog>
+
+@code {
+    [Parameter, EditorRequired] public BankAccountDetail Bank { get; set; } = default!;
+    [Parameter] public bool IsSaving { get; set; }
+    [Parameter] public string? ErrorMessage { get; set; }
+    [Parameter] public string ReturnFocusFallbackSelector { get; set; } = "#new-bank-action";
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback OnConfirm { get; set; }
+    private string ActionLabel => Bank.IsBlocked ? "Reactivate" : "Block";
+    private void BeforeNavigation(LocationChangingContext args) { if (IsSaving) args.PreventNavigation(); }
+}

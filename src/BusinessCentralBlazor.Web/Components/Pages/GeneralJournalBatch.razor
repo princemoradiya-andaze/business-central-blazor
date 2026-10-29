@@ -23,28 +23,17 @@ else if (batch is null)
 }
 else
 {
-    <nav aria-label="Breadcrumb">
-        <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="/financial/journals">General journals</a></li>
-            <li class="breadcrumb-item active" aria-current="page">@batch.Name</li>
-        </ol>
-    </nav>
-
-    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
-        <div>
-            <h1>@batch.Name</h1>
-            <p class="text-body-secondary mb-1">@batch.Description</p>
-            <p class="mb-0">Template: @batch.TemplateCode · Default period: @batch.DefaultPeriodName · Status: <strong>@batch.Status</strong></p>
-        </div>
+    <FinancialDetailLayout Title="@batch.Name" Breadcrumb="Finance / General Journal"
+                           BackUrl="/financial/journals" BackLabel="Back to General journals" Status="@($"Status: {batch.Status}")">
+    <Commands>
+        <a href="/financial/journals">General journals</a>
         @if (batch.Status == JournalBatchStatus.Open)
         {
-            <div class="d-flex flex-wrap gap-2">
                 <a class="btn btn-outline-secondary" href="@($"/financial/journals/{BatchId}/edit")">Edit batch</a>
                 <a class="btn btn-outline-secondary" href="@($"/financial/journals/{BatchId}/lines/new")">Add line</a>
                 <button class="btn btn-primary" type="button" disabled="@isSaving" @onclick="PostAsync">
                     @(isSaving ? "Posting..." : "Post batch")
                 </button>
-            </div>
         }
         else if (batch.ReversedByBatchId is null && batch.ReversalOfBatchId is null)
         {
@@ -52,7 +41,8 @@ else
                 Reverse entire batch
             </button>
         }
-    </div>
+    </Commands>
+    <ChildContent>
 
     @if (!string.IsNullOrWhiteSpace(errorMessage))
     {
@@ -71,13 +61,23 @@ else
         </div>
     }
 
+    <h2>General</h2>
+    <dl class="detail-fields">
+        <div><dt>Batch name</dt><dd>@batch.Name</dd></div>
+        <div><dt>Status</dt><dd>@batch.Status</dd></div>
+        <div><dt>Description</dt><dd>@batch.Description</dd></div>
+        <div><dt>Journal template</dt><dd>@batch.TemplateCode</dd></div>
+        <div><dt>Default accounting period</dt><dd>@batch.DefaultPeriodName</dd></div>
+        <div><dt>Balance (debit minus credit)</dt><dd>@batch.Lines.Sum(line => line.DebitAmount - line.CreditAmount).ToString("N2")</dd></div>
+    </dl>
+    <h2 class="detail-section">Journal lines</h2>
     @if (batch.Status == JournalBatchStatus.Open)
     {
-        <p class="text-body-secondary">Open batches can be edited. Posting permanently locks the lines.</p>
+        <p class="detail-note">Open batches can be edited. Posting permanently locks the lines.</p>
     }
     else
     {
-        <p class="text-body-secondary">Posted lines and ledger entries are immutable.</p>
+        <p class="detail-note">Posted lines and ledger entries are immutable.</p>
     }
 
     @if (batch.Lines.Count == 0)
@@ -188,14 +188,14 @@ else
                         <DataAnnotationsValidator />
                         <ValidationSummary class="alert alert-danger" />
                         <fieldset disabled="@isSaving">
-                            <div class="row g-3">
-                                <div class="col-md-4">
+                            <div class="detail-fields">
+                                <div>
                                     <label class="form-label" for="reversal-name">Reversing batch name</label>
                                     <InputText id="reversal-name" class="form-control" maxlength="32"
                                                @bind-Value="reversalInput.Name" />
                                     <ValidationMessage For="@(() => reversalInput.Name)" />
                                 </div>
-                                <div class="col-md-4">
+                                <div>
                                     <label class="form-label" for="reversal-period">Accounting period</label>
                                     <InputSelect id="reversal-period" class="form-select"
                                                  @bind-Value="reversalInput.AccountingPeriodId"
@@ -206,12 +206,12 @@ else
                                         }
                                     </InputSelect>
                                 </div>
-                                <div class="col-md-4">
+                                <div>
                                     <label class="form-label" for="reversal-date">Posting date</label>
                                     <InputDate id="reversal-date" class="form-control" TValue="DateOnly"
                                                @bind-Value="reversalInput.PostingDate" />
                                 </div>
-                                <div class="col-12">
+                                <div>
                                     <label class="form-label" for="reversal-description">Description</label>
                                     <InputText id="reversal-description" class="form-control" maxlength="100"
                                                @bind-Value="reversalInput.Description" />
@@ -230,6 +230,8 @@ else
             </div>
         </section>
     }
+    </ChildContent>
+    </FinancialDetailLayout>
 }
 
 @code {

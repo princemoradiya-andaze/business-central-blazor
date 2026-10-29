@@ -4,135 +4,338 @@
 @inject IBankService BankService
 @inject IGeneralJournalService JournalService
 @inject NavigationManager Navigation
+@inject ILogger<BankAccountActivity> Logger
 
-<PageTitle>Bank receipts, payments and statements</PageTitle>
-<h1>Bank receipts, payments and statements</h1>
-<a href="/financial/banks">Bank accounts</a>
+<PageTitle>Bank transactions</PageTitle>
 @if (error is not null)
 {
     <div class="alert alert-danger" role="alert">@error</div>
 }
-@if (bank is not null)
+@if (loading)
 {
-    <h2>@bank.Code - @bank.Name (@bank.CurrencyCode)</h2>
-    <p>Receipts and payments create balanced draft journals. Review and post them in General journals;
-        only posted G/L bank activity can be reconciled. Posting and reversal use the existing ledger workflow.</p>
-    <EditForm Model="@journal" OnValidSubmit="CreateJournalAsync" FormName="bank-journal">
-        <DataAnnotationsValidator /><ValidationSummary />
-        <fieldset disabled="@(saving || bank.IsBlocked)">
-            <legend>New receipt or payment</legend>
-            <label for="bank-receipt">Receipt (clear for payment)</label>
-            <InputCheckbox id="bank-receipt" @bind-Value="journal.IsReceipt" />
-            <label for="bank-document">Unique document number</label>
-            <InputText id="bank-document" class="form-control" @bind-Value="journal.DocumentNumber" />
-            <label for="bank-description">Description</label>
-            <InputText id="bank-description" class="form-control" @bind-Value="journal.Description" />
-            <label for="bank-date">Posting date</label>
-            <InputDate id="bank-date" class="form-control" @bind-Value="journal.PostingDate" />
-            <label for="bank-amount">Positive amount</label>
-            <InputNumber id="bank-amount" class="form-control" step="0.0001" @bind-Value="journal.Amount" />
-            <label for="bank-period">Accounting period</label>
-            <InputSelect id="bank-period" class="form-select" @bind-Value="journal.AccountingPeriodId">
-                <option value="@Guid.Empty">Select open period</option>
-                @foreach (var period in periods.Where(period => !period.IsClosed && !period.DateLocked))
-                {
-                    <option value="@period.Id">@period.Name</option>
-                }
-            </InputSelect>
-            <label for="bank-offset">Offset G/L account</label>
-            <InputSelect id="bank-offset" class="form-select" @bind-Value="journal.OffsetAccountId">
-                <option value="@Guid.Empty">Select offset account</option>
-                @foreach (var account in accounts.Where(account => account.Id != bank.GeneralLedgerAccountId))
-                {
-                    <option value="@account.Id">@account.Number - @account.Name</option>
-                }
-            </InputSelect>
-            <button type="submit" class="btn btn-primary my-3">Create draft journal</button>
-        </fieldset>
-    </EditForm>
-    <table class="table">
-        <caption>Journal-linked receipts and payments</caption>
-        <thead><tr><th>Document</th><th>Type</th><th>Status</th><th>Journal trace</th></tr></thead>
-        <tbody>
-            @foreach (var item in journals)
+    <p role="status">Loading bank transactions...</p>
+}
+else if (bank is not null)
+{
+    <RecordWorkspace Title="Bank transactions" IdPrefix="bank-transactions" StatusControlId="bank-transactions-status"
+                     StatusOptionsOverride="@StatusOptions" StatusFilter="@status" StatusFilterChanged="SetStatus"
+                     SearchPlaceholder="Search document or reference" SearchTerm="@search" SearchTermChanged="SetSearch"
+                     HasRecords="@HasRecords" EmptyMessage="No records match the current search and filters.">
+        <HeaderActions>
+            <a class="record-workspace-action" href="/financial/banks" aria-label="Back to Bank accounts">&#8592; Bank accounts</a>
+            @if (IsStatements)
             {
-                <tr><td>@item.DocumentNumber</td><td>@(item.IsReceipt ? "Receipt" : "Payment")</td><td>@item.Status</td>
-                    <td><a href="@($"/financial/journals/{item.BatchId}")">Review journal</a></td></tr>
+                <a id="new-bank-statement" class="record-workspace-action" href="@CardUrl("statement")" aria-disabled="@(bank.IsBlocked ? "true" : "false")"
+                   @onclick="PreventBlockedCreation" @onclick:preventDefault="@bank.IsBlocked">+ New statement</a>
             }
-        </tbody>
-    </table>
-    <EditForm Model="@statement" OnValidSubmit="CreateStatementAsync" FormName="bank-statement">
-        <DataAnnotationsValidator /><ValidationSummary />
-        <fieldset disabled="@(saving || bank.IsBlocked)">
-            <legend>New manual statement</legend>
-            <label for="statement-reference">Unique reference</label>
-            <InputText id="statement-reference" class="form-control" @bind-Value="statement.Reference" />
-            <label for="statement-start">From</label>
-            <InputDate id="statement-start" class="form-control" @bind-Value="statement.StartsOn" />
-            <label for="statement-end">Through</label>
-            <InputDate id="statement-end" class="form-control" @bind-Value="statement.EndsOn" />
-            <label for="statement-opening">Opening balance</label>
-            <InputNumber id="statement-opening" class="form-control" step="0.0001" @bind-Value="statement.OpeningBalance" />
-            <label for="statement-closing">Closing balance</label>
-            <InputNumber id="statement-closing" class="form-control" step="0.0001" @bind-Value="statement.ClosingBalance" />
-            <button type="submit" class="btn btn-primary my-3">Create statement</button>
-        </fieldset>
-    </EditForm>
-    <table class="table">
-        <caption>Manual statements</caption>
-        <thead><tr><th>Reference</th><th>Through</th><th>Status</th></tr></thead>
-        <tbody>
-            @foreach (var item in statements)
+            else
             {
-                <tr><td><a href="@($"/financial/bank-statements/{item.Id}")">@item.Reference</a></td>
-                    <td>@item.EndsOn</td><td>@(item.IsCompleted ? "Completed" : "Open")</td></tr>
+                <a id="new-bank-receipt" class="record-workspace-action" href="@CardUrl("receipt")" aria-disabled="@(bank.IsBlocked ? "true" : "false")"
+                   @onclick="PreventBlockedCreation" @onclick:preventDefault="@bank.IsBlocked">+ New receipt</a>
+                <a id="new-bank-payment" class="record-workspace-action" href="@CardUrl("payment")" aria-disabled="@(bank.IsBlocked ? "true" : "false")"
+                   @onclick="PreventBlockedCreation" @onclick:preventDefault="@bank.IsBlocked">+ New payment</a>
             }
-        </tbody>
-    </table>
+            @if (SelectedUrl is { } selectedUrl)
+            {
+                <a class="record-workspace-action" href="@selectedUrl">@(IsStatements ? "Open statement" : "Review journal")</a>
+            }
+            <button id="bank-status-action" type="button" class="record-workspace-action" disabled="@saving" @onclick="OpenStatus">
+                @(bank.IsBlocked ? "Reactivate account" : "Block account")
+            </button>
+        </HeaderActions>
+        <FilterContent>
+            <label for="bank-activity-filter-status">Status</label>
+            <select id="bank-activity-filter-status" class="form-select" value="@status" @onchange="SetFilterStatus">
+                @foreach (var option in StatusOptions) { <option value="@option.Value">@option.Label</option> }
+            </select>
+            <button type="button" class="btn btn-link btn-sm px-0" @onclick="ClearFilters">Clear filters</button>
+        </FilterContent>
+        <ContextContent>
+            <div class="bank-activity-context"><strong>@bank.Code - @bank.Name</strong> &nbsp; @bank.CurrencyCode &nbsp; <span>@(bank.IsBlocked ? "Blocked" : "Active")</span></div>
+            <nav class="bank-activity-tabs" aria-label="Bank transaction types">
+                <a class="@(!IsStatements ? "active" : null)" aria-current="@(!IsStatements ? "page" : null)" href="@ListUrl(false)">Receipts and payments</a>
+                <a class="@(IsStatements ? "active" : null)" aria-current="@(IsStatements ? "page" : null)" href="@ListUrl(true)">Manual statements</a>
+            </nav>
+        </ContextContent>
+        <ListContent>
+            <div class="table-responsive">
+                <table class="table table-striped align-middle">
+                    <caption class="visually-hidden">@(IsStatements ? "Manual bank statements" : "Journal-linked receipts and payments")</caption>
+                    <thead><tr><th scope="col">@(IsStatements ? "Reference" : "Document")</th><th scope="col">@(IsStatements ? "Through" : "Type")</th><th scope="col">Status</th>@if (!IsStatements) { <th scope="col">Journal trace</th> }</tr></thead>
+                    <tbody>
+                        @if (IsStatements)
+                        {
+                            @foreach (var item in VisibleStatements)
+                            {
+                                <tr @key="item.Id" class="@(selectedId == item.Id ? "record-row-selected" : null)" @onclick="() => selectedId = item.Id">
+                                    <th scope="row"><a href="@StatementUrl(item.Id)" @onclick:stopPropagation="true">@item.Reference</a></th>
+                                    <td>@item.EndsOn.ToString("yyyy-MM-dd")</td><td>@StatementStatus(item)</td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            @foreach (var item in VisibleJournals)
+                            {
+                                <tr @key="item.BatchId" class="@(selectedId == item.BatchId ? "record-row-selected" : null)" @onclick="() => selectedId = item.BatchId">
+                                    <th scope="row"><a href="@JournalUrl(item.BatchId)" @onclick:stopPropagation="true">@item.DocumentNumber</a></th>
+                                    <td>@(item.IsReceipt ? "Receipt" : "Payment")</td><td>@item.Status</td>
+                                    <td><a href="@JournalUrl(item.BatchId)" @onclick:stopPropagation="true">Review journal</a></td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </ListContent>
+        <TallTilesContent>@Tiles(true)</TallTilesContent>
+        <TilesContent>@Tiles(false)</TilesContent>
+        <DetailsContent>
+            <h3>@bank.Code - @bank.Name</h3>
+            <dl>
+                <div><dt>Currency</dt><dd>@bank.CurrencyCode</dd></div>
+                <div><dt>Bank status</dt><dd>@(bank.IsBlocked ? "Blocked" : "Active")</dd></div>
+                @if (IsStatements && VisibleStatements.FirstOrDefault(item => item.Id == selectedId) is { } statement)
+                {
+                    <div><dt>Reference</dt><dd>@statement.Reference</dd></div>
+                    <div><dt>Status</dt><dd>@StatementStatus(statement)</dd></div>
+                }
+                else if (!IsStatements && VisibleJournals.FirstOrDefault(item => item.BatchId == selectedId) is { } journal)
+                {
+                    <div><dt>Document</dt><dd>@journal.DocumentNumber</dd></div>
+                    <div><dt>Type</dt><dd>@(journal.IsReceipt ? "Receipt" : "Payment")</dd></div>
+                    <div><dt>Status</dt><dd>@journal.Status</dd></div>
+                }
+            </dl>
+        </DetailsContent>
+    </RecordWorkspace>
+    <p class="bank-activity-note">
+        @(IsStatements ? "Create manual statements and open existing statements in the established reconciliation workflow. Only posted bank G/L activity can be reconciled."
+            : "Receipts and payments create balanced draft journals. Review and post explicitly in General journals; no automatic posting.")
+    </p>
+    @if (bank.IsBlocked)
+    {
+        <p class="alert alert-warning">This bank account is blocked. Existing history is available; new journals and statements cannot be created.</p>
+    }
+
+    @if (statusOpen)
+    {
+        <BankStatusConfirmation Bank="@bank" IsSaving="@saving" ErrorMessage="@cardError" OnClose="CloseStatus"
+                                ReturnFocusFallbackSelector="a[href='/financial/banks']" OnConfirm="ToggleStatusAsync" />
+    }
+    @if (IsCreating)
+    {
+        <WorkspaceCardDialog LabelledBy="entity-card-heading" IsSaving="@saving" OnClose="RequestClose"
+                             ReturnFocusSelector="@(IsStatements ? "#new-bank-statement" : Create == "payment" ? "#new-bank-payment" : "#new-bank-receipt")">
+            <NavigationLock ConfirmExternalNavigation="@(saving || HasPendingChanges)" OnBeforeInternalNavigation="BeforeNavigation" />
+            <div class="bank-activity-card">
+                <div class="bank-activity-top">
+                    <button class="bank-activity-back" type="button" aria-label="Close record card" disabled="@saving" @onclick="RequestClose">&#8592;</button>
+                    <span>Cash management / @(IsStatements ? "Manual Bank Statement" : "Bank Transactions")</span>
+                    <span class="bank-activity-state">@(saving ? "Saving..." : "Unsaved draft")</span>
+                </div>
+                <h2 id="entity-card-heading" class="bank-activity-title">@(IsStatements ? "New Manual Bank Statement" : Create == "payment" ? "New Bank Payment" : "New Bank Receipt")</h2>
+                <div class="bank-activity-commands">
+                    <span>Home</span>
+                    <button type="submit" form="bank-activity-create" disabled="@(saving || bank.IsBlocked)">@(IsStatements ? "Create statement" : "Create draft journal")</button>
+                    <button type="button" disabled="@saving" @onclick="RequestClose">Cancel</button>
+                </div>
+                <div class="bank-activity-body">
+                    @if (cardError is not null) { <div class="alert alert-danger" role="alert">@cardError</div> }
+                    @if (confirmDiscard)
+                    {
+                        <div class="alert alert-warning" role="alert">
+                            Discard unsaved inputs before leaving?
+                            <button type="button" class="btn btn-link btn-sm" @onclick="Discard">Discard and close</button>
+                            <button type="button" class="btn btn-link btn-sm" @onclick="() => confirmDiscard = false">Keep editing</button>
+                        </div>
+                    }
+                    <h3 class="bank-activity-section">General</h3>
+                    <EditForm EditContext="@context" OnValidSubmit="CreateAsync" FormName="bank-activity-create" id="bank-activity-create">
+                        <DataAnnotationsValidator /><ValidationSummary />
+                        <fieldset disabled="@(saving || bank.IsBlocked)">
+                            <div class="bank-activity-fields" @oninput="() => draftChanged = true">
+                                <div><label for="activity-bank">Bank account</label><input id="activity-bank" value="@($"{bank.Code} - {bank.Name}")" readonly /></div>
+                                <div><label for="activity-currency">Currency</label><input id="activity-currency" value="@bank.CurrencyCode" readonly /></div>
+                                @if (IsStatements)
+                                {
+                                    <div><label for="statement-reference">Unique reference</label><CardInputText id="statement-reference" maxlength="64" @bind-Value="statementInput.Reference" /></div>
+                                    <div><label for="statement-start">From</label><InputDate id="statement-start" @bind-Value="statementInput.StartsOn" /></div>
+                                    <div><label for="statement-end">Through</label><InputDate id="statement-end" @bind-Value="statementInput.EndsOn" /></div>
+                                    <div><label for="statement-opening">Opening balance</label><InputNumber id="statement-opening" step="0.0001" @bind-Value="statementInput.OpeningBalance" /></div>
+                                    <div><label for="statement-closing">Closing balance</label><InputNumber id="statement-closing" step="0.0001" @bind-Value="statementInput.ClosingBalance" /></div>
+                                }
+                                else
+                                {
+                                    <div><label for="bank-document">Document number</label><CardInputText id="bank-document" maxlength="64" @bind-Value="journalInput.DocumentNumber" /></div>
+                                    <div><label for="bank-description">Description</label><CardInputText id="bank-description" maxlength="250" @bind-Value="journalInput.Description" /></div>
+                                    <div><label for="bank-date">Posting date</label><InputDate id="bank-date" @bind-Value="journalInput.PostingDate" /></div>
+                                    <div><label for="bank-amount">Positive amount</label><InputNumber id="bank-amount" step="0.0001" @bind-Value="journalInput.Amount" /></div>
+                                    <div><label for="bank-period">Accounting period</label><InputSelect id="bank-period" @bind-Value="journalInput.AccountingPeriodId">
+                                        <option value="@Guid.Empty">Select open period</option>
+                                        @foreach (var period in periods.Where(item => !item.IsClosed && !item.DateLocked)) { <option value="@period.Id">@period.Name</option> }
+                                    </InputSelect></div>
+                                    <div><label for="bank-offset">Offset G/L account</label><InputSelect id="bank-offset" @bind-Value="journalInput.OffsetAccountId">
+                                        <option value="@Guid.Empty">Select offset account</option>
+                                        @foreach (var account in accounts.Where(item => item.Id != bank.GeneralLedgerAccountId)) { <option value="@account.Id">@account.Number - @account.Name</option> }
+                                    </InputSelect></div>
+                                }
+                            </div>
+                        </fieldset>
+                    </EditForm>
+                    <p class="alert alert-info mt-4">
+                        @(IsStatements ? "After creation, continue in the existing statement reconciliation workflow to enter or import lines, match posted bank activity, and complete the statement."
+                            : "This creates a balanced journal draft. Review and post it in General journals. Foreign exchange is not added.")
+                    </p>
+                </div>
+                <footer>@(IsStatements ? "Creating a statement does not post a journal or complete reconciliation." : "Explicit draft creation only. Cancel discards unsaved inputs.")</footer>
+            </div>
+        </WorkspaceCardDialog>
+    }
 }
 
 @code {
     [Parameter] public Guid BankId { get; set; }
+    [SupplyParameterFromQuery(Name = "view")] public string? View { get; set; }
+    [SupplyParameterFromQuery(Name = "new")] public string? Create { get; set; }
     private BankAccountDetail? bank;
-    private BankJournalInput journal = new();
-    private BankStatementInput statement = new();
-    private IReadOnlyList<GeneralJournalAccountOption> accounts = [];
-    private IReadOnlyList<AccountingPeriodListItem> periods = [];
     private IReadOnlyList<BankJournalDetail> journals = [];
     private IReadOnlyList<BankStatementSummary> statements = [];
-    private bool saving;
-    private string? error;
+    private IReadOnlyList<GeneralJournalAccountOption> accounts = [];
+    private IReadOnlyList<AccountingPeriodListItem> periods = [];
+    private BankJournalInput journalInput = new();
+    private BankStatementInput statementInput = new();
+    private EditContext context = new(new BankJournalInput());
+    private string search = string.Empty, status = "all";
+    private string? loadedUri, error, cardError;
+    private Guid? selectedId, createdId;
+    private bool loading = true, saving, statusOpen, confirmDiscard, leaving, draftChanged;
+    private bool HasPendingChanges => draftChanged || context.IsModified();
+    private bool IsStatements => View == "statements";
+    private bool IsCreating => Create is "receipt" or "payment" or "statement";
+    private IReadOnlyList<(string Value, string Label)> StatusOptions => IsStatements
+        ? [("all", "All"), ("Open", "Open"), ("Completed", "Completed")]
+        : Enum.GetNames<JournalBatchStatus>().Select(value => (value, value)).Prepend(("all", "All")).ToArray();
+    private IEnumerable<BankJournalDetail> VisibleJournals => journals.Where(item => (status == "all" || item.Status.ToString() == status) && item.DocumentNumber.Contains(search.Trim(), StringComparison.OrdinalIgnoreCase));
+    private IEnumerable<BankStatementSummary> VisibleStatements => statements.Where(item => (status == "all" || StatementStatus(item) == status) && item.Reference.Contains(search.Trim(), StringComparison.OrdinalIgnoreCase));
+    private bool HasRecords => IsStatements ? VisibleStatements.Any() : VisibleJournals.Any();
+    private string? SelectedUrl => selectedId is { } id ? IsStatements ? StatementUrl(id) : JournalUrl(id) : null;
+    private static string StatementStatus(BankStatementSummary item) => item.IsCompleted ? "Completed" : "Open";
+    private static string JournalUrl(Guid id) => $"/financial/journals/{id}";
+    private static string StatementUrl(Guid id) => $"/financial/bank-statements/{id}";
+    private string ListUrl(bool statementsView) => $"/financial/banks/{BankId}" + (statementsView ? "?view=statements" : string.Empty);
+    private string CardUrl(string action) => $"/financial/banks/{BankId}?view={(action == "statement" ? "statements" : "journals")}&new={action}";
+
     protected override async Task OnParametersSetAsync()
     {
-        bank = null;
-        await ExecuteAsync(async user =>
+        var uri = Navigation.Uri;
+        if (loadedUri == uri) return;
+        loadedUri = uri; loading = true; bank = null; error = cardError = null;
+        statusOpen = confirmDiscard = leaving = draftChanged = false; createdId = null;
+        try
         {
-            bank = (await BankService.GetAccountsAsync(user)).SingleOrDefault(item => item.Id == BankId);
-            if (bank is null) throw new ValidationException("Bank account not found in the active company.");
-            accounts = await JournalService.GetPostingAccountsAsync(user);
-            periods = await JournalService.GetPeriodsAsync(user);
-            journals = await BankService.GetJournalsAsync(user, BankId);
-            statements = await BankService.GetStatementsAsync(user, BankId);
-        });
+            var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+            var loadedBank = (await BankService.GetAccountsAsync(user)).SingleOrDefault(item => item.Id == BankId);
+            if (loadedBank is null) throw new ValidationException("Bank account not found in the active company.");
+            var loadedJournals = await BankService.GetJournalsAsync(user, BankId);
+            var loadedStatements = await BankService.GetStatementsAsync(user, BankId);
+            var loadedAccounts = await JournalService.GetPostingAccountsAsync(user);
+            var loadedPeriods = await JournalService.GetPeriodsAsync(user);
+            if (loadedUri != uri) return;
+            bank = loadedBank; journals = loadedJournals; statements = loadedStatements; accounts = loadedAccounts; periods = loadedPeriods;
+            search = string.Empty; status = "all"; EnsureSelection();
+            if (Create is not null && (!IsCreating || (Create == "statement") != IsStatements))
+                throw new ValidationException("The requested bank transaction card is not available in this view.");
+            journalInput = new() { IsReceipt = Create != "payment" };
+            statementInput = new();
+            context = IsStatements ? new(statementInput) : new(journalInput);
+        }
+        catch (ValidationException exception) { if (loadedUri == uri) { bank = null; error = exception.Message; } }
+        catch (UnauthorizedAccessException) { if (loadedUri == uri) { bank = null; error = "Your active company is no longer available. Select an active company and try again."; } }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "Unable to load bank transactions for {BankId}", BankId);
+            if (loadedUri == uri) { bank = null; error = "Bank transactions could not be loaded. Reload the page to try again."; }
+        }
+        finally { if (loadedUri == uri) loading = false; }
     }
-    private Task CreateJournalAsync() => ExecuteAsync(async user =>
-    {
-        var id = await BankService.CreateJournalAsync(user, BankId, journal);
-        Navigation.NavigateTo($"/financial/journals/{id}");
-    });
-    private Task CreateStatementAsync() => ExecuteAsync(async user =>
-    {
-        var id = await BankService.CreateStatementAsync(user, BankId, statement);
-        Navigation.NavigateTo($"/financial/bank-statements/{id}");
-    });
-    private async Task ExecuteAsync(Func<System.Security.Claims.ClaimsPrincipal, Task> action)
+    private void EnsureSelection() => selectedId = RecordSelection.Reconcile(IsStatements ? VisibleStatements.Select(item => item.Id) : VisibleJournals.Select(item => item.BatchId), selectedId);
+    private void SetSearch(string value) { search = value; EnsureSelection(); }
+    private void SetStatus(string value) { status = value; EnsureSelection(); }
+    private void SetFilterStatus(ChangeEventArgs args) => SetStatus(args.Value?.ToString() ?? "all");
+    private void ClearFilters() { search = string.Empty; status = "all"; EnsureSelection(); }
+    private void PreventBlockedCreation() { if (bank?.IsBlocked == true) error = "Reactivate the bank account before creating journals or statements."; }
+    private void OpenStatus() { cardError = null; statusOpen = true; }
+    private void CloseStatus() { if (!saving) statusOpen = false; }
+    private void RequestClose()
     {
         if (saving) return;
-        saving = true;
-        error = null;
-        try { await action((await AuthenticationStateProvider.GetAuthenticationStateAsync()).User); }
-        catch (ValidationException exception) { error = exception.Message; }
-        catch (UnauthorizedAccessException exception) { error = exception.Message; }
+        if (HasPendingChanges) { confirmDiscard = true; return; }
+        Discard();
+    }
+    private void Discard() { if (saving) return; leaving = true; Navigation.NavigateTo(ListUrl(IsStatements)); }
+    private void BeforeNavigation(LocationChangingContext args)
+    {
+        if (!leaving && (saving || HasPendingChanges)) { args.PreventNavigation(); confirmDiscard = true; }
+    }
+    private Task CreateAsync() => ExecuteSaveAsync(async () =>
+    {
+        var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+        createdId ??= IsStatements ? await BankService.CreateStatementAsync(user, BankId, statementInput)
+            : await BankService.CreateJournalAsync(user, BankId, journalInput);
+        leaving = true;
+        Navigation.NavigateTo(IsStatements ? StatementUrl(createdId.Value) : JournalUrl(createdId.Value));
+    });
+    private Task ToggleStatusAsync() => ExecuteSaveAsync(async () =>
+    {
+        if (bank is not { } current) throw new ValidationException("Select an available bank account.");
+        var user = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+        var revision = await BankService.UpdateAccountAsync(user, current.Id, current.Revision, new()
+        {
+            Code = current.Code, Name = current.Name, AccountIdentifier = current.AccountIdentifier,
+            GeneralLedgerAccountId = current.GeneralLedgerAccountId, IsBlocked = !current.IsBlocked
+        });
+        bank = current with { IsBlocked = !current.IsBlocked, Revision = revision };
+        statusOpen = false; error = null;
+    });
+    private async Task ExecuteSaveAsync(Func<Task> action)
+    {
+        if (saving) return;
+        saving = true; cardError = null;
+        try { await action(); }
+        catch (ValidationException exception) { cardError = exception.Message; }
+        catch (UnauthorizedAccessException) { cardError = "Your active company is no longer available. Select an active company and try again."; }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "Unable to save bank transaction operation for {BankId}", BankId);
+            cardError = "The operation could not be completed. Your inputs have been retained.";
+        }
         finally { saving = false; }
     }
+    private RenderFragment Tiles(bool tall) => @<div class="record-tile-grid">
+        @if (IsStatements)
+        {
+            @foreach (var item in VisibleStatements)
+            {
+                <div @key="item.Id" class="record-tile @(tall ? "tall" : null) @(selectedId == item.Id ? "selected" : null)" tabindex="0" role="group"
+                     @onclick="() => selectedId = item.Id" @onkeydown='args => { if (args.Key is "Enter" or " ") selectedId = item.Id; }'>
+                    <a class="record-tile-title" href="@StatementUrl(item.Id)" @onclick:stopPropagation="true">@item.Reference</a>
+                    <span class="record-tile-meta">@StatementStatus(item)</span>
+                    @if (tall) { <span class="record-tile-meta">@item.EndsOn.ToString("yyyy-MM-dd")</span> }
+                </div>
+            }
+        }
+        else
+        {
+            @foreach (var item in VisibleJournals)
+            {
+                <div @key="item.BatchId" class="record-tile @(tall ? "tall" : null) @(selectedId == item.BatchId ? "selected" : null)" tabindex="0" role="group"
+                     @onclick="() => selectedId = item.BatchId" @onkeydown='args => { if (args.Key is "Enter" or " ") selectedId = item.BatchId; }'>
+                    <a class="record-tile-title" href="@JournalUrl(item.BatchId)" @onclick:stopPropagation="true">@item.DocumentNumber</a>
+                    <span class="record-tile-meta">@item.Status</span>
+                    @if (tall) { <span class="record-tile-meta">@(item.IsReceipt ? "Receipt" : "Payment")</span> }
+                </div>
+            }
+        }
+    </div>;
 }
