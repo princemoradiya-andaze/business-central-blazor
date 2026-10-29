@@ -4,53 +4,63 @@
 <PageTitle>All pages</PageTitle>
 
 <div class="navigation-directory">
+    <a class="directory-back-link" href="/" aria-label="Back to home" title="Back to home">
+        <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+            <path d="M19 12H5m0 0 7 7m-7-7 7-7" />
+        </svg>
+    </a>
     <header class="directory-heading">
-        <a class="directory-back-link" href="/" aria-label="Back to home" title="Back to home">
-            <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
-                <path d="M19 12H5m0 0 7 7m-7-7 7-7" />
-            </svg>
-        </a>
-        <div class="directory-heading-content">
-            <p class="directory-eyebrow">Company workspace</p>
-            <h1>All pages</h1>
-            <p>Browse implemented pages and shortcuts to common tasks in this company.</p>
-        </div>
+        <p class="directory-eyebrow">My Business Central</p>
+        <h1>Business Manager</h1>
     </header>
 
     <nav class="directory-groups" aria-label="All implemented pages">
-        @foreach (var group in DirectoryGroups)
+        @foreach (var column in DirectoryColumns)
         {
-            <details class="directory-group" open>
-                <summary aria-controls="@($"directory-{group.Key}-links")">
-                    <h2>
-                        @group.Label <span class="directory-count">(@group.Items.Count)</span>
-                    </h2>
-                    <svg class="directory-chevron" aria-hidden="true" viewBox="0 0 24 24" focusable="false">
-                        <path d="m3 16 9-9 9 9" />
-                    </svg>
-                </summary>
-                <ul id="@($"directory-{group.Key}-links")">
-                    @foreach (var item in group.Items)
-                    {
-                        <li><a href="@item.Href">- @item.Label</a></li>
-                    }
-                </ul>
-            </details>
+            <div class="directory-column">
+                @foreach (var group in column)
+                {
+                    <details class="directory-group" open>
+                        <summary aria-controls="@($"directory-{group.Key}-links")">
+                            <h2>
+                                @group.Label <span class="directory-count">(@group.Items.Count)</span>
+                            </h2>
+                            <svg class="directory-chevron" aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+                                <path d="m3 16 9-9 9 9" />
+                            </svg>
+                        </summary>
+                        <ul id="@($"directory-{group.Key}-links")">
+                            @foreach (var item in group.Items)
+                            {
+                                <li><a href="@item.Href">- @item.Label</a></li>
+                            }
+                        </ul>
+                    </details>
+                }
+            </div>
         }
     </nav>
 </div>
 
 @code {
-    private static readonly IReadOnlyList<NavigationGroup> DirectoryGroups =
+    private static readonly IReadOnlyList<IReadOnlyList<NavigationGroup>> DirectoryColumns =
     [
-        new("home", "Home",
         [
-            new("Customers", "/financial/sales/customers"),
-            new("Vendors", "/financial/purchasing/vendors"),
-            new("Items", "/financial/inventory"),
-            new("Bank Accounts", "/financial/banks"),
-            new("Chart of Accounts", "/financial/general-ledger/accounts")
-        ], []),
-        .. NavigationMenuCatalog.Groups
+            new("home", "Home",
+            [
+                new("Customers", "/financial/sales/customers"),
+                new("Vendors", "/financial/purchasing/vendors"),
+                new("Items", "/financial/inventory"),
+                new("Bank Accounts", "/financial/banks"),
+                new("Chart of Accounts", "/financial/general-ledger/accounts")
+            ], []),
+            .. NavigationMenuCatalog.Groups.Where(group => group.Key is "sales" or "inventory")
+        ],
+        [
+            .. NavigationMenuCatalog.Groups.Where(group => group.Key is "finance" or "purchasing" or "reports")
+        ],
+        [
+            .. NavigationMenuCatalog.Groups.Where(group => group.Key is "cash" or "more")
+        ]
     ];
 }

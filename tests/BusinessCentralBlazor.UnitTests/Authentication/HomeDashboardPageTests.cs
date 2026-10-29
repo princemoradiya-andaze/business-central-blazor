@@ -87,6 +87,9 @@ public sealed class HomeDashboardPageTests(AuthenticationWebApplicationFactory f
         var html = await response.Content.ReadAsStringAsync();
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("My Business Central", html, StringComparison.Ordinal);
+        Assert.Contains("Business Manager", html, StringComparison.Ordinal);
+        Assert.Equal(3, Regex.Matches(html, "<div class=\"directory-column\"").Count);
         Assert.Equal(8, Regex.Matches(html, "<details class=\"directory-group\" open[^>]*>").Count);
         foreach (var key in new[] { "home", "finance", "sales", "purchasing", "cash", "inventory", "reports", "more" })
         {
