@@ -1,0 +1,137 @@
+@inject ICompanyInformationService Service
+@inject AuthenticationStateProvider Authentication
+@inject CompanyProfileEvents ProfileEvents
+@inject ILogger<CompanyInformationCard> Logger
+@inject IJSRuntime JS
+
+<NavigationLock ConfirmExternalNavigation="@(dirty || saving || uploading)" OnBeforeInternalNavigation="BeforeNavigation" />
+<WorkspaceCardDialog OnClose="CloseAsync" IsSaving="@(saving || uploading)" LabelledBy="company-information-title"
+                     ReturnFocusSelector="#company-information-link" ReturnFocusFallbackSelector="#global-settings-toggle"
+                     CssClass="@(expanded ? "company-information expanded" : "company-information")">
+    <div class="workspace-card-top">
+        <button type="button" class="workspace-card-back" aria-label="Back to workspace" disabled="@(saving || uploading)" @onclick="CloseAsync">&#8592;</button>
+        <span>Company / Information</span>
+        <span class="profile-status" role="status">@(loading ? "Loading..." : uploading ? "Uploading picture..." : saving ? "Saving..." : dirty ? "Unsaved changes" : loaded ? "Saved" : "Unavailable")</span>
+        <button type="button" class="profile-icon" aria-label="@(expanded ? "Restore Company Information" : "Expand Company Information")" @onclick="() => expanded = !expanded">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="@(expanded ? "M1 6h5V1M6 6 1 1m14 9h-5v5m0-5 5 5" : "M10 1h5v5m0-5-5 5M6 15H1v-5m0 5 5-5")" /></svg>
+        </button>
+        <button type="button" class="profile-icon" aria-label="Close Company Information" disabled="@(saving || uploading)" @onclick="CloseAsync">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 2l12 12M14 2 2 14" /></svg>
+        </button>
+    </div>
+    <h1 id="company-information-title" class="profile-title">Company Information</h1>
+    <div class="workspace-card-commands">
+        <button type="submit" form="company-information-form" disabled="@(saving || uploading || !loaded)">Save</button>
+        <button type="button" disabled="@(saving || uploading || !dirty)" @onclick="DiscardAsync">Discard changes</button>
+        <span>Applies to the active company only</span>
+    </div>
+    <div class="workspace-card-body">
+        @if (loading) { <LoadingIndicator /> }
+        @if (error is not null) { <div class="alert alert-danger" role="alert">@error</div> }
+        @if (message is not null) { <div class="alert alert-success" role="status">@message</div> }
+        @if (loaded)
+        {
+            <EditForm id="company-information-form" Model="@input" OnValidSubmit="SaveAsync" FormName="company-information">
+                <DataAnnotationsValidator /><ValidationSummary />
+                <fieldset disabled="@(saving || uploading)" class="profile-fieldset" @oninput="MarkDirty" @onchange="MarkDirty">
+                    <h2 class="workspace-card-section">General</h2>
+                    <div class="profile-columns">
+                        <div class="profile-column">
+                            <div><label for="profile-name">Name</label><InputText id="profile-name" @bind-Value="input.Name" maxlength="160" /></div>
+                            <div><label for="profile-address">Address</label><InputText id="profile-address" @bind-Value="input.Address" maxlength="200" /></div>
+                            <div><label for="profile-address2">Address 2</label><InputText id="profile-address2" @bind-Value="input.Address2" maxlength="200" /></div>
+                            <div><label for="profile-city">City</label><InputText id="profile-city" @bind-Value="input.City" maxlength="100" /></div>
+                            <div><label for="profile-county">County</label><InputText id="profile-county" @bind-Value="input.County" maxlength="100" /></div>
+                            <div><label for="profile-postcode">Post Code</label><InputText id="profile-postcode" @bind-Value="input.PostCode" maxlength="20" /></div>
+                            <div><label for="profile-country">Country/Region Code</label><InputText id="profile-country" @bind-Value="input.CountryRegionCode" maxlength="2" placeholder="GB, IN, US..." /></div>
+                        </div>
+                        <div class="profile-column">
+                            <div><label for="profile-contact">Contact Name</label><InputText id="profile-contact" @bind-Value="input.ContactName" maxlength="100" /></div>
+                            <div><label for="profile-phone">Phone No.</label><InputText id="profile-phone" @bind-Value="input.PhoneNumber" maxlength="40" type="tel" /></div>
+                            <div><label for="profile-vat">VAT Registration No.</label><InputText id="profile-vat" @bind-Value="input.VatRegistrationNumber" maxlength="40" /></div>
+                            <div class="profile-picture"><label for="profile-logo">Picture</label><div>
+                                <div class="profile-logo">@if (input.LogoUrl is { } url) { <img src="@url" alt="Company logo" /> } else { <span>No picture</span> }</div>
+                                <InputFile id="profile-logo" OnChange="UploadLogoAsync" accept="image/png,image/jpeg,image/webp" />
+                                <button type="button" disabled="@(input.Logo is null)" @onclick="RemoveLogo">Remove picture</button>
+                                <p class="profile-help">PNG, JPEG or WebP, up to 2 MB.</p>
+                            </div></div>
+                        </div>
+                    </div>
+                    <h2 class="workspace-card-section communication-heading">Communication</h2>
+                    <div class="profile-columns">
+                        <div class="profile-column">
+                            <div><label for="profile-email">Email</label><InputText id="profile-email" @bind-Value="input.Email" maxlength="254" type="email" /></div>
+                            <div><label for="profile-website">Home Page</label><InputText id="profile-website" @bind-Value="input.Website" maxlength="250" placeholder="https://" /></div>
+                        </div>
+                        <p class="profile-help">Company contact details are separate from your sign-in account.</p>
+                    </div>
+                </fieldset>
+            </EditForm>
+        }
+    </div>
+</WorkspaceCardDialog>
+
+@code {
+    [Parameter] public EventCallback OnClose { get; set; }
+    private CompanyInformationInput input = new(), saved = new();
+    private bool loading = true, loaded, saving, uploading, dirty, expanded;
+    private string? error, message;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { input = await Service.GetAsync((await Authentication.GetAuthenticationStateAsync()).User); saved = input with { }; loaded = true; }
+        catch (UnauthorizedAccessException) { error = "Your company is no longer available. Select an available company."; }
+        catch (Exception ex) { Logger.LogError(ex, "Unable to load company information"); error = "Company information could not be loaded. Close and reopen the card to try again."; }
+        finally { loading = false; }
+    }
+
+    private void MarkDirty() { dirty = true; message = null; }
+    public async Task<bool> ConfirmLeaveAsync()
+    {
+        if (saving || uploading) return false;
+        if (dirty && !await JS.InvokeAsync<bool>("confirm", "Discard unsaved company information?")) return false;
+        dirty = false;
+        return true;
+    }
+    private async Task CloseAsync() { if (await ConfirmLeaveAsync()) await OnClose.InvokeAsync(); }
+    private async Task BeforeNavigation(LocationChangingContext context) { if (!await ConfirmLeaveAsync()) context.PreventNavigation(); }
+    private async Task DiscardAsync()
+    {
+        if (!await ConfirmLeaveAsync()) return;
+        input = saved with { }; error = message = null;
+    }
+    private async Task SaveAsync()
+    {
+        if (saving || uploading) return;
+        saving = true; error = message = null;
+        try
+        {
+            input = await Service.SaveAsync((await Authentication.GetAuthenticationStateAsync()).User, input);
+            saved = input with { }; dirty = false; message = "Company information saved.";
+            ProfileEvents.NotifyNameChanged(input.Name);
+        }
+        catch (ValidationException ex) { error = ex.Message; }
+        catch (UnauthorizedAccessException) { error = "Your company is no longer available. Select an available company."; }
+        catch (Exception ex) { Logger.LogError(ex, "Unable to save company information"); error = "The save could not be confirmed. Close and reopen the card to verify the current information before retrying."; }
+        finally { saving = false; }
+    }
+    private async Task UploadLogoAsync(InputFileChangeEventArgs args)
+    {
+        if (saving || uploading) return;
+        uploading = true; error = null;
+        try
+        {
+            var file = args.File;
+            if (file.Size > CompanyInformationService.MaximumLogoBytes) throw new ValidationException("Choose a logo up to 2 MB.");
+            await using var stream = file.OpenReadStream(CompanyInformationService.MaximumLogoBytes);
+            using var memory = new MemoryStream(); await stream.CopyToAsync(memory);
+            var bytes = memory.ToArray();
+            CompanyInformationService.ValidateLogo(bytes, file.ContentType);
+            input.Logo = bytes; input.LogoContentType = file.ContentType; MarkDirty();
+        }
+        catch (ValidationException ex) { error = ex.Message; }
+        catch (IOException ex) { Logger.LogWarning(ex, "Company logo upload failed"); error = "The logo could not be read. Choose the file again."; }
+        finally { uploading = false; }
+    }
+    private void RemoveLogo() { input.Logo = null; input.LogoContentType = null; MarkDirty(); }
+}

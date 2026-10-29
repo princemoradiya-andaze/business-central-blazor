@@ -18,7 +18,7 @@
 }
 @if (isLoading)
 {
-    <p role="status" aria-live="polite">Loading accounts...</p>
+    <LoadingIndicator />
 }
 else if (companyContextUnavailable)
 {
@@ -40,7 +40,7 @@ else
                      EmptyMessage="@(accounts.Count == 0 ? "No accounts have been set up for this company yet. Create an account to get started." : "No accounts match the current search and filters.")">
         <HeaderActions>
             <button id="new-account-action" class="record-workspace-action" type="button" disabled="@isSaving"
-                    @onclick='() => Navigation.NavigateTo("/financial/general-ledger/accounts/new")'>+ New</button>
+                    @onclick='() => Navigation.NavigateTo("/financial/general-ledger/accounts/new")'><span class="workspace-new-icon" aria-hidden="true"></span>New</button>
             <span class="record-workspace-separator" aria-hidden="true"></span>
             <button id="account-status-action" class="record-workspace-action" type="button"
                     disabled="@(SelectedAccount is null || isSaving)" @onclick="RequestStatusChange">

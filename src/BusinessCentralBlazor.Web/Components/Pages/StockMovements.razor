@@ -13,7 +13,7 @@
 }
 @if (isLoading)
 {
-    <p role="status">Loading stock movements...</p>
+    <LoadingIndicator />
 }
 else if (loaded)
 {
@@ -23,7 +23,7 @@ else if (loaded)
                      HasRecords="@VisibleMovements.Any()" EmptyMessage="No movements match the current search and filters.">
         <HeaderActions>
             <a class="record-workspace-action" href="/financial/inventory">Items</a>
-            <a id="new-movement-action" class="record-workspace-action" href="/financial/inventory/movements?new=movement">+ New</a>
+            <a id="new-movement-action" class="record-workspace-action" href="/financial/inventory/movements?new=movement"><span class="workspace-new-icon" aria-hidden="true"></span>New</a>
             @if (SelectedMovement is { } selected)
             {
                 <a class="record-workspace-action" href="@JournalUrl(selected)">Open journal</a>

@@ -60,7 +60,7 @@
                         aria-haspopup="menu" aria-expanded="@(IsViewMenuOpen ? "true" : "false")"
                         aria-controls="@($"{IdPrefix}-view-menu")"
                         @onclick="() => IsViewMenuOpen = !IsViewMenuOpen">
-                    <svg aria-hidden="true" viewBox="0 0 16 16"><path d="M2 3h12M2 8h12M2 13h12M5 2v2M5 7v2M5 12v2" /></svg>
+                    <WorkspaceViewIcon View="@View" />
                 </button>
                 <div id="@($"{IdPrefix}-view-menu")" class="record-workspace-view-menu"
                      role="menu" aria-label="@($"{Title} view")" hidden="@(!IsViewMenuOpen)">

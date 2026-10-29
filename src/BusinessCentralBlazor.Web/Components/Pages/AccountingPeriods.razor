@@ -19,7 +19,7 @@
 }
 @if (isLoading)
 {
-    <p role="status" aria-live="polite">Loading accounting periods...</p>
+    <LoadingIndicator />
 }
 else if (companyContextUnavailable)
 {
@@ -42,7 +42,7 @@ else
                      EmptyMessage="@(periods.Count == 0 ? "No accounting periods have been created for this company." : "No accounting periods match the current search and filters.")">
         <HeaderActions>
             <a id="new-accounting-period-action" class="record-workspace-action"
-               href="/financial/accounting-periods/new">+ New</a>
+               href="/financial/accounting-periods/new"><span class="workspace-new-icon" aria-hidden="true"></span>New</a>
             <span class="record-workspace-separator" aria-hidden="true"></span>
             <a class="record-workspace-action" href="/financial/journals">General journals</a>
         </HeaderActions>

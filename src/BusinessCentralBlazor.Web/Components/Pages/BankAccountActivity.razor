@@ -13,7 +13,7 @@
 }
 @if (loading)
 {
-    <p role="status">Loading bank transactions...</p>
+    <LoadingIndicator />
 }
 else if (bank is not null)
 {
@@ -26,14 +26,14 @@ else if (bank is not null)
             @if (IsStatements)
             {
                 <a id="new-bank-statement" class="record-workspace-action" href="@CardUrl("statement")" aria-disabled="@(bank.IsBlocked ? "true" : "false")"
-                   @onclick="PreventBlockedCreation" @onclick:preventDefault="@bank.IsBlocked">+ New statement</a>
+                   @onclick="PreventBlockedCreation" @onclick:preventDefault="@bank.IsBlocked"><span class="workspace-new-icon" aria-hidden="true"></span>New statement</a>
             }
             else
             {
                 <a id="new-bank-receipt" class="record-workspace-action" href="@CardUrl("receipt")" aria-disabled="@(bank.IsBlocked ? "true" : "false")"
-                   @onclick="PreventBlockedCreation" @onclick:preventDefault="@bank.IsBlocked">+ New receipt</a>
+                   @onclick="PreventBlockedCreation" @onclick:preventDefault="@bank.IsBlocked"><span class="workspace-new-icon" aria-hidden="true"></span>New receipt</a>
                 <a id="new-bank-payment" class="record-workspace-action" href="@CardUrl("payment")" aria-disabled="@(bank.IsBlocked ? "true" : "false")"
-                   @onclick="PreventBlockedCreation" @onclick:preventDefault="@bank.IsBlocked">+ New payment</a>
+                   @onclick="PreventBlockedCreation" @onclick:preventDefault="@bank.IsBlocked"><span class="workspace-new-icon" aria-hidden="true"></span>New payment</a>
             }
             @if (SelectedUrl is { } selectedUrl)
             {

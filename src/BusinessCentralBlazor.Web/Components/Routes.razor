@@ -1,4 +1,7 @@
-﻿<Router AppAssembly="typeof(Program).Assembly" NotFoundPage="typeof(Pages.NotFound)">
+﻿@attribute [StreamRendering]
+@inject IJSRuntime JS
+
+<Router AppAssembly="typeof(Program).Assembly" NotFoundPage="typeof(Pages.NotFound)" OnNavigateAsync="BeginNavigationAsync">
     <Found Context="routeData">
         <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
             <NotAuthorized Context="authenticationState">
@@ -15,3 +18,19 @@
         <FocusOnNavigate RouteData="routeData" Selector="h1" />
     </Found>
 </Router>
+
+@code {
+    private bool interactive;
+
+    private async Task BeginNavigationAsync(Microsoft.AspNetCore.Components.Routing.NavigationContext context)
+    {
+        if (interactive) await JS.InvokeVoidAsync("globalWorkspace.beginNavigation");
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        interactive = true;
+        await JS.InvokeVoidAsync("globalWorkspace.ready");
+        await JS.InvokeVoidAsync("globalWorkspace.endNavigation");
+    }
+}

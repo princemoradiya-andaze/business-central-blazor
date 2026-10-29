@@ -235,7 +235,7 @@ public sealed class PurchasingPageTests(AuthenticationWebApplicationFactory fact
             "aria-label=\"Vendors\"", "id=\"vendor-search\"", "id=\"vendor-status\"",
             "id=\"vendor-filter-toggle\"", "id=\"vendor-filter-pane\"", "id=\"vendor-details-toggle\"",
             "id=\"vendor-details-pane\"", "Tall tiles", ">Tiles</span>", ">List</span>",
-            ">+ New</a>", "Block", "V-LOCAL", "Local vendor", "2000", "Blocked",
+            "class=\"workspace-new-icon\" aria-hidden=\"true\"", "</span>New</a>", "Block", "V-LOCAL", "Local vendor", "2000", "Blocked",
             "class=\"vendor-action-bar\"", "class=\"vendor-command-separator\"",
             "class=\"vendor-search-toggle\"", "class=\"vendor-search-input \"",
             "class=\"vendor-view-filter\"", "id=\"vendor-status-options\"",

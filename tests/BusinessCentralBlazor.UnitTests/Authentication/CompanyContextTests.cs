@@ -107,8 +107,8 @@ public sealed class CompanyContextTests(AuthenticationWebApplicationFactory fact
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains("No active company memberships are assigned", html, StringComparison.Ordinal);
         Assert.DoesNotContain("Set active company", html, StringComparison.Ordinal);
-        Assert.Contains("account-card", html, StringComparison.Ordinal);
-        Assert.Contains("account.css", html, StringComparison.Ordinal);
+        Assert.Contains("class=\"signin-card\"", html, StringComparison.Ordinal);
+        Assert.Contains("signin.css", html, StringComparison.Ordinal);
     }
 
     [Fact]

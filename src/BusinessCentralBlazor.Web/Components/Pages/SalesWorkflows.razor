@@ -15,7 +15,7 @@
 <PageTitle>@Title</PageTitle>
 @if (isLoading)
 {
-    <p role="status">Loading @Title.ToLowerInvariant()...</p>
+    <LoadingIndicator />
 }
 else if (companyUnavailable)
 {
@@ -35,7 +35,7 @@ else
         <HeaderActions>
             @if (Section == "orders")
             {
-                <a id="new-sales-order-action" class="record-workspace-action" href="/financial/sales/orders/new">+ New</a>
+                <a id="new-sales-order-action" class="record-workspace-action" href="/financial/sales/orders/new"><span class="workspace-new-icon" aria-hidden="true"></span>New</a>
                 <a class="record-workspace-action" href="/financial/sales/fulfillment">Ship and invoice</a>
             }
             else if (Section == "fulfillment")

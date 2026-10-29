@@ -19,7 +19,7 @@
 }
 @if (isLoading)
 {
-    <p role="status">Loading bank accounts...</p>
+    <LoadingIndicator />
 }
 else
 {
@@ -36,7 +36,7 @@ else
                      EmptyMessage="@(banks.Count == 0 ? "No bank accounts have been configured for this company." : "No bank accounts match the current search and status filter.")">
         <HeaderActions>
             <button id="new-bank-action" class="record-workspace-action" type="button" disabled="@isSaving"
-                    @onclick='() => Navigation.NavigateTo("/financial/banks/new")'>+ New bank account</button>
+                    @onclick='() => Navigation.NavigateTo("/financial/banks/new")'><span class="workspace-new-icon" aria-hidden="true"></span>New bank account</button>
             <span class="record-workspace-separator" aria-hidden="true"></span>
             <button id="bank-status-action" class="record-workspace-action" type="button"
                     disabled="@(SelectedBank is null || isSaving)" @onclick="RequestStatusChange">

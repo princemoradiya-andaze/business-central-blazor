@@ -39,7 +39,7 @@
 
     @if (isLoading)
     {
-        <p role="status">Loading company overview...</p>
+        <LoadingIndicator />
     }
     else if (!string.IsNullOrWhiteSpace(errorMessage))
     {

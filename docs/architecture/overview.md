@@ -43,3 +43,17 @@ erDiagram
 ```
 
 The initial ER model has been implemented as EF Core entities and SQL Server migrations. See [the schema catalogue, constraints, and verification record](../schema/initial-schema.md). Identity login/logout, active-company context, and application-level tenant/company authorization are implemented. The generic Workspace notes example demonstrates SQL-backed company-scoped CRUD; its service, schema, data, and example component code remain, but its product navigation and routed CRUD pages are retired. Former note routes render an authorized unavailable notice without loading or modifying notes. Database row-level security is not implemented. Period-date validation, balanced posting transactions, posted-entry immutability, and reversal workflows are documented future application invariants, not yet implemented business behavior. Catalogue currencies are shared while exchange rates remain company-scoped.
+
+## Company information and global shell
+
+`CompanyInformation` is an optional one-to-one profile keyed by `CompanyId`, with a restrictive
+company foreign key and an optimistic Guid version token. It stores core contact/address fields
+and a bounded raster logo; the canonical name remains on `Company`. It is independent of
+`CompanySettings`, so a company can maintain its profile before configuring a base currency.
+The company-authorized service updates the name/profile and audit action in one EF save.
+
+The layout owns the profile card and available-company panel. A shared client coordinator
+layers all business dialogs below the global header, preserves background scroll, and places
+loading above the entire application. Company changes still use the server-rendered account
+endpoint and cookie claim rather than mutating company state inside an existing circuit.
+The email-first sign-in UI retains the same Identity authentication and lockout boundary.

@@ -131,7 +131,7 @@ public sealed class GeneralJournalPageTests(AuthenticationWebApplicationFactory 
         var listHtml = await listResponse.Content.ReadAsStringAsync();
         Assert.Equal(HttpStatusCode.OK, listResponse.StatusCode);
         Assert.Contains("PAGE-TEST", listHtml, StringComparison.Ordinal);
-        Assert.Contains(">+ New</a>", listHtml, StringComparison.Ordinal);
+        Assert.Contains("<span class=\"workspace-new-icon\" aria-hidden=\"true\"></span>New</a>", listHtml, StringComparison.Ordinal);
         AssertCustomerToolbarLayout(
             listHtml,
             "journal-status-quick",

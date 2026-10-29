@@ -1,6 +1,8 @@
 @using BusinessCentralBlazor.Web.Services
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject IActiveCompanyContext ActiveCompanyContext
+@inject CompanyProfileEvents ProfileEvents
+@implements IDisposable
 
 <div class="company-switcher" aria-live="polite" aria-label="@CompanyAccessibleLabel">
     @if (activeCompany is null)
@@ -9,7 +11,7 @@
     }
     else
     {
-        <span class="company-name">@activeCompany.Name <span class="company-code">(@activeCompany.Code)</span></span>
+        <a class="company-name" href="/" aria-label="@($"{activeCompany.Name} ({activeCompany.Code}) - Home")">@activeCompany.Name <span class="company-code">(@activeCompany.Code)</span></a>
     }
 </div>
 
@@ -21,7 +23,14 @@
 
     protected override async Task OnInitializedAsync()
     {
+        ProfileEvents.NameChanged += UpdateName;
         var authenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         activeCompany = await ActiveCompanyContext.ResolveAsync(authenticationState.User);
     }
+    private void UpdateName(string name)
+    {
+        if (activeCompany is not null) activeCompany = activeCompany with { Name = name };
+        _ = InvokeAsync(StateHasChanged);
+    }
+    public void Dispose() => ProfileEvents.NameChanged -= UpdateName;
 }

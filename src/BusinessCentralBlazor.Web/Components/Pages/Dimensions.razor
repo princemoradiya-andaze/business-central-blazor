@@ -19,7 +19,7 @@
 }
 @if (isLoading)
 {
-    <p role="status" aria-live="polite">Loading dimensions...</p>
+    <LoadingIndicator />
 }
 else if (companyContextUnavailable)
 {
@@ -42,7 +42,7 @@ else
                      EmptyMessage="@(dimensions.Count == 0 ? "No dimensions have been set up for this company yet." : "No dimensions match the current search and filters.")">
         <HeaderActions>
             <a id="new-dimension-action" class="record-workspace-action"
-               href="/financial/dimensions/new">+ New</a>
+               href="/financial/dimensions/new"><span class="workspace-new-icon" aria-hidden="true"></span>New</a>
         </HeaderActions>
         <FilterContent>
             <label for="dimension-filter-status">Values</label>

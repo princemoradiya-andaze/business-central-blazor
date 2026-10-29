@@ -18,7 +18,7 @@
 }
 @if (isLoading)
 {
-    <p role="status">Loading inventory...</p>
+    <LoadingIndicator />
 }
 else
 {
@@ -35,7 +35,7 @@ else
                      EmptyMessage="@(items.Count == 0 ? "No inventory items have been configured for this company." : "No items match the current search and status filter.")">
         <HeaderActions>
             <button id="new-item-action" class="record-workspace-action" type="button" disabled="@isSaving"
-                    @onclick='() => Navigation.NavigateTo("/financial/inventory/new")'>+ New item</button>
+                    @onclick='() => Navigation.NavigateTo("/financial/inventory/new")'><span class="workspace-new-icon" aria-hidden="true"></span>New item</button>
             <span class="record-workspace-separator" aria-hidden="true"></span>
             <button id="item-status-action" class="record-workspace-action" type="button"
                     disabled="@(SelectedItem is null || isSaving)" @onclick="RequestStatusChange">

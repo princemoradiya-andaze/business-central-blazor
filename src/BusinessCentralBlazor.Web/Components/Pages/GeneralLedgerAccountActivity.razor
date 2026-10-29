@@ -18,7 +18,7 @@
         <a href="/financial/general-ledger/accounts">Chart of Accounts</a>
     </Commands>
     <ChildContent>
-        @if (busy) { <p role="status">Loading account activity...</p> }
+        @if (busy) { <LoadingIndicator /> }
         @if (errorMessage is not null) { <div class="alert alert-danger" role="alert">@errorMessage</div> }
         <h2>Filters</h2>
         <EditForm Model="@filter" OnValidSubmit="ApplyFilters" id="account-activity-filter">

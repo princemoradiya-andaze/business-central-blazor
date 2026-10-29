@@ -19,7 +19,7 @@
     <ChildContent>
         @if (statusMessage is not null) { <div class="alert alert-success" role="status">@statusMessage</div> }
         @if (errorMessage is not null) { <div class="alert alert-danger" role="alert">@errorMessage</div> }
-        @if (isLoading) { <p role="status">Loading company settings...</p> }
+        @if (isLoading) { <LoadingIndicator /> }
         else if (loaded)
         {
             <section aria-labelledby="settings-general">

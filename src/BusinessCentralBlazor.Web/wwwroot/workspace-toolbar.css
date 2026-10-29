@@ -1,0 +1,134 @@
+.app-shell :is(.record-workspace-toolbar, .customer-action-bar, .vendor-action-bar) {
+    min-height: 44px;
+    font: 16px "Segoe UI", Arial, sans-serif;
+    background: #f5f6f7;
+    border-bottom-color: #c8c8c8;
+}
+
+.app-shell :is(.record-workspace-toolbar, .customer-action-bar, .vendor-action-bar) h1 {
+    font-size: 16px;
+    font-weight: 600;
+    color: #171717;
+}
+
+.app-shell :is(.record-workspace-toolbar, .customer-action-bar, .vendor-action-bar) h1::after {
+    content: ":";
+}
+
+.app-shell :is(.record-workspace-toolbar, .customer-action-bar, .vendor-action-bar) h1 + span {
+    display: none;
+}
+
+.app-shell :is(.record-workspace-status, .customer-view-filter, .vendor-view-filter) {
+    height: auto;
+    min-height: 44px;
+    gap: 8px;
+    padding: 0 16px;
+    font-size: 16px;
+    color: #00838f;
+}
+
+.app-shell :is(.record-workspace-status-chevron, .customer-view-filter-chevron, .vendor-view-filter-chevron) {
+    width: 8px;
+    height: 8px;
+    border-color: #243746;
+}
+
+.app-shell :is(.record-workspace-search-toggle, .customer-search-toggle, .vendor-search-toggle) {
+    width: 44px;
+    height: 44px;
+    flex-basis: 44px;
+    margin-left: 12px;
+    color: #00838f;
+    border-left: 1px solid #c8c8c8;
+}
+
+.app-shell :is(.record-workspace-search-icon, .customer-search-icon, .vendor-search-icon) {
+    width: 24px;
+    height: 24px;
+    border: 0;
+    border-radius: 0;
+    background: currentColor;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='black' stroke-width='1.2' stroke-linecap='round'%3E%3Ccircle cx='14.5' cy='8.5' r='7'/%3E%3Cpath d='M9.55 13.45 1.5 21.5'/%3E%3C/g%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+.app-shell :is(.record-workspace-search-icon, .customer-search-icon, .vendor-search-icon)::after {
+    content: none;
+}
+
+.app-shell :is(.record-workspace-search, .customer-search-input, .vendor-search-input) {
+    height: 34px;
+    font-size: 16px;
+}
+
+.app-shell :is(.record-workspace-toolbar, .customer-action-bar, .vendor-action-bar)
+:is(.record-workspace-separator, .customer-command-separator, .vendor-command-separator) {
+    height: 26px;
+    margin: 0 10px;
+    background: #c8c8c8;
+}
+
+.app-shell :is(.record-workspace-toolbar, .customer-action-bar, .vendor-action-bar)
+:is(.record-workspace-action, .customer-action-button, .vendor-action-button) {
+    min-height: 44px;
+    gap: 6px;
+    padding: 0 10px;
+    font-size: 16px;
+    font-weight: 400;
+    color: #171717;
+}
+
+.app-shell :is(.record-workspace-toolbar, .customer-action-bar, .vendor-action-bar)
+:is(.record-workspace-action, .customer-action-button, .vendor-action-button):disabled {
+    color: #98a2b3;
+    background: transparent;
+    cursor: not-allowed;
+}
+
+.workspace-new-icon {
+    display: inline-block;
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+    background: #00838f;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2v20M2 12h20' fill='none' stroke='black' stroke-width='1'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+.app-shell :is(.record-workspace-control, .customer-view-control, .vendor-view-control) {
+    width: 36px;
+    height: 44px;
+    color: #00838f;
+}
+
+.app-shell :is(.record-workspace-control, .customer-view-control, .vendor-view-control) svg {
+    width: 20px;
+    height: 20px;
+    stroke-width: 1;
+}
+
+.app-shell :is(.record-workspace-status-option, .record-workspace-view-option,
+.customer-view-filter-option, .customer-view-option, .vendor-view-filter-option, .vendor-view-option) {
+    font-size: 16px;
+}
+
+.app-shell :is(.record-workspace-toolbar, .customer-action-bar, .vendor-action-bar)
+:is(button, a):focus-visible {
+    outline: 2px solid #00838f;
+    outline-offset: -2px;
+}
+
+@media (max-width: 760px) {
+    .app-shell :is(.record-workspace-toolbar, .record-workspace-actions,
+    .customer-action-bar, .customer-actions, .vendor-action-bar, .vendor-actions) {
+        flex-wrap: wrap;
+    }
+
+    .app-shell :is(.record-workspace-actions, .customer-actions, .vendor-actions) {
+        flex-shrink: 1;
+    }
+
+    .app-shell :is(.record-workspace-search, .customer-search-input, .vendor-search-input).expanded {
+        width: min(200px, 42vw);
+        flex-basis: min(200px, 42vw);
+    }
+}

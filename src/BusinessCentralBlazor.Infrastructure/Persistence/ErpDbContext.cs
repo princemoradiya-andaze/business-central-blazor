@@ -11,6 +11,7 @@ public sealed class ErpDbContext(DbContextOptions<ErpDbContext> options)
 {
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<Company> Companies => Set<Company>();
+    public DbSet<CompanyInformation> CompanyInformation => Set<CompanyInformation>();
     public DbSet<CompanySettings> CompanySettings => Set<CompanySettings>();
     public DbSet<WorkspaceNote> WorkspaceNotes => Set<WorkspaceNote>();
     public DbSet<TenantMembership> TenantMemberships => Set<TenantMembership>();
@@ -338,6 +339,26 @@ public sealed class ErpDbContext(DbContextOptions<ErpDbContext> options)
             entity.Property(company => company.CreatedAtUtc).HasColumnType("datetimeoffset");
             entity.HasOne<Tenant>().WithMany().HasForeignKey(company => company.TenantId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<CompanyInformation>(entity =>
+        {
+            entity.HasKey(item => item.CompanyId);
+            entity.HasOne<Company>().WithOne().HasForeignKey<CompanyInformation>(item => item.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.Property(item => item.Address).HasMaxLength(200);
+            entity.Property(item => item.Address2).HasMaxLength(200);
+            entity.Property(item => item.City).HasMaxLength(100);
+            entity.Property(item => item.County).HasMaxLength(100);
+            entity.Property(item => item.PostCode).HasMaxLength(20);
+            entity.Property(item => item.CountryRegionCode).HasMaxLength(2);
+            entity.Property(item => item.ContactName).HasMaxLength(100);
+            entity.Property(item => item.PhoneNumber).HasMaxLength(40);
+            entity.Property(item => item.VatRegistrationNumber).HasMaxLength(40);
+            entity.Property(item => item.Email).HasMaxLength(254);
+            entity.Property(item => item.Website).HasMaxLength(250);
+            entity.Property(item => item.LogoContentType).HasMaxLength(30);
+            entity.Property(item => item.Version).IsConcurrencyToken();
         });
 
         modelBuilder.Entity<CompanySettings>(entity =>

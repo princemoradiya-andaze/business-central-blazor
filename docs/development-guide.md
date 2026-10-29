@@ -279,6 +279,69 @@ The Release solution build, all 96 Release tests, EF model-drift check, and gene
 review passed. The automated service tests use the existing in-memory harness; complete the live
 SQL Server/browser purchasing workflow verification before merging the purchasing slice.
 
+## Global company profile, switching, and sign-in
+
+Apply migration `20261029083635_AddCompanyInformation` to the intended development database
+before opening **Settings > Company Information**. It adds an optional one-to-one profile table;
+existing companies need no seed data, and no existing tables or financial records are removed.
+Check the connection string and database name first:
+
+```powershell
+dotnet ef database update --project src\BusinessCentralBlazor.Infrastructure --startup-project src\BusinessCentralBlazor.Web
+```
+
+The profile card edits the canonical company name, address/contact/tax-registration details,
+email, HTTP(S) website, and picture. Country/region accepts a recognized two-letter code.
+Pictures are limited to 2 MB and PNG/JPEG/WebP MIME types with matching file signatures;
+SVG is not accepted. The service reauthorizes active company access on every read/save,
+uses an optimistic version token to reject stale edits, and records the company/user/action
+without copying profile fields into audit metadata. Save and Discard are explicit; closing
+or changing company prompts before discarding unsaved profile changes. This is separate
+from **More > Company Settings**, which continues to manage base currency.
+
+**Environment: Local** and **Settings > Change company** open the same searchable
+Available Companies panel. Only active companies authorized through both tenant and company
+memberships appear. Opening/closing the panel preserves the underlying card draft and scroll;
+switching uses the existing antiforgery-protected account endpoint and rechecks membership.
+Other pages' native unsaved-change guards still apply. Switching from Company Information
+reopens the card for the newly selected company; other switches return to Home.
+
+The header search ("Tell me what you want to do") searches the existing navigation catalog,
+including reports, plus Company Information. It navigates to pages, not business-record contents.
+Search and Notifications can open above an existing card without discarding its draft.
+Notifications currently displays an empty state; no event feed or notification persistence is provided.
+The account avatar uses the authenticated identity and contains the existing antiforgery-protected
+Sign out action.
+
+Shared cards use coordinated nonmodal dialog layers so the global header remains usable.
+Only the top card and header receive keyboard navigation; Escape closes the top surface.
+The background document is scroll-locked while a card/panel is open. The shared
+**Getting ready...** loading state covers the whole viewport, including the header, during
+startup, navigation, and asynchronous page/profile loading. It has no artificial minimum delay
+and respects reduced-motion preferences.
+
+Sign-in is email/Next, then password/Sign in, with Back to change email. Next validates the
+email format without checking whether the account exists. Existing Identity passwords,
+lockout, remember-me cookies, local return-URL validation, company selection, and disabled
+self-registration remain unchanged. The visual design is application-branded; it does not
+add Microsoft identity, SSO, or external integrations.
+
+The standalone company selector and access-denied page share the sign-in card and
+responsive styling in `signin.css`. Company selection retains its searchable list,
+current-company marker, local return URL, and antiforgery-protected POST. The company
+identity in shared navigation links to Home and underlines on hover or keyboard focus.
+
+All pages using `MainLayout` use a viewport-height shell: the header and company/module
+navigation remain above a dedicated scrolling content area. Module labels use regular
+Segoe UI at 16px, including the active module. Workspace overlays lock the content
+scroller as well as document scrolling. Standalone account pages retain their own layout.
+
+`workspace-toolbar.css` provides the shared list-toolbar appearance for `RecordWorkspace`
+and the Customers/Vendors workspaces: 16px text, 44px controls, teal SVG-mask search and
+New icons, and responsive wrapping. Page-specific actions and behavior remain unchanged.
+The shared `WorkspaceViewIcon` follows the selected List, Tall tiles, or Tiles view in
+both `RecordWorkspace` and the Customers/Vendors view-picker buttons.
+
 ## Branch and review workflow
 
 - `main` is production-ready; `dev` is the integration branch.

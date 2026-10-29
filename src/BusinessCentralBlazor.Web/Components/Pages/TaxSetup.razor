@@ -10,7 +10,7 @@
 <PageTitle>Tax setup</PageTitle>
 @if (isLoading)
 {
-    <p role="status">Loading tax setup...</p>
+    <LoadingIndicator />
 }
 else if (companyContextUnavailable)
 {
@@ -28,7 +28,7 @@ else
                      SearchPlaceholder="Search tax codes" SearchTerm="@searchTerm" SearchTermChanged="SetSearch"
                      HasRecords="@FilteredCodes.Any()" EmptyMessage="No tax codes match the current search and filters.">
         <HeaderActions>
-            <a id="new-tax-code-action" class="record-workspace-action" href="/financial/tax-setup/new">+ New</a>
+            <a id="new-tax-code-action" class="record-workspace-action" href="/financial/tax-setup/new"><span class="workspace-new-icon" aria-hidden="true"></span>New</a>
             <span class="record-workspace-separator" aria-hidden="true"></span>
             <a class="record-workspace-action" href="/financial/journals">General journals</a>
         </HeaderActions>
