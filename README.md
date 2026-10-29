@@ -34,6 +34,19 @@ See [the architecture overview](docs/architecture/overview.md), [the schema disc
 
 ## Development workflow
 
+Reports provides a compact **General Ledger Entries** workspace with applied filters, search,
+selection, list/tile views, Details, and links to account activity and posted journals.
+The analysis icon opens a read-only workspace with multiple named views, configurable columns,
+nested groups/subtotals, calendar date hierarchies, pivots, per-view filters, and selection statistics.
+View configurations are retained in this browser per user and company; ledger data is never saved
+to browser storage. Leave analysis mode to return to the unchanged normal workspace.
+Account activity uses the matching financial detail layout with date filters, balances, and posted entries.
+**Trial Balance** opens a report request dialog over Home with SVG expand/restore controls and separate account/totals filters, layouts,
+optional category/zero balances, and Advanced row-limit/region settings. Preview, CSV, and browser
+print/Save as PDF share the same report snapshot. Maximum rows is a safety limit, not a page size;
+oversized reports are rejected rather than truncating financial totals. PDF uses the browser printer.
+See the development guide for supported filters and output limitations.
+
 Inventory uses one **Stock Movements** menu link for movement history, with the shared list/tile
 workspace and an explicit **+ New** stock movement card. Draft creation opens its linked journal;
 stock changes only on explicit posting. Items and the existing inventory services are unchanged.

@@ -67,7 +67,51 @@ the account hierarchy and direct-posting setup and links to account activity; th
 shortcut and the existing full-page account form routes remain available. Blocking and reactivating
 use the existing account update operation and do not add a delete workflow.
 
-The authenticated financial menu links to company-scoped posted entries at `/financial/general-ledger/entries`, account activity at `/financial/general-ledger/accounts/{accountId}/activity`, and the trial balance at `/financial/general-ledger/trial-balance`. Entry search supports inclusive posting-date bounds, account selection, and a document-number substring. Account activity reports opening debit/credit balances before the start date, debit/credit totals within the selected range, and the resulting closing balance. The trial balance includes posting accounts and their net debit or credit balances through the selected date, inclusive, with reconciling totals.
+The authenticated financial menu links to company-scoped posted entries at `/financial/general-ledger/entries`, account activity at `/financial/general-ledger/accounts/{accountId}/activity`, and the trial balance at `/financial/general-ledger/trial-balance`. General Ledger Entries uses the shared List/Tall tiles/Tiles workspace with search, Filters and Details panes, selection, and links to account activity and the related posted journal. Apply filters supports inclusive posting-date bounds, account selection, and a document-number substring; totals reflect both the applied filters and search. Account activity reports opening debit/credit balances before the start date, debit/credit totals within the selected range, and the resulting closing balance.
+
+General Ledger Entries also offers **Enter analysis mode** beside search. This read-only workspace
+uses the entries already returned by the company-scoped inquiry and the current list search. Each
+analysis view independently stores visible/reordered columns, sorting, nested row groups, amount
+values, pivot column labels, and extra filters. Posting date has calendar year/quarter/month fields;
+signed Amount is Debit minus Credit. Account and entry identifiers are never summable; Entry No.
+is also excluded from grouping. Only fields supplied by the inquiry are offered (no placeholder
+department, project, posting-group, or source-currency data).
+
+Views can be added, renamed, duplicated, deleted, and reopened. Configuration only (never ledger
+rows) is stored in browser local storage under a versioned user-and-company key. It is not shared
+across devices. Invalid/unavailable storage produces an explicit warning with a reset action.
+Analysis filters apply before grouping/pivot totals; invalid numeric filters show an error instead
+of falling back to unfiltered data. Calculations use decimal precision and display four decimals.
+Pivot generation rejects more than 200 value columns with a narrowing instruction rather than
+truncating financial totals. The summary distinguishes source entry counts before/after list
+search and analysis filtering from group headings, and shows sum/average/min/max for selected
+amount cells. Drag/drop has select and arrow-button alternatives. Leaving analysis preserves the
+normal workspace's view, filter pane, and search.
+
+Trial Balance opens a scrollable, expandable report request dialog over the existing Home dashboard,
+with SVG expand/restore icons rather than a separate report landing page. Closing, cancelling, or
+pressing Escape from the request or preview returns to `/`. The existing report deep link remains supported.
+Account number, name substring, and category filters are separate from totals filters (inclusive as-of date
+and document substring). Removing an optional filter also removes its value. Only posting accounts are
+included, and balances remain cumulative through the selected date, including previous periods.
+Include zero balances is optional. Standard layout shows debit/credit balances; Compact shows signed
+balances, with an optional category column in either layout. Advanced includes a maximum row safety
+limit (1 to 500000), date/number format region (en-GB, en-US, de-DE), and English report labels.
+Exceeding the row limit rejects the whole report, never a partial set of financial totals.
+
+Preview, CSV export, and browser printing use the same generated report snapshot and settings.
+Edit request retains the filters; rerun to refresh data. CSV includes company/date/filter metadata,
+quoted four-decimal amounts, and spreadsheet-formula protection for text. Print/Save as PDF opens the
+browser's print dialog with only the report document, not the application shell or request controls.
+PDF depends on the browser's Save as PDF destination; no native PDF/Excel/Word exporter is provided.
+Filtered account/document subsets can legitimately have unequal debit/credit totals and show their
+difference. Unsupported Budget, Business Unit, Project, VAT reporting date, dimensions, and
+additional-currency report filters are not offered. Generation-time/document-count limits are not implemented.
+
+Account activity uses the shared financial detail layout: context/back navigation, account title,
+read-only status, Apply/Clear filters and account-entries commands, General fields, opening/period/closing
+debit/credit balances, and a responsive posted-entry table linking to existing journals. Applied dates
+are shown separately from editable filter inputs. Existing inquiry calculations are unchanged.
 
 These reports read immutable `GeneralLedgerEntries` only. Account and active-company scope is resolved server-side for every operation; posted entries cannot be edited or deleted through inquiry screens. This feature reuses the existing schema and requires no migration.
 

@@ -53,6 +53,7 @@ public sealed class GeneralLedgerInquiryServiceTests(AuthenticationWebApplicatio
         var filteredEntry = Assert.Single(filteredEntries.Entries);
         Assert.Equal("RCPT-42", filteredEntry.DocumentNumber);
         Assert.Equal(cashId, filteredEntry.AccountId);
+        Assert.NotEqual(Guid.Empty, filteredEntry.JournalBatchId);
         Assert.Equal(0m, filteredEntries.TotalDebit);
         Assert.Equal(40m, filteredEntries.TotalCredit);
         Assert.DoesNotContain(filteredEntries.Entries, entry => entry.AccountId == otherCashId);
@@ -120,6 +121,71 @@ public sealed class GeneralLedgerInquiryServiceTests(AuthenticationWebApplicatio
             new DateOnly(2026, 10, 31)));
     }
 
+    [Fact]
+    public async Task TrialBalanceFiltersCumulativeBalancesAndRejectsOversizedReportsWithoutTruncation()
+    {
+        var (principal, companyId) = await CreateUserAndCompanyAsync("trial-request");
+        var cash = await AddAccountAsync(companyId, "1000", "Cash");
+        var equity = await AddAccountAsync(companyId, "3000", "Opening equity", AccountCategory.Equity);
+        var expense = await AddAccountAsync(companyId, "6000", "Office expense", AccountCategory.Expense);
+        var zero = await AddAccountAsync(companyId, "6100", "Zero expense", AccountCategory.Expense);
+        await AddAccountAsync(companyId, "9000", "Heading", AccountCategory.Asset, AccountType.Heading);
+        var (otherPrincipal, otherCompanyId) = await CreateUserAndCompanyAsync("trial-private");
+        var privateAccount = await AddAccountAsync(otherCompanyId, "1000", "Private cash");
+        var period = await CreatePeriodAsync(principal);
+        await PostBatchAsync(principal, period, cash, equity, new(2026, 10, 1), "OPEN-1", 100m);
+        await PostBatchAsync(principal, period, expense, cash, new(2026, 10, 5), "COST-2", 40m);
+        await PostBatchAsync(principal, period, expense, cash, new(2026, 10, 20), "LATER-3", 10m);
+        await using var scope = factory.Services.CreateAsyncScope();
+        var service = scope.ServiceProvider.GetRequiredService<IGeneralLedgerInquiryService>();
+        var request = new TrialBalanceRequest { AsOfDate = new(2026, 10, 5), MaximumRows = 4 };
+        var full = await service.GetTrialBalanceAsync(principal, request);
+        Assert.Equal(4, full.Lines.Count);
+        Assert.Equal(100m, full.TotalDebit);
+        Assert.Equal(100m, full.TotalCredit);
+        Assert.Equal(60m, full.Lines.Single(line => line.AccountId == cash).DebitBalance);
+        Assert.Contains(full.Lines, line => line.AccountId == zero);
+        var exception = await Assert.ThrowsAsync<ValidationException>(() =>
+            service.GetTrialBalanceAsync(principal, request with { MaximumRows = 2 }));
+        Assert.Contains("Report contains 4 rows", exception.Message);
+        Assert.Contains("No partial totals", exception.Message);
+        var nonzero = await service.GetTrialBalanceAsync(principal, request with { IncludeZeroBalances = false, MaximumRows = 3 });
+        Assert.Equal(3, nonzero.Lines.Count);
+        Assert.Equal(full.TotalDebit, nonzero.TotalDebit);
+        var filtered = await service.GetTrialBalanceAsync(principal, request with
+        {
+            Category = AccountCategory.Expense, AccountName = "Office", DocumentNumber = "COST", MaximumRows = 1
+        });
+        var line = Assert.Single(filtered.Lines);
+        Assert.Equal(expense, line.AccountId);
+        Assert.Equal(40m, filtered.TotalDebit);
+        Assert.Equal(0m, filtered.TotalCredit);
+        var oneAccount = await service.GetTrialBalanceAsync(principal, request with { AccountId = cash, MaximumRows = 1 });
+        Assert.Equal(60m, Assert.Single(oneAccount.Lines).DebitBalance);
+        Assert.Empty((await service.GetTrialBalanceAsync(principal, request with { AccountId = privateAccount })).Lines);
+        Assert.Empty((await service.GetTrialBalanceAsync(otherPrincipal, request with { AccountId = cash })).Lines);
+        var before = await service.GetTrialBalanceAsync(principal, request with { AsOfDate = new(2026, 9, 30) });
+        Assert.All(before.Lines, line => Assert.Equal(0m, line.DebitBalance + line.CreditBalance));
+        Assert.Empty((await service.GetTrialBalanceAsync(principal, request with { AsOfDate = new(2026, 9, 30), IncludeZeroBalances = false })).Lines);
+    }
+
+    [Fact]
+    public async Task TrialBalanceRejectsInvalidRequestSettings()
+    {
+        var (principal, _) = await CreateUserAndCompanyAsync("trial-invalid");
+        await using var scope = factory.Services.CreateAsyncScope();
+        var service = scope.ServiceProvider.GetRequiredService<IGeneralLedgerInquiryService>();
+        foreach (var request in new TrialBalanceRequest[]
+        {
+            new() { MaximumRows = 0 }, new() { MaximumRows = 500001 }, new() { AsOfDate = default },
+            new() { FormatRegion = "not-a-region" }, new() { Category = (AccountCategory)999 },
+            new() { DocumentNumber = new string('x', 65) }, new() { AccountName = new string('x', 101) }
+        })
+        {
+            await Assert.ThrowsAsync<ValidationException>(() => service.GetTrialBalanceAsync(principal, request));
+        }
+    }
+
     private async Task<(ClaimsPrincipal Principal, Guid CompanyId)> CreateUserAndCompanyAsync(string prefix)
     {
         var email = $"{prefix}-{Guid.NewGuid():N}@example.invalid";
@@ -141,7 +207,8 @@ public sealed class GeneralLedgerInquiryServiceTests(AuthenticationWebApplicatio
             company.CompanyId);
     }
 
-    private async Task<Guid> AddAccountAsync(Guid companyId, string number, string name)
+    private async Task<Guid> AddAccountAsync(Guid companyId, string number, string name,
+        AccountCategory category = AccountCategory.Asset, AccountType type = AccountType.Posting)
     {
         await using var scope = factory.Services.CreateAsyncScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<ErpDbContext>();
@@ -151,8 +218,8 @@ public sealed class GeneralLedgerInquiryServiceTests(AuthenticationWebApplicatio
             CompanyId = companyId,
             Number = number,
             Name = name,
-            Category = AccountCategory.Asset,
-            Type = AccountType.Posting,
+            Category = category,
+            Type = type,
             AllowsDirectPosting = true
         };
         dbContext.GeneralLedgerAccounts.Add(account);

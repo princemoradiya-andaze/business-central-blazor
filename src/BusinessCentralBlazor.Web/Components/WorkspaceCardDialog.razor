@@ -1,7 +1,7 @@
 @implements IAsyncDisposable
 @inject IJSRuntime JS
 
-<dialog class="workspace-card-dialog @(LabelledBy == "entity-card-heading" ? "entity-dialog" : null)" aria-labelledby="@LabelledBy" aria-describedby="@DescribedBy" @ref="dialog">
+<dialog class="workspace-card-dialog @(LabelledBy == "entity-card-heading" ? "entity-dialog" : null) @CssClass" aria-labelledby="@LabelledBy" aria-describedby="@DescribedBy" @ref="dialog">
     @ChildContent
 </dialog>
 
@@ -13,6 +13,7 @@
     [Parameter] public string? DescribedBy { get; set; }
     [Parameter] public string ReturnFocusSelector { get; set; } = "button";
     [Parameter] public string? ReturnFocusFallbackSelector { get; set; }
+    [Parameter] public string? CssClass { get; set; }
 
     private ElementReference dialog;
     private IJSObjectReference? module;

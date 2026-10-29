@@ -1,0 +1,399 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@inject ILogger<LedgerAnalysisWorkspace> Logger
+
+<section class="analysis-workspace" aria-label="General Ledger Entries analysis">
+    <header class="analysis-toolbar">
+        <h1>General Ledger Entries: <span>All posted entries</span></h1>
+        <label class="visually-hidden" for="analysis-search">Search General Ledger Entries analysis</label>
+        <input id="analysis-search" type="search" placeholder="Search entries" value="@Search" @oninput="SearchChangedAsync" />
+        <button type="button" class="analysis-toggle" aria-label="Leave analysis mode" title="Leave analysis mode" @onclick="Leave">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="3" width="17" height="17" rx="3" /><path d="M7 7h3v4H7zm0 7h3v3H7zm6-7h4m-4 4h4m-4 4h2m2 3 3 3m0-7v7h-7" /></svg>
+        </button>
+        <div class="analysis-tabs" role="group" aria-label="Analysis views">
+            @for (var index = 0; index < preferences.Views.Count; index++)
+            {
+                var viewIndex = index;
+                <button type="button" class="@(index == preferences.SelectedView ? "active" : null)" aria-pressed="@(index == preferences.SelectedView ? "true" : "false")" @onclick="() => SelectViewAsync(viewIndex)">@preferences.Views[index].Name</button>
+            }
+        </div>
+        <button type="button" aria-label="Add analysis view" title="Add analysis view" disabled="@(preferences.Views.Count >= 50)" @onclick="() => AddViewAsync(false)">+</button>
+        <button type="button" class="analysis-panel-toggle" aria-pressed="@(panelOpen ? "true" : "false")" @onclick="() => panelOpen = !panelOpen">Columns / Filters</button>
+    </header>
+    <div class="analysis-view-actions">
+        <button type="button" @onclick="() => renaming = !renaming">Rename view</button>
+        <button type="button" disabled="@(preferences.Views.Count >= 50)" @onclick="() => AddViewAsync(true)">Duplicate view</button>
+        <button type="button" @onclick="DeleteViewAsync">@(preferences.Views.Count == 1 ? "Reset view" : "Delete view")</button>
+        <span>Read-only &middot; Uses the applied list filters and search &middot; Views saved in this browser for your user and company</span>
+    </div>
+    @if (renaming)
+    {
+        <form class="analysis-rename" @onsubmit="RenameAsync" @onsubmit:preventDefault>
+            <label for="analysis-view-name">View name</label><input id="analysis-view-name" maxlength="60" required @bind="viewName" />
+            <button type="submit">Save name</button><button type="button" @onclick="() => renaming = false">Cancel</button>
+        </form>
+    }
+    @if (storageError is not null)
+    {
+        <div class="alert alert-warning" role="alert">@storageError <button type="button" @onclick="ResetSavedAsync">Reset saved analysis views</button></div>
+    }
+    @if (analysisError is not null) { <div class="alert alert-danger" role="alert">@analysisError</div> }
+    <div class="analysis-layout">
+        <div class="analysis-grid" tabindex="0" aria-label="Analysis data">
+            @if (analysisError is null)
+            {
+                @if (View.Pivot && (View.Groups.Count == 0 || View.ColumnLabels.Count == 0 || View.Values.Count == 0))
+                {
+                    <p class="analysis-empty">Add at least one Row Group, one Column Label, and one Value to build your pivot.</p>
+                }
+                else if (View.Pivot)
+                {
+                    <table>
+                        <caption class="visually-hidden">Pivot analysis of filtered posted entries</caption>
+                        <thead><tr>
+                            <th scope="col">@string.Join(" / ", View.Groups.Select(id => LedgerAnalysis.Field(id).Label))</th>
+                            @foreach (var key in pivotKeys)
+                            {
+                                @foreach (var value in View.Values)
+                                {
+                                    <th scope="col" class="numeric">@LedgerAnalysis.KeyLabel(key)<br />@LedgerAnalysis.Field(value).Label</th>
+                                }
+                            }
+                            @foreach (var value in View.Values) { <th scope="col" class="numeric">Total @LedgerAnalysis.Field(value).Label</th> }
+                        </tr></thead>
+                        <tbody>
+                            @foreach (var group in rows.GroupBy(entry => LedgerAnalysis.Key(entry, View.Groups)).OrderBy(group => group.Key, StringComparer.Ordinal))
+                            {
+                                <tr><th scope="row">@LedgerAnalysis.KeyLabel(group.Key)</th>
+                                    @foreach (var key in pivotKeys)
+                                    {
+                                        @foreach (var value in View.Values)
+                                        {
+                                            @AmountCell(group.Where(entry => LedgerAnalysis.Key(entry, View.ColumnLabels) == key).Sum(entry => LedgerAnalysis.Amount(entry, value)), $"pivot:{group.Key}:{key}:{value}")
+                                        }
+                                    }
+                                    @foreach (var value in View.Values) { @AmountCell(group.Sum(entry => LedgerAnalysis.Amount(entry, value)), $"pivot-total:{group.Key}:{value}") }
+                                </tr>
+                            }
+                            <tr class="analysis-total"><th scope="row">Grand total</th>
+                                @foreach (var key in pivotKeys)
+                                {
+                                    @foreach (var value in View.Values) { <td class="numeric">@Format(rows.Where(entry => LedgerAnalysis.Key(entry, View.ColumnLabels) == key).Sum(entry => LedgerAnalysis.Amount(entry, value)))</td> }
+                                }
+                                @foreach (var value in View.Values) { <td class="numeric">@Format(rows.Sum(entry => LedgerAnalysis.Amount(entry, value)))</td> }
+                            </tr>
+                        </tbody>
+                    </table>
+                }
+                else if (View.Columns.Count == 0) { <p class="analysis-empty">No visible columns. Choose fields in Columns.</p> }
+                else
+                {
+                    <table>
+                        <caption class="visually-hidden">Analysis of filtered posted general ledger entries</caption>
+                        <thead><tr>
+                            @foreach (var field in View.Columns)
+                            {
+                                <th scope="col" draggable="true" @ondragstart="() => draggedField = field" @ondragover:preventDefault @ondrop="() => DropColumnAsync(field)"
+                                    aria-sort="@(View.SortField == field ? View.SortDescending ? "descending" : "ascending" : "none")">
+                                    <button type="button" @onclick="() => SortAsync(field)">@LedgerAnalysis.Field(field).Label @(View.SortField == field ? View.SortDescending ? "\u2193" : "\u2191" : "")</button>
+                                </th>
+                            }
+                        </tr></thead>
+                        <tbody>
+                            @if (rows.Count == 0) { <tr><td colspan="@View.Columns.Count">No entries match the analysis filters.</td></tr> }
+                            @if (View.Groups.Count > 0) { @GroupRows(groups) }
+                            else { @DetailRows(rows) }
+                            <tr class="analysis-total">
+                                @for (var index = 0; index < View.Columns.Count; index++)
+                                {
+                                    var field = View.Columns[index];
+                                    <td class="@(LedgerAnalysis.Field(field).IsAmount ? "numeric" : null)">@(LedgerAnalysis.Field(field).IsAmount ? Format(rows.Sum(entry => LedgerAnalysis.Amount(entry, field))) : index == 0 ? "Total" : "")</td>
+                                }
+                            </tr>
+                        </tbody>
+                    </table>
+                }
+            }
+        </div>
+        @if (panelOpen)
+        {
+            <aside class="analysis-panel" aria-label="Analysis configuration">
+                <div class="analysis-panel-tabs">
+                    <button type="button" class="@(!filtersOpen ? "active" : null)" @onclick="() => filtersOpen = false">Columns</button>
+                    <button type="button" class="@(filtersOpen ? "active" : null)" @onclick="() => filtersOpen = true">Analysis Filters (@View.Filters.Count)</button>
+                </div>
+                @if (!filtersOpen)
+                {
+                    <div class="analysis-fields">
+                        <label><input type="checkbox" role="switch" checked="@View.Pivot" @onchange="TogglePivotAsync" /> Pivot Mode</label>
+                        <label class="visually-hidden" for="analysis-field-search">Search analysis columns</label>
+                        <input id="analysis-field-search" type="search" placeholder="Search columns..." @bind="fieldSearch" @bind:event="oninput" />
+                        <div class="analysis-field-list">
+                            @foreach (var field in LedgerAnalysis.Fields.Where(field => field.Label.Contains(fieldSearch, StringComparison.OrdinalIgnoreCase)))
+                            {
+                                <div class="analysis-field" draggable="true" @ondragstart="() => draggedField = field.Id">
+                                    <span class="analysis-grip" aria-hidden="true">::</span>
+                                    <label><input type="checkbox" checked="@View.Columns.Contains(field.Id)" @onchange="() => ToggleColumnAsync(field.Id)" /> @field.Label</label>
+                                    @if (View.Columns.Contains(field.Id))
+                                    {
+                                        <button type="button" title="Move column left" aria-label="@($"Move {field.Label} left")" disabled="@(View.Columns.IndexOf(field.Id) == 0)" @onclick="() => MoveColumnAsync(field.Id, -1)">&larr;</button>
+                                        <button type="button" title="Move column right" aria-label="@($"Move {field.Label} right")" disabled="@(View.Columns.IndexOf(field.Id) == View.Columns.Count - 1)" @onclick="() => MoveColumnAsync(field.Id, 1)">&rarr;</button>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </div>
+                    @Zone("groups", "Row Groups", View.Groups)
+                    @if (View.Pivot) { @Zone("labels", "Column Labels", View.ColumnLabels) }
+                    @Zone("values", "Values", View.Values)
+                    <p class="analysis-hint">Drag fields into areas or use Add field. Only descriptive/date fields can group; only amounts can be summed. Arrows reorder visible columns.</p>
+                }
+                else
+                {
+                    <div class="analysis-filters">
+                        <p class="analysis-hint">These filters affect only this view, in addition to the applied list filters. Amounts use a decimal point without thousands separators.</p>
+                        @foreach (var filter in View.Filters)
+                        {
+                            <div class="analysis-filter" @key="filter">
+                                <label>Field<select aria-label="Filter field" value="@filter.Field" @onchange="args => SetFilterFieldAsync(filter, args.Value?.ToString())">
+                                    @foreach (var field in LedgerAnalysis.Fields) { <option value="@field.Id">@field.Label</option> }
+                                </select></label>
+                                <label>Comparison<select aria-label="Filter comparison" @bind="filter.Operator" @bind:after="ChangeAsync">
+                                    @if (LedgerAnalysis.Field(filter.Field).IsAmount)
+                                    {
+                                        <option value="equals">Equals</option><option value="gte">Greater than or equal</option><option value="lte">Less than or equal</option>
+                                    }
+                                    else { <option value="contains">Contains</option><option value="equals">Equals</option> }
+                                </select></label>
+                                <label>Value<input aria-label="Filter value" maxlength="200" value="@filter.Value" @onchange="args => SetFilterValueAsync(filter, args.Value?.ToString())" /></label>
+                                <button type="button" @onclick="() => RemoveFilterAsync(filter)">Remove filter</button>
+                            </div>
+                        }
+                        <button type="button" disabled="@(View.Filters.Count >= 30)" @onclick="AddFilterAsync">+ Add filter</button>
+                        <button type="button" @onclick="ClearFiltersAsync">Clear analysis filters</button>
+                    </div>
+                }
+            </aside>
+        }
+    </div>
+    <footer class="analysis-summary" aria-live="polite">
+        <span>Rows: <strong>@(analysisError is null ? rows.Count.ToString() : "Unavailable")</strong></span>
+        <span>Before list search: <strong>@SourceCount</strong></span><span>After list search: <strong>@Entries.Count</strong></span>
+        @if (selection.Count > 0 && analysisError is null)
+        {
+            <span>Selected cells: @selection.Count</span><span>Sum: @Format(selection.Values.Sum())</span>
+            <span>Average: @Format(selection.Values.Average())</span><span>Min: @Format(selection.Values.Min())</span><span>Max: @Format(selection.Values.Max())</span>
+            <button type="button" @onclick="() => selection.Clear()">Clear selection</button>
+        }
+    </footer>
+    <p class="analysis-hint">Counts refer to source entries, not group headings. Click an amount or use its keyboard button; Ctrl+click adds/removes cells. Preferences contain configuration only, not ledger data.</p>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<GeneralLedgerEntryListItem> Entries { get; set; } = [];
+    [Parameter] public int SourceCount { get; set; }
+    [Parameter, EditorRequired] public string StorageKey { get; set; } = "";
+    [Parameter] public string Search { get; set; } = "";
+    [Parameter] public EventCallback<string> SearchChanged { get; set; }
+    [Parameter] public EventCallback Leave { get; set; }
+    private LedgerAnalysisPreferences preferences = new();
+    private LedgerAnalysisView View => preferences.Views[preferences.SelectedView];
+    private IReadOnlyList<GeneralLedgerEntryListItem> rows = [];
+    private IReadOnlyList<LedgerAnalysisGroup> groups = [];
+    private IReadOnlyList<string> pivotKeys = [];
+    private readonly HashSet<string> collapsed = [];
+    private readonly Dictionary<string, decimal> selection = [];
+    private string? analysisError, storageError, draggedField, loadedKey;
+    private string fieldSearch = "", viewName = "Analysis 1";
+    private bool panelOpen = true, filtersOpen, renaming;
+    private IJSObjectReference? module;
+    private bool disposed;
+    private static string Format(decimal amount) => amount.ToString("N4");
+
+    protected override void OnParametersSet() { selection.Clear(); Rebuild(); }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (loadedKey == StorageKey || disposed) return;
+        loadedKey = StorageKey;
+        preferences = new();
+        storageError = null;
+        try
+        {
+            module ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/ledgerAnalysisPreferences.js");
+            var json = await module.InvokeAsync<string?>("load", StorageKey);
+            if (json is not null)
+            {
+                var saved = System.Text.Json.JsonSerializer.Deserialize<LedgerAnalysisPreferences>(json)
+                    ?? throw new ValidationException("Saved analysis preferences are empty.");
+                LedgerAnalysis.Validate(saved);
+                preferences = saved;
+            }
+        }
+        catch (Exception exception) when (exception is JSException or System.Text.Json.JsonException or ValidationException)
+        {
+            Logger.LogWarning(exception, "Unable to load ledger analysis preferences");
+            storageError = "Saved analysis views could not be loaded. Default views are shown; use Reset to replace saved preferences.";
+        }
+        Rebuild();
+        if (!disposed) await InvokeAsync(StateHasChanged);
+    }
+
+    private void Rebuild()
+    {
+        analysisError = null;
+        rows = []; groups = []; pivotKeys = [];
+        viewName = View.Name;
+        try
+        {
+            LedgerAnalysis.Validate(preferences);
+            rows = LedgerAnalysis.Filter(Entries, View);
+            groups = LedgerAnalysis.Group(rows, View.Groups);
+            if (View.Pivot) pivotKeys = LedgerAnalysis.PivotKeys(rows, View);
+        }
+        catch (ValidationException exception) { analysisError = exception.Message; }
+    }
+
+    private async Task ChangeAsync()
+    {
+        selection.Clear(); collapsed.Clear(); Rebuild();
+        if (analysisError is not null || storageError is not null) return;
+        try
+        {
+            module ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/ledgerAnalysisPreferences.js");
+            await module.InvokeVoidAsync("save", StorageKey, System.Text.Json.JsonSerializer.Serialize(preferences));
+        }
+        catch (JSException exception)
+        {
+            Logger.LogWarning(exception, "Unable to save ledger analysis preferences");
+            storageError = "Analysis view changes could not be saved in this browser. Current changes remain available until you leave the page.";
+        }
+    }
+
+    private async Task ResetSavedAsync()
+    {
+        preferences = new(); storageError = null;
+        await ChangeAsync();
+    }
+    private Task SearchChangedAsync(ChangeEventArgs args) => SearchChanged.InvokeAsync(args.Value?.ToString() ?? "");
+    private async Task SelectViewAsync(int index) { preferences.SelectedView = index; renaming = false; await ChangeAsync(); }
+    private async Task AddViewAsync(bool duplicate)
+    {
+        if (preferences.Views.Count >= 50) return;
+        var view = duplicate ? View.Copy() : new LedgerAnalysisView();
+        view.Name = duplicate ? (view.Name.Length > 55 ? view.Name[..55] : view.Name) + " copy" : $"Analysis {preferences.Views.Count + 1}";
+        preferences.Views.Add(view); preferences.SelectedView = preferences.Views.Count - 1; renaming = false; await ChangeAsync();
+    }
+    private async Task DeleteViewAsync()
+    {
+        if (preferences.Views.Count == 1) preferences.Views[0] = new();
+        else { preferences.Views.RemoveAt(preferences.SelectedView); preferences.SelectedView = Math.Max(0, preferences.SelectedView - 1); }
+        renaming = false; await ChangeAsync();
+    }
+    private async Task RenameAsync()
+    {
+        if (string.IsNullOrWhiteSpace(viewName)) { analysisError = "Enter a view name."; return; }
+        View.Name = viewName.Trim(); renaming = false; await ChangeAsync();
+    }
+    private async Task TogglePivotAsync(ChangeEventArgs args) { View.Pivot = args.Value is true; await ChangeAsync(); }
+    private async Task ToggleColumnAsync(string id) { if (!View.Columns.Remove(id)) View.Columns.Add(id); await ChangeAsync(); }
+    private async Task MoveColumnAsync(string id, int delta)
+    {
+        var index = View.Columns.IndexOf(id); var target = index + delta;
+        if (index >= 0 && target >= 0 && target < View.Columns.Count)
+        { (View.Columns[index], View.Columns[target]) = (View.Columns[target], View.Columns[index]); await ChangeAsync(); }
+    }
+    private async Task DropColumnAsync(string target)
+    {
+        if (draggedField is null || !View.Columns.Contains(draggedField)) return;
+        var index = View.Columns.IndexOf(target); View.Columns.Remove(draggedField); View.Columns.Insert(index, draggedField);
+        draggedField = null; await ChangeAsync();
+    }
+    private List<string> Area(string area) => area switch { "groups" => View.Groups, "labels" => View.ColumnLabels, _ => View.Values };
+    private async Task AddFieldAsync(string area, string? id)
+    {
+        draggedField = null;
+        if (string.IsNullOrEmpty(id)) return;
+        var field = LedgerAnalysis.Field(id);
+        if (area == "values" ? !field.IsAmount : !field.CanGroup)
+        { analysisError = area == "values" ? "Only summable amount fields can be added to Values." : "Only descriptive and date fields can be grouped."; return; }
+        if (!Area(area).Contains(id)) Area(area).Add(id);
+        await ChangeAsync();
+    }
+    private async Task RemoveFieldAsync(string area, string id) { Area(area).Remove(id); await ChangeAsync(); }
+    private async Task SortAsync(string field) { View.SortDescending = View.SortField == field && !View.SortDescending; View.SortField = field; await ChangeAsync(); }
+    private async Task SetFilterFieldAsync(LedgerAnalysisFilter filter, string? field)
+    {
+        filter.Field = field ?? "account"; filter.Operator = LedgerAnalysis.Field(filter.Field).IsAmount ? "gte" : "contains"; filter.Value = ""; await ChangeAsync();
+    }
+    private async Task SetFilterValueAsync(LedgerAnalysisFilter filter, string? value) { filter.Value = value ?? ""; await ChangeAsync(); }
+    private async Task AddFilterAsync() { View.Filters.Add(new()); await ChangeAsync(); }
+    private async Task RemoveFilterAsync(LedgerAnalysisFilter filter) { View.Filters.Remove(filter); await ChangeAsync(); }
+    private async Task ClearFiltersAsync() { View.Filters.Clear(); await ChangeAsync(); }
+    private void SelectAmount(MouseEventArgs args, string key, decimal amount)
+    {
+        var remove = selection.ContainsKey(key);
+        if (!args.CtrlKey && !args.MetaKey) selection.Clear();
+        if (remove) selection.Remove(key); else selection[key] = amount;
+    }
+    private RenderFragment AmountCell(decimal amount, string key) => @<td class="numeric @(selection.ContainsKey(key) ? "analysis-selected" : null)">
+        <button type="button" aria-pressed="@(selection.ContainsKey(key) ? "true" : "false")" @onclick="args => SelectAmount(args, key, amount)">@Format(amount)</button>
+    </td>;
+    private RenderFragment DetailRows(IEnumerable<GeneralLedgerEntryListItem> items) => @<text>
+        @foreach (var entry in LedgerAnalysis.Sort(items, View))
+        {
+            <tr @key="entry.Id">
+                @foreach (var field in View.Columns)
+                {
+                    @if (LedgerAnalysis.Field(field).IsAmount) { @AmountCell(LedgerAnalysis.Amount(entry, field), $"{entry.Id}:{field}") }
+                    else if (field == "account") { <td><a href="@($"/financial/general-ledger/accounts/{entry.AccountId}/activity")">@entry.AccountNumber</a></td> }
+                    else if (field == "document") { <td><a href="@($"/financial/journals/{entry.JournalBatchId}")">@entry.DocumentNumber</a></td> }
+                    else { <td>@LedgerAnalysis.Text(entry, field)</td> }
+                }
+            </tr>
+        }
+    </text>;
+    private RenderFragment GroupRows(IReadOnlyList<LedgerAnalysisGroup> nodes) => @<text>
+        @foreach (var group in nodes)
+        {
+            <tr class="analysis-group"><td colspan="@View.Columns.Count" style="@($"padding-left:{12 + group.Depth * 20}px")">
+                <button type="button" aria-expanded="@(!collapsed.Contains(group.Key) ? "true" : "false")" @onclick="() => { if (!collapsed.Add(group.Key)) collapsed.Remove(group.Key); }">
+                    @(collapsed.Contains(group.Key) ? "\u25b8" : "\u25be") @LedgerAnalysis.Field(View.Groups[group.Depth]).Label: @group.Label (@group.Entries.Count entries)
+                </button>
+                @foreach (var value in View.Values) { <span class="analysis-subtotal">@LedgerAnalysis.Field(value).Label: @Format(group.Entries.Sum(entry => LedgerAnalysis.Amount(entry, value)))</span> }
+            </td></tr>
+            @if (!collapsed.Contains(group.Key))
+            {
+                @if (group.Children.Count > 0) { @GroupRows(group.Children) }
+                else { @DetailRows(group.Entries) }
+            }
+        }
+    </text>;
+    private RenderFragment Zone(string area, string title, List<string> ids) => @<section class="analysis-zone"
+        @ondragover:preventDefault @ondrop="() => AddFieldAsync(area, draggedField)">
+        <h2>@title</h2>
+        <div class="analysis-chips">
+            @foreach (var id in ids)
+            {
+                <span class="analysis-chip" draggable="true" @ondragstart="() => draggedField = id">
+                    @(area == "values" ? $"Sum({LedgerAnalysis.Field(id).Label})" : LedgerAnalysis.Field(id).Label)
+                    <button type="button" aria-label="@($"Remove {LedgerAnalysis.Field(id).Label} from {title}")" @onclick="() => RemoveFieldAsync(area, id)">&times;</button>
+                </span>
+            }
+        </div>
+        <label class="visually-hidden" for="@($"analysis-add-{area}")">Add @title field</label>
+        <select id="@($"analysis-add-{area}")" value="" @onchange="args => AddFieldAsync(area, args.Value?.ToString())">
+            <option value="">+ Add field or drag here</option>
+            @foreach (var field in LedgerAnalysis.Fields.Where(field => (area == "values" ? field.IsAmount : field.CanGroup) && !ids.Contains(field.Id)))
+            { <option value="@field.Id">@field.Label</option> }
+        </select>
+    </section>;
+
+    public async ValueTask DisposeAsync()
+    {
+        disposed = true;
+        if (module is null) return;
+        try { await module.DisposeAsync(); }
+        catch (JSDisconnectedException) { }
+    }
+}

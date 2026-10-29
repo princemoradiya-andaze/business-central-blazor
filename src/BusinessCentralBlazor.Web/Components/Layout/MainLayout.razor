@@ -85,6 +85,9 @@
                    path.Equals("/financial/banks", StringComparison.OrdinalIgnoreCase) ||
                    path.StartsWith("/financial/banks/", StringComparison.OrdinalIgnoreCase) ||
                    path.Equals("/financial/general-ledger/accounts", StringComparison.OrdinalIgnoreCase) ||
+                   path.Equals("/financial/general-ledger/entries", StringComparison.OrdinalIgnoreCase) ||
+                   (path.StartsWith("/financial/general-ledger/accounts/", StringComparison.OrdinalIgnoreCase) &&
+                    path.EndsWith("/activity", StringComparison.OrdinalIgnoreCase)) ||
                    path.Equals("/financial/journals", StringComparison.OrdinalIgnoreCase) ||
                    path.StartsWith("/financial/bank-statements/", StringComparison.OrdinalIgnoreCase) ||
                    (path.StartsWith("/financial/journals/", StringComparison.OrdinalIgnoreCase) &&
